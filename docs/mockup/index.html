@@ -10,6 +10,8 @@
     --bg: #f1f2f6;
     --panel-bg: #ffffff;
     --modal-bg: #ffffff;
+    --raised: #ffffff;
+    --hidden-bg: #f1f2f6;
     --text: #1c1c1e;
     --text-dim: #8a8f98;
     --border: #e6e7ec;
@@ -21,16 +23,20 @@
     --done: #1fb874;
     --shadow: 0 1px 2px rgba(20,20,43,.04), 0 8px 20px rgba(20,20,43,.05);
     --note-card-bg: #eaf2ff;
+    --note-alpha: 0.1;
   }
   [data-theme="dark"] {
     --bg: #14151a;
     --panel-bg: #1d1e25;
-    --modal-bg: #1d1e25;
+    --modal-bg: #242530;
+    --raised: #2a2b36;
+    --hidden-bg: #20212a;
     --text: #f1f1f3;
     --text-dim: #8d909c;
     --border: #2c2d36;
     --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
     --note-card-bg: #1c2433;
+    --note-alpha: 0.18;
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
@@ -46,6 +52,7 @@
     transition: background .2s;
   }
   button { font-family: inherit; border: none; cursor: pointer; }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   svg.icon { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; display: block; flex: 0 0 auto; }
 
   /* ===== Top bar ===== */
@@ -58,7 +65,8 @@
   .brand { display:flex; align-items:center; gap:10px; }
   .brand-mark {
     width: 30px; height: 30px; border-radius: 9px;
-    background: linear-gradient(135deg, var(--accent), #8b6cff);
+    background-color: var(--accent);
+    background-image: linear-gradient(135deg, rgba(255,255,255,.32), rgba(255,255,255,0));
     display: flex; align-items: center; justify-content: center; color: white;
   }
   .brand-mark svg.icon { width: 17px; height: 17px; stroke-width: 2.1; }
@@ -68,8 +76,9 @@
   /* ===== Bộ chuyển đổi Space — dropdown cạnh logo ===== */
   .space-switcher { position: relative; margin-left: 6px; }
   .space-switcher-btn {
-    display: flex; align-items: center; gap: 6px; background: var(--bg); border: 1px solid var(--border);
+    display: flex; align-items: center; gap: 6px; background: var(--raised); border: 1px solid var(--border);
     border-radius: 9px; padding: 7px 12px; font-size: 13px; font-weight: 600; color: var(--text);
+    transition: border-color .12s, color .12s;
   }
   .space-switcher-btn:hover { border-color: var(--accent); color: var(--accent); }
   .space-switcher-btn svg.icon { width: 12px; height: 12px; color: var(--text-dim); }
@@ -81,7 +90,7 @@
   .space-menu-item {
     display: flex; align-items: center; gap: 8px; padding: 8px 9px; border-radius: 8px; cursor: pointer; font-size: 13.5px;
   }
-  .space-menu-item:hover { background: var(--bg); }
+  .space-menu-item:hover { background: var(--raised); }
   .space-menu-item.active { color: var(--accent); font-weight: 700; }
   .space-menu-item .space-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .space-menu-item .space-tools { display: flex; gap: 3px; opacity: 0; flex: 0 0 auto; }
@@ -94,7 +103,7 @@
   .space-menu-add:hover { background: rgba(var(--accent-rgb), .1); }
 
   .btn-primary { background: var(--accent); color: white; padding: 7px 14px; border-radius: 9px; font-size: 14.5px; font-weight: 600; display:inline-flex; align-items:center; gap:6px; }
-  .btn-ghost { background: var(--modal-bg); color: var(--text); border: 1px solid var(--border); padding: 7px 13px; border-radius: 9px; font-size: 14.5px; display:inline-flex; align-items:center; gap:6px; transition: border-color .15s, color .15s; }
+  .btn-ghost { background: var(--raised); color: var(--text); border: 1px solid var(--border); padding: 7px 13px; border-radius: 9px; font-size: 14.5px; display:inline-flex; align-items:center; gap:6px; transition: border-color .15s, color .15s; }
   .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
 
   /* ===== Dashboard ===== */
@@ -163,12 +172,12 @@
 
   .filter-tabs { display: flex; gap: 3px; background: var(--bg); padding: 3px; border-radius: 8px; }
   .filter-tabs button { font-size: 12.5px; padding: 4px 9px; border-radius: 6px; background: transparent; color: var(--text-dim); font-weight: 600; }
-  .filter-tabs button.active { background: var(--modal-bg); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .filter-tabs button.active { background: var(--raised); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
 
   /* ===== Việc cần làm ===== */
   .task-row { display: flex; align-items: flex-start; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
   .task-row:last-child { border-bottom: none; }
-  .check { width: 17px; height: 17px; border-radius: 6px; border: 1.6px solid var(--border); flex: 0 0 auto; margin-top: 1px; display:flex; align-items:center; justify-content:center; cursor:pointer; background: var(--modal-bg); transition: all .12s; }
+  .check { width: 17px; height: 17px; border-radius: 6px; border: 1.6px solid var(--border); flex: 0 0 auto; margin-top: 1px; display:flex; align-items:center; justify-content:center; cursor:pointer; background: var(--raised); transition: all .12s; }
   .check svg.icon { width: 11px; height: 11px; stroke-width: 3; opacity: 0; transition: opacity .1s; color: white; }
   .check.checked { background: var(--done); border-color: var(--done); }
   .check.checked svg.icon { opacity: 1; }
@@ -176,14 +185,14 @@
   .task-row.done .row-title { text-decoration: line-through; color: var(--text-dim); }
   .row-title { font-weight: 500; }
   .row-meta { display: flex; gap: 6px; margin-top: 4px; }
-  .meta-tag { font-size: 11.5px; padding: 2px 7px; border-radius: 6px; background: var(--bg); color: var(--text-dim); display:inline-flex; align-items:center; gap:4px; font-weight: 600; }
+  .meta-tag { font-size: 11.5px; padding: 2px 7px; border-radius: 6px; background: var(--raised); color: var(--text-dim); display:inline-flex; align-items:center; gap:4px; font-weight: 600; }
   .meta-tag svg.icon { width: 10px; height: 10px; }
   .meta-tag.tag-recurring { color: var(--recurring-color); background: rgba(20,184,166,.12); }
   .meta-tag.tag-once { color: var(--task-color); background: rgba(91,108,255,.1); }
   .row-tools { display: flex; gap: 4px; opacity: 0; transition: opacity .12s; }
   .task-row:hover .row-tools, .reminder-item-row:hover .row-tools, .note-card:hover .nc-tools { opacity: 1; }
 
-  .icon-btn { background: var(--bg); border: 1px solid var(--border); border-radius: 7px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; color: var(--text-dim); flex: 0 0 auto; transition: color .12s, border-color .12s; }
+  .icon-btn { background: var(--raised); border: 1px solid var(--border); border-radius: 7px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; color: var(--text-dim); flex: 0 0 auto; transition: color .12s, border-color .12s; }
   .icon-btn:hover { color: var(--accent); border-color: var(--accent); }
   .icon-btn svg.icon { width: 13px; height: 13px; }
 
@@ -203,7 +212,7 @@
   .habit-row:hover .row-tools { opacity: 1; }
   .week-track { display: flex; align-items: center; gap: 7px; }
   .week-dot {
-    width: 13px; height: 13px; border-radius: 50%; background: var(--bg); border: 1.5px solid var(--border);
+    width: 13px; height: 13px; border-radius: 50%; background: var(--raised); border: 1.5px solid var(--border);
     flex: 0 0 13px; cursor: default;
   }
   .week-dot.filled { background: var(--habit-color); border-color: var(--habit-color); }
@@ -219,7 +228,7 @@
   .reminder-row.info .dot { background: var(--recurring-color); }
   .reminder-row.done .r-text { text-decoration: line-through; color: var(--text-dim); }
   .r-text { flex: 1; }
-  .r-toggle { font-size: 12.5px; padding: 4px 9px; border-radius: 7px; border: 1px solid var(--border); background: var(--bg); color: var(--text-dim); font-weight: 600; display:inline-flex; align-items:center; gap:4px; }
+  .r-toggle { font-size: 12.5px; padding: 4px 9px; border-radius: 7px; border: 1px solid var(--border); background: var(--raised); color: var(--text-dim); font-weight: 600; display:inline-flex; align-items:center; gap:4px; }
   .r-toggle svg.icon { width: 11px; height: 11px; }
   .reminder-row.done .r-toggle { color: var(--done); border-color: var(--done); background: rgba(31,184,116,.08); }
   .reminder-row.newest-pending {
@@ -240,18 +249,32 @@
   /* ===== Ghi chú: tìm kiếm / sắp xếp ===== */
   .notes-toolbar { display: flex; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--border); flex: 0 0 auto; }
   .notes-toolbar input[type=text] {
-    flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    flex: 1; background: var(--raised); border: 1px solid var(--border); border-radius: 8px;
     padding: 6px 10px; color: var(--text); font-family: inherit; font-size: 12.5px;
+    transition: border-color .12s;
   }
   .notes-toolbar select {
-    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    background: var(--raised); border: 1px solid var(--border); border-radius: 8px;
     padding: 6px 8px; color: var(--text); font-family: inherit; font-size: 12.5px; flex: 0 0 auto;
+    cursor: pointer; transition: border-color .12s;
   }
-  .notes-toolbar input[type=text]:focus, .notes-toolbar select:focus { outline: 2px solid rgba(var(--accent-rgb),.3); border-color: var(--accent); }
+  .notes-toolbar input[type=text]:hover, .notes-toolbar select:hover { border-color: var(--accent); }
+  .notes-toolbar input[type=text]:focus, .notes-toolbar select:focus {
+    outline: none; border-color: var(--accent);
+  }
+  .sort-switcher { position: relative; flex: 0 0 auto; }
+  .sort-switcher-btn {
+    display: flex; align-items: center; gap: 6px; background: var(--raised); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 10px; font-size: 12.5px; font-weight: 600; color: var(--text);
+    cursor: pointer; transition: border-color .12s, color .12s;
+  }
+  .sort-switcher-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .sort-switcher-btn svg.icon { width: 11px; height: 11px; color: var(--text-dim); }
+  #sort-menu { left: auto; right: 0; min-width: 190px; }
 
   /* ===== Ghi chú card grid ===== */
-  /* Lưới tự xếp theo hàng (trái→phải, trên→dưới) — đúng thứ tự dữ liệu (khác masonry cột
-     trước đây), nhưng card ngắn không còn chiếm hết chiều ngang như khi xếp 1 cột dọc */
+  /* Masonry 2 cột: JS (renderNotes) luôn chèn card tiếp theo vào cột đang thấp hơn (đo
+     offsetHeight), không xếp theo lưới hàng cố định — tránh khoảng hở lớn giữa các card. */
   .notes-masonry { display: flex; gap: 10px; align-items: flex-start; }
   .notes-col { display: flex; flex-direction: column; gap: 10px; flex: 1; min-width: 0; }
   .note-card {
@@ -266,7 +289,15 @@
   .note-card .badge svg.icon { width: 9px; height: 9px; }
   .note-card .nc-title { font-weight: 700; margin: 0 0 3px; }
   .note-card .nc-content { color: var(--text-dim); white-space: pre-wrap; line-height: 1.5; }
-  .note-card.hidden-card { background: var(--bg); border-style: dashed; box-shadow: none; }
+  .note-card .badge-sensitive { color: var(--reminder-color); background: rgba(255,93,122,.14); }
+
+  .sensitive-toggle {
+    display: inline-flex; align-items: center; gap: 7px; padding: 8px 12px; border-radius: 9px;
+    border: 1.5px solid var(--border); background: var(--raised); color: var(--text-dim);
+    font-size: 13.5px; font-weight: 600; transition: border-color .12s, color .12s, background .12s;
+  }
+  .sensitive-toggle.active { border-color: var(--reminder-color); color: var(--reminder-color); background: rgba(255,93,122,.1); }
+  .note-card.hidden-card { background: var(--hidden-bg); border-style: dashed; box-shadow: none; }
   .note-card.hidden-card .nc-title { color: var(--text-dim); opacity: .6; }
   .note-placeholder { display: flex; align-items: center; gap: 6px; color: var(--text-dim); font-size: 13px; padding: 2px 0; }
   .note-placeholder svg.icon { width: 14px; height: 14px; opacity: .6; }
@@ -279,13 +310,13 @@
 
   /* ===== Modal (luôn nền đặc — dễ đọc, không kính mờ) ===== */
   .overlay { position: fixed; inset: 0; background: rgba(20,20,30,.45); display: flex; align-items: center; justify-content: center; z-index: 50; backdrop-filter: blur(2px); }
-  .modal { background: var(--modal-bg); border-radius: 16px; width: 440px; max-width: 90vw; padding: 22px; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+  .modal { background: var(--modal-bg); border: 1px solid var(--border); border-radius: 16px; width: 440px; max-width: 90vw; padding: 22px; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
   .modal-settings { width: 760px; max-width: 92vw; }
   .modal h2 { margin: 0 0 18px; font-size: 17.5px; font-weight: 700; }
   .field { margin-bottom: 14px; }
   .field label { display: block; font-size: 13.5px; color: var(--text-dim); margin-bottom: 6px; font-weight: 600; }
   .field input, .field textarea, .field select {
-    width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 9px;
+    width: 100%; background: var(--raised); border: 1px solid var(--border); border-radius: 9px;
     padding: 9px 11px; color: var(--text); font-family: inherit; font-size: 15px;
   }
   .field input:focus, .field textarea:focus, .field select:focus { outline: 2px solid rgba(var(--accent-rgb),.35); border-color: var(--accent); }
@@ -302,16 +333,17 @@
   .setting-block > label, .setting-block > div > label { display:flex; align-items:center; gap:7px; font-size: 13.5px; color: var(--text-dim); margin-bottom: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
   .setting-block > label svg.icon, .setting-block > div > label svg.icon { width: 13px; height: 13px; }
   .theme-toggle, .export-import { display: flex; gap: 10px; }
-  .theme-toggle button { flex: 1; padding: 10px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--bg); color: var(--text); font-size: 14.5px; font-weight: 600; display:flex; align-items:center; justify-content:center; gap:7px; }
+  .theme-toggle button { flex: 1; padding: 10px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--raised); color: var(--text); font-size: 14.5px; font-weight: 600; display:flex; align-items:center; justify-content:center; gap:7px; }
   .theme-toggle button.active { border-color: var(--accent); color: var(--accent); background: rgba(var(--accent-rgb),.08); }
   .color-palette { display: flex; gap: 11px; }
   .swatch { width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; box-shadow: 0 0 0 1px var(--border) inset; }
   .swatch.active { border-color: var(--text); }
+  .swatch:focus-visible, .bg-thumb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   .bg-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 8px; }
   .bg-thumb { height: 46px; border-radius: 10px; border: 2px solid transparent; cursor: pointer; box-shadow: 0 0 0 1px var(--border) inset; }
   .bg-thumb.active { border-color: var(--accent); }
-  .bg-thumb.plain { display:flex; align-items:center; justify-content:center; font-size:12.5px; color: var(--text-dim); background: var(--bg); font-weight: 600; }
+  .bg-thumb.plain { display:flex; align-items:center; justify-content:center; font-size:12.5px; color: var(--text-dim); background: var(--raised); font-weight: 600; }
   .hint { font-size: 12.5px; color: var(--text-dim); line-height: 1.5; margin: 0; }
   .export-import button { flex: 1; }
 
@@ -336,7 +368,7 @@
   }
 </style>
 </head>
-<body data-theme="light">
+<body data-theme="dark">
 
   <div class="topbar">
     <div class="brand">
@@ -424,11 +456,13 @@
         </div>
         <div class="notes-toolbar collapsible-hide">
           <input type="text" id="note-search" placeholder="Tìm note..." oninput="onNoteSearchChange()" />
-          <select id="note-sort" onchange="onNoteSortChange()">
-            <option value="order">Thứ tự thủ công</option>
-            <option value="title">Tên A-Z</option>
-            <option value="recent">Mới sửa gần nhất</option>
-          </select>
+          <div class="sort-switcher">
+            <button class="sort-switcher-btn" id="sort-switcher-btn" onclick="toggleSortMenu()">
+              <span id="sort-switcher-label">Thứ tự thủ công</span>
+              <span id="sort-switcher-chevron"></span>
+            </button>
+            <div class="space-menu" id="sort-menu" style="display:none;"></div>
+          </div>
         </div>
         <div class="block-body" id="notes-body"></div>
         <div class="collapsed-placeholder" id="placeholder-notes"></div>
@@ -555,6 +589,10 @@
         <label>Màu thẻ</label>
         <div class="color-palette" id="note-color-palette"></div>
       </div>
+      <div class="field">
+        <input type="hidden" id="note-sensitive" value="false" />
+        <button type="button" class="sensitive-toggle" id="note-sensitive-btn" onclick="toggleNoteSensitiveField()"></button>
+      </div>
       <div class="modal-actions">
         <button class="btn-ghost" onclick="closeModal('note-modal')">Hủy</button>
         <button class="btn-primary" onclick="saveNoteCard()">Lưu</button>
@@ -571,7 +609,7 @@
         <div class="setting-block">
           <label id="lbl-theme"></label>
           <div class="theme-toggle">
-            <button class="active" id="theme-light-btn" onclick="setTheme('light', this)"></button>
+            <button id="theme-light-btn" onclick="setTheme('light', this)"></button>
             <button id="theme-dark-btn" onclick="setTheme('dark', this)"></button>
           </div>
         </div>
@@ -662,6 +700,8 @@
    ======================================================================== */
 const ICON_PATHS = {
   notebook: '<path d="M6 3h12a1 1 0 011 1v16a1 1 0 01-1 1H6a1 1 0 01-1-1V4a1 1 0 011-1z"/><line x1="9" y1="7" x2="16" y2="7"/><line x1="9" y1="11" x2="16" y2="11"/><line x1="9" y1="15" x2="13" y2="15"/><line x1="5" y1="7" x2="6.6" y2="7"/><line x1="5" y1="12" x2="6.6" y2="12"/><line x1="5" y1="17" x2="6.6" y2="17"/>',
+  lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/>',
+  unlock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 017.5-2.5"/>',
   settings: '<circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/>',
   plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
   pencil: '<path d="M4 20l.9-3.9L16.3 4.7a1.4 1.4 0 012 0l1 1a1.4 1.4 0 010 2L7.9 19.1z"/><path d="M14.5 6.5l3 3"/>',
@@ -729,7 +769,7 @@ let spaces = [
       { id: 22, title: 'Ăn uống đúng giờ', completedDates: [dateOffset(6), dateOffset(4), dateOffset(3)] },
     ],
     noteCards: [
-      { id: 31, title: 'Mật khẩu wifi nhà', content: 'SSID: HomeNet_5G\nPass: ********', hidden: false, updatedAt: Date.now() - 600000, color: '#8b5cf6' },
+      { id: 31, title: 'Mật khẩu wifi nhà', content: 'SSID: HomeNet_5G\nPass: HomeWifi@2026', hidden: false, sensitive: true, updatedAt: Date.now() - 600000, color: '#8b5cf6' },
       { id: 32, title: 'Số đo quần áo', content: 'Áo: M\nQuần: 30\nGiày: 41', hidden: false, updatedAt: Date.now() - 500000, color: '#0ea5e9' },
       { id: 33, title: 'Ý tưởng video', content: '- Review app ghi chú\n- Tutorial Chrome sync', hidden: false, updatedAt: Date.now() - 400000, color: '#22c55e' },
       { id: 34, title: 'Test ngắn', content: 'Test1', hidden: false, updatedAt: Date.now() - 300000, color: '#f97316' },
@@ -774,6 +814,14 @@ let habits = spaces[0].habits;
 let noteCards = spaces[0].noteCards;
 let noteSearch = '';
 let noteSortBy = 'order';
+/* Trạng thái "đang hiện nội dung" của note đánh dấu nhạy cảm — chỉ tồn tại trong phiên xem
+   hiện tại (không lưu), mỗi lần render lại sẽ tự che nếu người dùng không bấm hiện lại */
+let revealedSensitiveIds = new Set();
+function toggleSensitiveReveal(id){
+  if (revealedSensitiveIds.has(id)) revealedSensitiveIds.delete(id);
+  else revealedSensitiveIds.add(id);
+  renderNotes();
+}
 /* Mỗi card có màu riêng để phân biệt trực quan (không còn đồng nhất 1 màu tím như trước) —
    tự gán xoay vòng theo palette khi tạo mới, người dùng có thể đổi lại trong modal sửa */
 const NOTE_PALETTE = ['#8b5cf6', '#0ea5e9', '#22c55e', '#f97316', '#ec4899', '#64748b'];
@@ -802,6 +850,7 @@ function renderStaticIcons(){
   document.getElementById('btn-settings').innerHTML = svgIcon('settings') + ' Cài đặt';
   document.getElementById('space-switcher-icon').innerHTML = svgIcon('layers');
   document.getElementById('space-switcher-chevron').innerHTML = svgIcon('chevronDown');
+  document.getElementById('sort-switcher-chevron').innerHTML = svgIcon('chevronDown');
 
   const grip = `<span class="grip-handle" aria-hidden="true">${svgIcon('grip')}</span>`;
   document.getElementById('ic-tasks-title').innerHTML = `${grip}<span class="block-icon" style="background:rgba(91,108,255,.12); color:var(--task-color)">${svgIcon('checkSquare')}</span><span class="title-text">Việc cần làm</span>`;
@@ -957,17 +1006,27 @@ function getVisibleNoteCards(){
   return list;
 }
 
+function maskSensitiveContent(text){
+  return (text || '').split('\n').map(line => line.trim() ? '•'.repeat(Math.min(line.length, 22)) : '').join('\n');
+}
 function noteCardHtml(c){
   const color = c.color || NOTE_PALETTE[0];
+  const revealed = revealedSensitiveIds.has(c.id);
+  const showMasked = c.sensitive && !revealed;
   const inner = c.hidden
     ? `<div class="note-placeholder">${svgIcon('eyeOff')}<span>Đã ẩn nội dung note này</span></div>`
-    : `<p class="nc-content">${escapeHtml(c.content)}</p>`;
-  const bgStyle = c.hidden ? '' : `background:${hexToRgba(color, 0.1)};`;
+    : `<p class="nc-content">${escapeHtml(showMasked ? maskSensitiveContent(c.content) : c.content)}</p>`;
+  const noteAlpha = parseFloat(getComputedStyle(document.body).getPropertyValue('--note-alpha')) || 0.1;
+  const bgStyle = c.hidden ? '' : `background:${hexToRgba(color, noteAlpha)};`;
+  const badge = c.sensitive
+    ? `<span class="badge badge-sensitive" style="color:${color}; background:${hexToRgba(color, 0.14)}">${svgIcon('lock')} Bảo mật</span>`
+    : `<span class="badge" style="color:${color}; background:${hexToRgba(color, 0.14)}">${svgIcon('notebook')} Note</span>`;
   return `<div class="note-card ${c.hidden?'hidden-card':''}" data-id="${c.id}" style="border-left-color:${color}; ${bgStyle}">
       <div class="nc-head">
-        <span class="badge" style="color:${color}; background:${hexToRgba(color, 0.14)}">${svgIcon('notebook')} Note</span>
+        ${badge}
         <div class="nc-tools">
           ${noteSortBy === 'order' ? `<span class="card-grip" title="Kéo để đổi thứ tự" aria-label="Kéo để đổi thứ tự card">${svgIcon('grip')}</span>` : ''}
+          ${c.sensitive && !c.hidden ? `<button class="icon-btn" onclick="toggleSensitiveReveal(${c.id})" title="${revealed ? 'Che nội dung mật khẩu' : 'Hiện nội dung mật khẩu'}" aria-label="${revealed ? 'Che nội dung mật khẩu' : 'Hiện nội dung mật khẩu'}">${svgIcon(revealed ? 'unlock' : 'lock')}</button>` : ''}
           <button class="icon-btn" onclick="editNoteCard(${c.id})" title="Sửa note" aria-label="Sửa note">${svgIcon('pencil')}</button>
           <button class="icon-btn" onclick="toggleNoteHidden(${c.id})" title="${c.hidden ? 'Hiện nội dung' : 'Ẩn nội dung'}" aria-label="${c.hidden ? 'Hiện nội dung' : 'Ẩn nội dung'}">${svgIcon(c.hidden ? 'eyeOff' : 'eye')}</button>
           <button class="icon-btn" onclick="deleteNoteCard(${c.id})" title="Xoá note" aria-label="Xoá note">${svgIcon('trash')}</button>
@@ -1006,8 +1065,30 @@ function onNoteSearchChange(){
   noteSearch = document.getElementById('note-search').value;
   renderNotes();
 }
-function onNoteSortChange(){
-  noteSortBy = document.getElementById('note-sort').value;
+
+const NOTE_SORT_OPTIONS = [
+  { value: 'order', label: 'Thứ tự thủ công' },
+  { value: 'title', label: 'Tên A-Z' },
+  { value: 'recent', label: 'Mới sửa gần nhất' },
+];
+function renderSortMenu(){
+  const menu = document.getElementById('sort-menu');
+  menu.innerHTML = NOTE_SORT_OPTIONS.map(o => `
+    <div class="space-menu-item ${o.value === noteSortBy ? 'active' : ''}" onclick="selectNoteSort('${o.value}')">
+      ${o.value === noteSortBy ? svgIcon('check') : `<span style="width:15px;height:15px;display:inline-block;flex:0 0 auto;"></span>`}
+      <span class="space-name">${o.label}</span>
+    </div>`).join('');
+}
+function toggleSortMenu(){
+  const menu = document.getElementById('sort-menu');
+  const opening = menu.style.display === 'none';
+  if (opening) renderSortMenu();
+  menu.style.display = opening ? 'block' : 'none';
+}
+function selectNoteSort(value){
+  noteSortBy = value;
+  document.getElementById('sort-switcher-label').textContent = NOTE_SORT_OPTIONS.find(o => o.value === value).label;
+  document.getElementById('sort-menu').style.display = 'none';
   renderNotes();
 }
 
@@ -1260,11 +1341,24 @@ function setNoteColor(color, el){
   el.parentElement.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
   el.classList.add('active');
 }
+function renderSensitiveToggleBtn(active){
+  const btn = document.getElementById('note-sensitive-btn');
+  btn.classList.toggle('active', active);
+  btn.innerHTML = svgIcon(active ? 'lock' : 'unlock') + (active ? ' Đã đánh dấu chứa mật khẩu/thông tin nhạy cảm' : ' Đánh dấu chứa mật khẩu/thông tin nhạy cảm');
+}
+function toggleNoteSensitiveField(){
+  const input = document.getElementById('note-sensitive');
+  const next = input.value !== 'true';
+  input.value = String(next);
+  renderSensitiveToggleBtn(next);
+}
 function openNoteCreate(){
   document.getElementById('note-modal-title').textContent = 'Note mới';
   document.getElementById('note-id').value = '';
   document.getElementById('note-title').value = '';
   document.getElementById('note-content').value = '';
+  document.getElementById('note-sensitive').value = 'false';
+  renderSensitiveToggleBtn(false);
   renderNoteColorPalette(defaultNoteColor());
   document.getElementById('note-modal').style.display = 'flex';
 }
@@ -1274,6 +1368,8 @@ function editNoteCard(id){
   document.getElementById('note-id').value = c.id;
   document.getElementById('note-title').value = c.title;
   document.getElementById('note-content').value = c.content;
+  document.getElementById('note-sensitive').value = String(!!c.sensitive);
+  renderSensitiveToggleBtn(!!c.sensitive);
   renderNoteColorPalette(c.color || NOTE_PALETTE[0]);
   document.getElementById('note-modal').style.display = 'flex';
 }
@@ -1283,6 +1379,7 @@ function saveNoteCard(){
     title: document.getElementById('note-title').value.trim() || 'Note chưa đặt tên',
     content: document.getElementById('note-content').value,
     color: document.getElementById('note-color').value || NOTE_PALETTE[0],
+    sensitive: document.getElementById('note-sensitive').value === 'true',
     updatedAt: Date.now(),
   };
   if (id) Object.assign(noteCards.find(x => x.id === Number(id)), payload);
@@ -1291,7 +1388,7 @@ function saveNoteCard(){
   renderAll();
 }
 function toggleNoteHidden(id){ const c = noteCards.find(x => x.id === id); c.hidden = !c.hidden; renderAll(); }
-function deleteNoteCard(id){ showConfirm('Xoá card note này? Hành động không thể hoàn tác.', () => { noteCards = noteCards.filter(c => c.id !== id); renderAll(); }); }
+function deleteNoteCard(id){ showConfirm('Xoá card note này? Hành động không thể hoàn tác.', () => { noteCards = noteCards.filter(c => c.id !== id); revealedSensitiveIds.delete(id); renderAll(); }); }
 
 /* ========================================================================
    Modal / theme / accent / background helpers
@@ -1304,11 +1401,15 @@ function showConfirm(message, onConfirm){
   document.getElementById('confirm-modal').style.display = 'flex';
 }
 function openSettings(){ document.getElementById('settings-modal').style.display = 'flex'; }
-function setTheme(mode, btn){
+function applyTheme(mode){
   document.body.setAttribute('data-theme', mode);
-  btn.parentElement.querySelectorAll('button').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
+  document.getElementById('theme-light-btn').classList.toggle('active', mode === 'light');
+  document.getElementById('theme-dark-btn').classList.toggle('active', mode === 'dark');
   applyHeaderTint();
+  renderNotes();
+}
+function setTheme(mode, btn){
+  applyTheme(mode);
 }
 function setAccent(color, el){
   document.documentElement.style.setProperty('--accent', color);
@@ -1525,8 +1626,9 @@ function switchSpace(id){
   taskFilter = 'all';
   noteSearch = '';
   noteSortBy = 'order';
+  revealedSensitiveIds.clear();
   document.getElementById('note-search').value = '';
-  document.getElementById('note-sort').value = 'order';
+  document.getElementById('sort-switcher-label').textContent = NOTE_SORT_OPTIONS.find(o => o.value === 'order').label;
   document.querySelectorAll('#task-filter-tabs button').forEach(b => b.classList.toggle('active', b.dataset.filter === 'all'));
   updateSpaceSwitcherLabel();
   document.getElementById('space-menu').style.display = 'none';
@@ -1573,6 +1675,10 @@ document.addEventListener('mousedown', (e) => {
   const switcher = document.querySelector('.space-switcher');
   const menu = document.getElementById('space-menu');
   if (menu.style.display !== 'none' && !switcher.contains(e.target)) menu.style.display = 'none';
+
+  const sortSwitcher = document.querySelector('.sort-switcher');
+  const sortMenu = document.getElementById('sort-menu');
+  if (sortMenu.style.display !== 'none' && !sortSwitcher.contains(e.target)) sortMenu.style.display = 'none';
 });
 
 renderStaticIcons();
@@ -1581,6 +1687,8 @@ setupOverlayClickClose();
 updateSpaceSwitcherLabel();
 renderAll();
 updateHideAllBtn();
+const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+applyTheme(prefersDark ? 'dark' : 'light');
 </script>
 </body>
 </html>
