@@ -62,7 +62,13 @@ không có backend, không tài khoản riêng, không quảng cáo, không theo
 ## Việc CHỈ bạn tự làm được (không thể tự động qua agent)
 
 1. Tạo Google Developer Account tại Chrome Web Store Developer Dashboard, trả phí đăng ký $5 (yêu cầu thẻ thanh toán + đăng nhập Google).
-2. Upload file `extension/kn-space-extension.zip` (giữ nguyên field `key` trong manifest.json để ID khớp với bản đang test).
+2. Upload file `extension/kn-space-extension.zip`.
+   > **Lưu ý:** Chrome Web Store KHÔNG cho phép field `"key"` trong `manifest.json` khi upload qua dashboard
+   > (lỗi "Không cho phép trường key trong tệp kê khai"). Field này đã bị bỏ khỏi `manifest.json` —
+   > nghĩa là Store sẽ tự cấp 1 **ID khác** với ID đang dùng để Load unpacked test hiện tại.
+   > Dữ liệu hiện có trên các máy đang test **sẽ KHÔNG tự chuyển qua** bản Store sau khi cài.
+   > Trước khi chuyển hẳn 5 máy sang bản Store, dùng **Settings → Export** để backup JSON,
+   > rồi sau khi cài bản Store xong thì **Settings → Import** lại để khôi phục dữ liệu.
 3. Điền các mục Store listing + Privacy practices theo nội dung phía trên.
 4. Chọn Visibility = Unlisted, Submit for review.
 5. Theo dõi trạng thái duyệt trong dashboard — có thể bị yêu cầu bổ sung giải trình do dùng `chrome_url_overrides.newtab`.
