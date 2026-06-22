@@ -1,1 +1,11 @@
 .history/
+
+# extension (Chrome Extension MV3 + React + Vite)
+extension/node_modules/
+extension/dist/
+extension/*.tsbuildinfo
+extension/*.zip
+extension/*.crx
+# Private key dùng để giữ cố định extension ID (cho chrome.storage.sync đồng bộ đúng
+# giữa nhiều máy) — KHÔNG commit, tự backup riêng (vd. password manager/USB riêng).
+extension/*.pem

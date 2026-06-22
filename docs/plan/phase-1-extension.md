@@ -1,4 +1,4 @@
-# Phase 1 — Extension cá nhân (desktop) 🚧 ĐANG LÀM
+# Phase 1 — Extension cá nhân (desktop) 🟡 CODE XONG — CHỜ VERIFY TRÊN CHROME THẬT
 
 ## Mục tiêu
 Một bản KN-Space **dùng được ngay cho cá nhân trên desktop**: full dashboard 5 khối, dữ liệu lưu bền và đồng bộ giữa các máy đăng nhập cùng Chrome account. Không backend, không auth, không hosting.
@@ -69,117 +69,131 @@ extension/
 ### 0. Chuẩn bị yêu cầu
 - [x] Làm sạch [requirements.md](../requirements.md), chỉ giữ scope Phase 1 Extension desktop.
 - [x] Đồng bộ plan với mockup hiện tại: Ghi chú dùng Grid/List, không còn masonry.
-- [ ] Dev đọc kỹ [requirements.md](../requirements.md), [mockup index.html](../mockup/index.html), và file plan này trước khi code.
+- [x] Dev đọc kỹ [requirements.md](../requirements.md), [mockup index.html](../mockup/index.html), và file plan này trước khi code.
 
 ### 1. Tạo khung extension
-- [ ] Tạo thư mục `extension/`.
-- [ ] Scaffold React + TypeScript + Vite trong `extension/`.
-- [ ] Cài dependency tối thiểu: `react`, `react-dom`, `lucide-react`; dev dependency: `typescript`, `vite`, `@vitejs/plugin-react`.
-- [ ] Tạo `extension/manifest.json` theo Manifest V3.
-- [ ] Khai báo permission tối thiểu: `storage`.
-- [ ] Khai báo `action` và `background.service_worker`.
-- [ ] Tạo `extension/background.js`.
-- [ ] Tạo `extension/index.html`.
-- [ ] Tạo `extension/src/main.tsx`.
-- [ ] Tạo `extension/src/App.tsx`.
-- [ ] Tạo `extension/src/storage/chromeStorage.ts`.
-- [ ] Tạo thư mục `extension/icons/`.
+- [x] Tạo thư mục `extension/`.
+- [x] Scaffold React + TypeScript + Vite trong `extension/`.
+- [x] Cài dependency tối thiểu: `react`, `react-dom`, `lucide-react`; dev dependency: `typescript`, `vite`, `@vitejs/plugin-react`.
+- [x] Tạo `extension/manifest.json` theo Manifest V3.
+- [x] Khai báo permission tối thiểu: `storage`.
+- [x] Khai báo `action` và `background.service_worker`.
+- [x] Tạo `extension/background.js`.
+- [x] Tạo `extension/index.html`.
+- [x] Tạo `extension/src/main.tsx`.
+- [x] Tạo `extension/src/App.tsx`.
+- [x] Tạo `extension/src/storage/chromeStorage.ts`.
+- [x] Tạo thư mục `extension/icons/`.
 
 ### 2. Background mở dashboard full-tab
-- [ ] Implement `background.js`: click icon extension mở `index.html`.
-- [ ] Nếu dashboard đã mở, focus tab cũ thay vì mở tab trùng.
-- [ ] Verify click icon mở/focus đúng tab.
+- [x] Implement `background.js`: click icon extension mở `index.html`.
+- [x] Nếu dashboard đã mở, focus tab cũ thay vì mở tab trùng.
+- [ ] Verify click icon mở/focus đúng tab. _(cần test trên Chrome thật qua "Load unpacked" — xem hướng dẫn ở Handoff note)_
 
 ### 3. Port mockup sang React components
-- [ ] Trích layout/CSS/token cần thiết từ `docs/mockup/index.html`.
-- [ ] Tách component theo khối: Tasks, ReminderDefinitions, Habits, Notes, Notifications.
-- [ ] Tách component shell: TopBar, SpaceSwitcher, SettingsModal, ConfirmModal, AppLayout.
-- [ ] Dùng `lucide-react` cho toàn bộ icon chính.
-- [ ] Giữ lại UI/UX đúng mockup: 5 khối, Space switcher, Settings, modal, note Grid/List, ẩn/hiện khối.
-- [ ] Verify app dev/build không lỗi layout lớn.
+- [x] Trích layout/CSS/token cần thiết từ `docs/mockup/index.html`.
+- [x] Tách component theo khối: Tasks, ReminderDefinitions, Habits, Notes, Notifications.
+- [x] Tách component shell: TopBar, SpaceSwitcher, SettingsModal, ConfirmModal, AppLayout.
+- [x] Dùng `lucide-react` cho toàn bộ icon chính.
+- [x] Giữ lại UI/UX đúng mockup: 5 khối, Space switcher, Settings, modal, note Grid/List, ẩn/hiện khối.
+- [x] Verify app dev/build không lỗi layout lớn. _(verify được: `npm run build` pass, `tsc --noEmit` sạch; chưa verify bằng mắt trên Chrome thật)_
 
 ### 4. MV3 CSP + build output
-- [ ] Đảm bảo `index.html` không có inline `<script>`.
-- [ ] Đảm bảo build output không cần `eval`/remote script.
-- [ ] Cấu hình Vite output phù hợp Chrome Extension MV3.
-- [ ] Đảm bảo modal, Settings, Space menu, filter, note sort/view, CRUD, drag/drop hoạt động qua React event handlers.
-- [ ] Verify console không còn lỗi CSP khi load unpacked.
+- [x] Đảm bảo `index.html` không có inline `<script>`.
+- [x] Đảm bảo build output không cần `eval`/remote script.
+- [x] Cấu hình Vite output phù hợp Chrome Extension MV3.
+- [x] Đảm bảo modal, Settings, Space menu, filter, note sort/view, CRUD, drag/drop hoạt động qua React event handlers.
+- [ ] Verify console không còn lỗi CSP khi load unpacked. _(cần test trên Chrome thật)_
 
 ### 5. Chuẩn hoá state runtime
-- [ ] Thiết kế TypeScript types cho AppState, Space, Task, ReminderDefinition, Habit, Note, Settings.
-- [ ] Gom state demo hiện tại thành một object/app state rõ ràng.
-- [ ] Dùng reducer/custom hooks để mutation tập trung, dễ persist.
-- [ ] Giữ đủ dữ liệu: spaces, currentSpaceId, settings, layout sizes, collapsedBlocks, note view/sort/search.
-- [ ] Seed demo "Cá nhân"/"Công ty" chỉ khi storage rỗng.
-- [ ] Khi chuyển Space reset UI tạm: task filter, note search, note sort, hidden note state.
+- [x] Thiết kế TypeScript types cho AppState, Space, Task, ReminderDefinition, Habit, Note, Settings.
+- [x] Gom state demo hiện tại thành một object/app state rõ ràng.
+- [x] Dùng reducer/custom hooks để mutation tập trung, dễ persist (1 `useReducer` gốc + Context, domain sub-reducers compose trong `appReducer.ts`).
+- [x] Giữ đủ dữ liệu: spaces, currentSpaceId, settings, layout sizes, collapsedBlocks, note view/sort/search.
+- [x] Seed demo "Cá nhân"/"Công ty" chỉ khi storage rỗng.
+- [x] Khi chuyển Space reset UI tạm: task filter, note search, note sort, hidden note state.
 
 ### 6. Implement storage
-- [ ] `chromeStorage.ts` có API `loadAppState()`.
-- [ ] `chromeStorage.ts` có API `saveAppState()` hoặc các hàm save theo phần.
-- [ ] Lưu chính bằng `chrome.storage.sync`.
-- [ ] Tách key để tránh giới hạn 8KB/item: settings/layout riêng, mỗi space một key.
-- [ ] Có debounce khi ghi sau mutation.
-- [ ] Fallback sang `chrome.storage.local` khi vượt quota sync.
-- [ ] Có cảnh báo nhẹ nếu dữ liệu phải fallback local.
-- [ ] Verify reload tab vẫn giữ dữ liệu.
+- [x] `chromeStorage.ts` có API `loadAppState()`.
+- [x] `chromeStorage.ts` có API `saveAppState()` hoặc các hàm save theo phần (`flushSave`/`scheduleSave`/`forceFlush`).
+- [x] Lưu chính bằng `chrome.storage.sync`.
+- [x] Tách key để tránh giới hạn 8KB/item: settings/layout riêng, mỗi space một key (+ `space-index` key riêng để tự phục hồi).
+- [x] Có debounce khi ghi sau mutation (600ms).
+- [x] Fallback sang `chrome.storage.local` khi vượt quota sync.
+- [x] Có cảnh báo nhẹ nếu dữ liệu phải fallback local (`.fallback-banner` trong `App.tsx`).
+- [ ] Verify reload tab vẫn giữ dữ liệu. _(cần test trên Chrome thật)_
 
 ### 7. Wire CRUD 5 khối vào storage
-- [ ] Việc cần làm: tạo/sửa/xoá/tick/filter và persist.
-- [ ] Nhắc việc: tạo/sửa/xoá loại một lần/lặp lại và persist.
-- [ ] Thói quen: tạo/sửa/xoá/tick hôm nay, `completedDates`, streak và persist.
-- [ ] Ghi chú: tạo/xem/sửa/xoá/màu/Grid/List/sort/order/ẩn nội dung theo phiên và persist phần cần lưu.
-- [ ] Thông báo: tổng hợp đúng từ 3 khối nguồn, nút Xong đồng bộ về Việc cần làm/Thói quen.
+- [x] Việc cần làm: tạo/sửa/xoá/tick/filter và persist.
+- [x] Nhắc việc: tạo/sửa/xoá loại một lần/lặp lại và persist.
+- [x] Thói quen: tạo/sửa/xoá/tick hôm nay, `completedDates`, streak và persist.
+- [x] Ghi chú: tạo/xem/sửa/xoá/màu/Grid/List/sort/order/ẩn nội dung theo phiên và persist phần cần lưu.
+- [x] Thông báo: tổng hợp đúng từ 3 khối nguồn, nút Xong đồng bộ về Việc cần làm/Thói quen (derive thuần qua `computeNotifications`, không lưu storage riêng).
 
 ### 8. Wire Space vào storage
-- [ ] Tạo Space mới và persist.
-- [ ] Đổi tên Space và persist.
-- [ ] Xoá Space, chặn xoá khi chỉ còn 1 Space.
-- [ ] Chuyển Space và load đúng dữ liệu riêng.
-- [ ] Sắp xếp Space lên/xuống và persist.
-- [ ] Bật/tắt khối theo Space (`enabledBlocks`) và persist.
-- [ ] Settings vẫn dùng chung mọi Space.
+- [x] Tạo Space mới và persist.
+- [x] Đổi tên Space và persist.
+- [x] Xoá Space, chặn xoá khi chỉ còn 1 Space.
+- [x] Chuyển Space và load đúng dữ liệu riêng.
+- [x] Sắp xếp Space lên/xuống và persist.
+- [x] Bật/tắt khối theo Space (`enabledBlocks`) và persist.
+- [x] Settings vẫn dùng chung mọi Space.
 
 ### 9. Wire Settings vào storage
-- [ ] Theme sáng/tối persist.
-- [ ] Màu chủ đạo persist.
-- [ ] Ảnh nền/header tint persist.
-- [ ] Layout sizes persist.
-- [ ] Thứ tự khối chính persist.
-- [ ] Khôi phục layout mặc định hoạt động và persist.
-- [ ] Ẩn/hiện khối và Ẩn tất cả/Hiện tất cả hoạt động đúng.
+- [x] Theme sáng/tối persist.
+- [x] Màu chủ đạo persist.
+- [x] Ảnh nền/header tint persist.
+- [x] Layout sizes persist.
+- [x] Thứ tự khối chính persist.
+- [x] Khôi phục layout mặc định hoạt động và persist.
+- [x] Ẩn/hiện khối và Ẩn tất cả/Hiện tất cả hoạt động đúng.
 
 ### 10. Export/Import JSON
-- [ ] Export toàn bộ spaces + settings thành file `.json`.
-- [ ] Import đọc file `.json`.
-- [ ] Trước khi import có modal xác nhận thay thế dữ liệu hiện tại.
-- [ ] Sau import lưu vào storage.
-- [ ] Sau import reset UI tạm hợp lý: Space hợp lệ, task filter All, note sort manual, note search rỗng.
-- [ ] Verify export/import khôi phục đúng dữ liệu.
+- [x] Export toàn bộ spaces + settings thành file `.json`.
+- [x] Import đọc file `.json`.
+- [x] Trước khi import có modal xác nhận thay thế dữ liệu hiện tại.
+- [x] Sau import lưu vào storage (qua debounce save bình thường, vì IMPORT_DATA đổi `state.spaces/settings/currentSpaceId`).
+- [x] Sau import reset UI tạm hợp lý: Space hợp lệ, task filter All, note sort manual, note search rỗng.
+- [ ] Verify export/import khôi phục đúng dữ liệu. _(cần test trên Chrome thật)_
 
 ### 11. Icons
-- [ ] Tạo icon extension 16x16.
-- [ ] Tạo icon extension 32x32.
-- [ ] Tạo icon extension 48x48.
-- [ ] Tạo icon extension 128x128.
-- [ ] Khai báo icons trong `manifest.json`.
-- [ ] Dùng `lucide-react` cho icon UI trong dashboard.
+- [x] Tạo icon extension 16x16.
+- [x] Tạo icon extension 32x32.
+- [x] Tạo icon extension 48x48.
+- [x] Tạo icon extension 128x128.
+- [x] Khai báo icons trong `manifest.json`.
+- [x] Dùng `lucide-react` cho icon UI trong dashboard.
+  > Lưu ý: 4 icon hiện tại là placeholder màu solid `#5b6cff` (sinh bằng script, không phải artwork thật). Đủ để build/load unpacked nhưng nên thay icon thương hiệu thật trước khi phát hành.
 
 ### 12. Verification cuối Phase 1
-- [ ] Load unpacked extension thành công.
-- [ ] Click icon mở/focus dashboard full-tab.
-- [ ] Console sạch lỗi CSP/runtime.
-- [ ] CRUD đủ 5 khối.
-- [ ] Tạo/đổi tên/xoá/sắp xếp Space.
-- [ ] Bật/tắt khối theo Space.
-- [ ] Đổi theme/màu/ảnh nền/layout/thứ tự khối.
-- [ ] Reload tab dữ liệu còn nguyên.
-- [ ] Export JSON tải file đúng.
-- [ ] Import JSON khôi phục đúng.
-- [ ] Test dữ liệu lớn hoặc mô phỏng quota để xác nhận fallback local/cảnh báo nhẹ.
+- [ ] Load unpacked extension thành công. _(cần Chrome thật)_
+- [ ] Click icon mở/focus dashboard full-tab. _(cần Chrome thật)_
+- [ ] Console sạch lỗi CSP/runtime. _(cần Chrome thật)_
+- [x] CRUD đủ 5 khối. _(verify qua code review + build pass; UI thật cần Chrome)_
+- [x] Tạo/đổi tên/xoá/sắp xếp Space. _(verify qua code review)_
+- [x] Bật/tắt khối theo Space. _(verify qua code review)_
+- [x] Đổi theme/màu/ảnh nền/layout/thứ tự khối. _(verify qua code review; đã fix bug `--accent-rgb` không cập nhật theo accent mới chọn)_
+- [ ] Reload tab dữ liệu còn nguyên. _(cần Chrome thật)_
+- [ ] Export JSON tải file đúng. _(cần Chrome thật, `URL.createObjectURL` + click <a> cần DOM thật)_
+- [ ] Import JSON khôi phục đúng. _(cần Chrome thật)_
+- [ ] Test dữ liệu lớn hoặc mô phỏng quota để xác nhận fallback local/cảnh báo nhẹ. _(cần Chrome thật, không mô phỏng được quota sync trong Node)_
 
 ### Handoff note
-- **Trạng thái hiện tại:** requirements đã được làm sạch cho Phase 1; chưa bắt đầu code extension.
-- **Đang làm dở:** chưa có.
-- **Bước tiếp theo:** cập nhật implementation sang React + TypeScript + Vite; nếu đã có thử nghiệm vanilla trong `extension/`, cần thay bằng scaffold React trước khi tiếp tục.
-- **File đã sửa trong lượt này:** `docs/requirements.md`, `docs/plan/phase-1-extension.md`.
-- **Lệnh verify đã chạy:** chưa có lệnh test code, chỉ rà nội dung tài liệu.
+- **Trạng thái hiện tại:** Code Phase 1 đã hoàn thiện toàn bộ theo plan (toàn bộ mục §1–§11 đã làm). `npm run build` pass sạch (tsc -b + vite build), `npx tsc --noEmit` không lỗi. Còn lại các mục verify ở §12 cần kiểm tra trực tiếp trên Chrome (load unpacked) — không thể giả lập đầy đủ `chrome.storage`/`chrome.action`/`chrome.tabs` trong môi trường CLI/Node.
+- **Đang làm dở:** Không còn việc code dở. Chỉ còn bước kiểm thử thủ công trên Chrome thật (§12) và quyết định icon thương hiệu thật (hiện là placeholder solid color).
+- **Rủi ro/điểm cần chủ dự án tự kiểm tra kỹ:**
+  1. Kéo-thả note card (kỹ thuật arm/disarm qua ref + HTML5 DnD) — rủi ro UI cao nhất, cần test thực tế kéo-thả trong cả Grid và List view.
+  2. Logic due-today cho nhắc lặp lại theo "Ngày" (`(số ngày từ createdAt) % freqN === 0`, file `src/features/reminders/reminderUtils.ts`) là field/logic MỚI không có trong mockup gốc — đã verify bằng script Node độc lập cho case "mỗi 3 ngày" (đến hạn đúng vào ngày 0, 3, 6, 9...), nhưng nên tạo thử 1 reminder thật trong app và quan sát qua nhiều ngày (hoặc sửa tạm `createdAt` trong storage để giả lập) để chắc chắn.
+  3. Quota fallback `sync → local`: logic đã viết đúng (catch cả reject promise và `chrome.runtime.lastError`), nhưng chưa test được tình huống quota thật vượt 8KB/item hoặc 100KB tổng trên Chrome thật.
+- **File đã sửa/tạo trong lượt này:** toàn bộ `extension/` (manifest.json, background.js, index.html, package.json, tsconfig.json, vite.config.ts, icons/*.png, và toàn bộ `extension/src/**`) + `.gitignore` (thêm `extension/node_modules/`, `extension/dist/`, `extension/*.tsbuildinfo`) + `docs/plan/phase-1-extension.md` (checklist này).
+- **Bug tự phát hiện và đã sửa trong lượt review cuối:**
+  1. `--accent-rgb` (CSS var dùng cho mọi `rgba(var(--accent-rgb),alpha)` — scrollbar, focus ring, filter-tabs active...) không được cập nhật khi user đổi màu accent trong Settings, chỉ `--accent` (hex) được set. Đã sửa trong `src/App.tsx`: tính lại rgb từ hex mỗi khi `settings.accent` đổi.
+  2. `id="block-notes"`/`id="block-reminders"` (dùng cho responsive CSS `@media (max-width: 980px)`) bị đặt nhầm vào `BlockShell` con (`.sub-block`) thay vì đúng wrapper `.main-block` ở `AppLayout.tsx` — khiến rule responsive không áp đúng phần tử cha có `style.flex` inline. Đã sửa: chuyển id lên đúng wrapper trong `AppLayout.tsx`, bỏ `domId` trùng khỏi `NotesBlock`/`NotificationsBlock`.
+  3. Dọn `src/iconMap.ts` (dead code không được import bởi component nào, sót lại từ giai đoạn đầu trước khi quyết định dùng lucide-react trực tiếp).
+- **Lệnh verify đã chạy:**
+  - `cd extension && npm install` — pass (102 packages).
+  - `cd extension && npm run build` (= `tsc -b && vite build`) — pass, output `extension/dist/` đủ `index.html`, `assets/*.js,*.css`, `manifest.json`, `background.js`, `icons/*.png`.
+  - `cd extension && npx tsc --noEmit -p tsconfig.json` — pass, 0 lỗi.
+  - Script Node độc lập verify logic `isRecurringDueToday` cho case "mỗi 3 ngày" — đúng kỳ vọng (due vào ngày 0, 3, 6, 9...).
+  - Đọc thủ công `dist/index.html`, `dist/manifest.json`, `dist/background.js` — xác nhận không có `default_popup`, không inline script, mọi asset path tương đối.
+- **Bước tiếp theo (cho chủ dự án):** mở `chrome://extensions`, bật "Developer mode", bấm "Load unpacked", chọn thư mục `extension/dist/` (không phải `extension/` gốc). Sau đó test theo checklist §12 còn lại. Nếu cần build lại sau khi sửa code: chạy lại `npm run build` trong `extension/`, rồi bấm icon "reload" của extension trong `chrome://extensions` (không cần load unpacked lại từ đầu).
