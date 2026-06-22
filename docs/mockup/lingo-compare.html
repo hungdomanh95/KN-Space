@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KN-Space — Lingo Design System (So sánh)</title>
+<style>
+  /* ===== Lingo Design System Tokens ===== */
+  :root {
+    /* Brand */
+    --brand:           #58CC03;
+    --brand-medium:    #89E219;
+    --brand-strong:    #58A700;
+    --brand-soft:      #C7F8A1;
+    --brand-softer:    #E5FFC2;
+
+    /* Neutral backgrounds */
+    --bg-page:         #F7F7F7;
+    --bg-white:        #FFFFFF;
+    --bg-hover:        #F7F7F7;
+
+    /* Text */
+    --text-heading:    #4B4B4B;
+    --text-body:       #777777;
+    --text-subtle:     #AFAFAF;
+    --text-white:      #FFFFFF;
+    --text-brand:      #58A700;
+    --text-brand-dim:  #3D7400;
+
+    /* Status */
+    --danger:          #FF4B4B;
+    --danger-soft:     #FFE5E5;
+    --danger-border:   #FFC4C4;
+    --danger-text:     #E62E2E;
+    --success:         #58CC02;
+    --success-soft:    #E5FFC2;
+    --warning:         #FFC800;
+    --warning-soft:    #FFF8E0;
+    --warning-text:    #8A6F00;
+    --purple-text:     #8549BA;
+    --sky:             #1CB0F6;
+
+    /* Borders */
+    --border:          #E5E5E5;
+    --border-strong:   #DBDBDB;
+    --border-brand:    #58CC03;
+    --border-brand-subtle: #C7F8A1;
+
+    /* Shadows (flat offset) */
+    --shadow-brand:    #58A700;
+    --shadow-secondary:#E5E5E5;
+    --shadow-danger:   #E62E2E;
+
+    /* Radii */
+    --radius:          12px;
+    --radius-pill:     9999px;
+
+    /* Disabled */
+    --disabled-bg:     #F7F7F7;
+    --disabled-text:   #AFAFAF;
+  }
+
+  /* Dark mode */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg-page:         #131F24;
+      --bg-white:        #131F24;
+      --bg-hover:        #1F2C30;
+      --text-heading:    #FFFFFF;
+      --text-body:       #AFAFAF;
+      --text-subtle:     #777777;
+      --text-brand:      #89E219;
+      --text-brand-dim:  #C7F8A1;
+      --border:          #37464F;
+      --border-strong:   #4B6B7C;
+      --border-brand:    #89E219;
+      --border-brand-subtle: #2D5500;
+      --brand-softer:    #1A3300;
+      --brand-soft:      #2D5500;
+      --danger-soft:     #4A0000;
+      --danger-border:   #8A0000;
+      --success-soft:    #1A3300;
+      --warning-soft:    #4A3700;
+      --shadow-secondary:#2A3438;
+    }
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  body {
+    background: var(--bg-page);
+    color: var(--text-body);
+    display: flex; flex-direction: column;
+    height: 100vh; overflow: hidden;
+  }
+
+  /* ===== Topbar ===== */
+  .topbar {
+    background: var(--bg-white);
+    border-bottom: 2px solid var(--border);
+    padding: 0 20px;
+    height: 56px;
+    display: flex; align-items: center; justify-content: space-between;
+    flex: 0 0 auto;
+    gap: 12px;
+  }
+  .topbar-left { display: flex; align-items: center; gap: 14px; }
+  .logo {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 17px; font-weight: 700; color: var(--text-heading); letter-spacing: -.01em;
+  }
+  .logo-icon {
+    width: 30px; height: 30px; border-radius: 8px;
+    background: var(--brand); display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 0 var(--shadow-brand);
+  }
+  .logo-icon svg { width: 18px; height: 18px; color: #fff; }
+  .space-switcher {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border-radius: var(--radius);
+    border: 2px solid var(--border); background: var(--bg-white);
+    font-size: 13.5px; font-weight: 700; color: var(--text-heading);
+    cursor: pointer; transition: background 100ms ease-out;
+  }
+  .space-switcher:hover { background: var(--bg-hover); }
+  .topbar-right { display: flex; align-items: center; gap: 8px; }
+
+  /* ===== Buttons ===== */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 10px 16px; border-radius: var(--radius);
+    font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px;
+    border: 2px solid transparent; cursor: pointer;
+    transition: background-color 100ms ease-out, transform 100ms ease-out;
+    white-space: nowrap;
+  }
+  .btn:active { transform: translateY(2px); }
+  .btn-brand {
+    background: var(--brand); color: var(--text-white);
+    box-shadow: 0 4px 0 var(--shadow-brand);
+  }
+  .btn-brand:hover { background: var(--brand-medium); }
+  .btn-brand:active { box-shadow: 0 2px 0 var(--shadow-brand); }
+  .btn-secondary {
+    background: var(--bg-white); color: var(--text-body);
+    border-color: var(--border);
+    box-shadow: 0 4px 0 var(--shadow-secondary);
+  }
+  .btn-secondary:hover { background: var(--bg-hover); color: var(--text-heading); }
+  .btn-secondary:active { box-shadow: 0 2px 0 var(--shadow-secondary); }
+  .btn-ghost {
+    background: transparent; color: var(--text-heading);
+    border-color: transparent; box-shadow: none;
+    text-transform: none; letter-spacing: normal; font-weight: 600;
+  }
+  .btn-ghost:hover { background: var(--bg-hover); }
+  .btn-danger {
+    background: var(--danger); color: #fff;
+    box-shadow: 0 4px 0 var(--shadow-danger);
+  }
+  .btn-danger:hover { background: #E62E2E; }
+  .btn-danger:active { box-shadow: 0 2px 0 var(--shadow-danger); }
+  .btn svg { width: 16px; height: 16px; }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+  .btn-icon {
+    width: 36px; height: 36px; padding: 0; border-radius: var(--radius);
+    background: var(--bg-white); border: 2px solid var(--border); color: var(--text-body);
+    display: inline-flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 0 var(--shadow-secondary); cursor: pointer;
+    transition: background 100ms ease-out, transform 100ms ease-out;
+  }
+  .btn-icon:hover { background: var(--bg-hover); color: var(--text-heading); }
+  .btn-icon:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--shadow-secondary); }
+  .btn-icon svg { width: 16px; height: 16px; }
+
+  /* ===== Dashboard layout ===== */
+  #dashboard { flex: 1; display: flex; min-height: 0; padding: 14px; gap: 12px; }
+  #main-row { display: flex; flex: 1; min-height: 0; min-width: 0; gap: 12px; }
+
+  /* ===== Block / Card ===== */
+  .block {
+    background: var(--bg-white);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 2px 0 var(--shadow-secondary);
+    min-width: 0; min-height: 0;
+    transition: flex .15s ease;
+  }
+  .block-combined { display: flex; flex-direction: column; gap: 12px; background: transparent; border: none; box-shadow: none; }
+  .combined-inner { flex: 1; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+  .combined-bottom { display: flex; gap: 12px; flex: 1; min-height: 0; }
+
+  .block-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px; border-bottom: 2px solid var(--border); flex: 0 0 auto; gap: 10px;
+  }
+  .block-title {
+    display: flex; align-items: center; gap: 9px;
+    font-size: 14px; font-weight: 700; color: var(--text-heading);
+    margin: 0; letter-spacing: -.01em;
+  }
+  .block-icon {
+    width: 28px; height: 28px; border-radius: 8px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 14px; flex: 0 0 auto;
+  }
+  .block-icon.brand  { background: var(--brand-softer); color: var(--text-brand-dim); border: 2px solid var(--border-brand-subtle); }
+  .block-icon.teal   { background: #E0FAF5; color: #007A5E; border: 2px solid #A7F3E4; }
+  .block-icon.orange { background: #FFF3E0; color: #C05200; border: 2px solid #FFD4A3; }
+  .block-icon.purple { background: #F3E8FF; color: var(--purple-text); border: 2px solid #DDD6FE; }
+  .block-icon.pink   { background: #FFE4F2; color: #BE185D; border: 2px solid #FBCFE8; }
+  .block-icon svg { width: 14px; height: 14px; }
+
+  .block-body { flex: 1; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+  .block-body::-webkit-scrollbar { width: 4px; }
+  .block-body::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 2px; }
+
+  /* ===== Filter tabs ===== */
+  .filter-tabs { display: flex; gap: 4px; }
+  .filter-tab {
+    padding: 4px 10px; border-radius: var(--radius-pill);
+    font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px;
+    border: 2px solid var(--border); background: var(--bg-white); color: var(--text-body);
+    cursor: pointer; transition: all 100ms ease-out;
+  }
+  .filter-tab.active {
+    background: var(--brand-softer); border-color: var(--border-brand-subtle);
+    color: var(--text-brand-dim);
+  }
+  .filter-tab:hover:not(.active) { background: var(--bg-hover); }
+
+  /* ===== Task row ===== */
+  .task-row {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px 12px; border-radius: var(--radius);
+    border: 2px solid transparent;
+    transition: background 100ms ease-out, border-color 100ms ease-out;
+    cursor: pointer;
+  }
+  .task-row:hover { background: var(--bg-hover); border-color: var(--border); }
+  .task-check {
+    width: 20px; height: 20px; border-radius: 6px; flex: 0 0 auto; margin-top: 1px;
+    border: 2px solid var(--border-strong); background: var(--bg-white);
+    display: flex; align-items: center; justify-content: center;
+    transition: all 100ms ease-out; cursor: pointer;
+  }
+  .task-check.done { background: var(--brand); border-color: var(--brand-strong); }
+  .task-check.done svg { display: block; }
+  .task-check svg { display: none; width: 12px; height: 12px; color: #fff; }
+  .task-content { flex: 1; min-width: 0; }
+  .task-title { font-size: 14px; font-weight: 600; color: var(--text-heading); line-height: 1.35; }
+  .task-row.is-done .task-title { text-decoration: line-through; color: var(--text-subtle); }
+  .task-meta { display: flex; gap: 6px; margin-top: 5px; flex-wrap: wrap; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px;
+    padding: 3px 8px; border-radius: var(--radius-pill); border: 2px solid transparent;
+  }
+  .badge-brand  { background: var(--brand-softer); border-color: var(--border-brand-subtle); color: var(--text-brand-dim); }
+  .badge-teal   { background: #E0FAF5; border-color: #A7F3E4; color: #007A5E; }
+  .badge-orange { background: #FFF3E0; border-color: #FFD4A3; color: #C05200; }
+  .badge-danger { background: var(--danger-soft); border-color: var(--danger-border); color: var(--danger-text); }
+
+  /* ===== Reminder row ===== */
+  .reminder-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 12px; border-radius: var(--radius);
+    border: 2px solid transparent;
+    transition: background 100ms ease-out;
+  }
+  .reminder-row:hover { background: var(--bg-hover); border-color: var(--border); }
+  .reminder-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
+  .reminder-dot.once     { background: var(--brand); }
+  .reminder-dot.recurring { background: #00CD9C; }
+  .reminder-dot.notif    { background: #FF4B4B; }
+  .reminder-text { font-size: 13.5px; font-weight: 600; color: var(--text-heading); flex: 1; }
+  .reminder-time { font-size: 12px; color: var(--text-subtle); font-weight: 600; white-space: nowrap; }
+  .reminder-row.urgent {
+    background: var(--danger-soft); border-color: var(--danger-border);
+    animation: urgentPulse 2s ease-in-out infinite;
+  }
+  .reminder-row.urgent .reminder-dot { background: var(--danger); box-shadow: 0 0 0 3px var(--danger-soft); }
+  .reminder-row.urgent .reminder-text { color: var(--danger-text); font-weight: 700; }
+  @keyframes urgentPulse {
+    0%,100% { background: var(--danger-soft); }
+    50% { background: #FFD4D4; }
+  }
+
+  /* ===== Habits ===== */
+  .habit-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 12px; border-radius: var(--radius);
+    border: 2px solid transparent;
+    transition: background 100ms ease-out;
+  }
+  .habit-row:hover { background: var(--bg-hover); border-color: var(--border); }
+  .habit-title { font-size: 13.5px; font-weight: 600; color: var(--text-heading); flex: 1; }
+  .streak-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 12px; font-weight: 700; color: #C05200;
+    background: #FFF3E0; border: 2px solid #FFD4A3;
+    padding: 3px 8px; border-radius: var(--radius-pill);
+  }
+  .week-dots { display: flex; gap: 3px; }
+  .week-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    border: 2px solid var(--border-strong); background: var(--bg-white);
+  }
+  .week-dot.filled { background: #FF9600; border-color: #C05200; }
+  .week-dot.today  { border-color: #C05200; box-shadow: 0 0 0 2px #FFD4A3; }
+
+  /* ===== Notes ===== */
+  .notes-grid {
+    flex: 1; overflow-y: auto; padding: 10px 12px;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    grid-auto-rows: min-content; gap: 10px; align-content: start;
+  }
+  .note-card {
+    background: var(--bg-white); border: 2px solid var(--border);
+    border-radius: var(--radius); padding: 12px 12px 10px;
+    display: flex; flex-direction: column; gap: 6px;
+    box-shadow: 0 2px 0 var(--shadow-secondary);
+    transition: background 100ms ease-out, border-color 100ms ease-out, transform 100ms ease-out;
+    cursor: pointer;
+  }
+  .note-card:hover { background: var(--bg-hover); border-color: var(--border-strong); transform: translateY(-1px); box-shadow: 0 4px 0 var(--shadow-secondary); }
+  .note-card-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .note-color-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
+  .note-title { font-size: 13.5px; font-weight: 700; color: var(--text-heading); line-height: 1.35; }
+  .note-body  { font-size: 12.5px; color: var(--text-body); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .note-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 2px; }
+  .note-date { font-size: 11px; color: var(--text-subtle); font-weight: 600; }
+  .note-badge-pill {
+    font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+    padding: 2px 7px; border-radius: var(--radius-pill); border: 2px solid;
+  }
+
+  /* ===== Notification rows ===== */
+  .notif-row {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px 12px; border-radius: var(--radius);
+    border: 2px solid transparent;
+    transition: background 100ms ease-out;
+  }
+  .notif-row:hover { background: var(--bg-hover); border-color: var(--border); }
+  .notif-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; margin-top: 4px; }
+  .notif-content { flex: 1; min-width: 0; }
+  .notif-text { font-size: 13.5px; font-weight: 600; color: var(--text-heading); }
+  .notif-time { font-size: 11.5px; color: var(--text-subtle); margin-top: 2px; }
+  .new-badge {
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px;
+    padding: 2px 7px; border-radius: var(--radius-pill);
+    background: var(--brand); color: #fff; border: 2px solid var(--brand-strong);
+    flex: 0 0 auto;
+  }
+
+  /* ===== Notes toolbar ===== */
+  .notes-toolbar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; border-bottom: 2px solid var(--border); flex: 0 0 auto;
+  }
+  .notes-toolbar input {
+    flex: 1; padding: 7px 12px; border-radius: var(--radius);
+    border: 2px solid var(--border); background: var(--bg-page);
+    font-size: 13px; color: var(--text-heading);
+    outline: none; transition: border-color 100ms ease-out;
+  }
+  .notes-toolbar input:focus { border-color: var(--border-brand); }
+  .notes-toolbar input::placeholder { color: var(--text-subtle); }
+
+  /* ===== Head actions row ===== */
+  .head-actions { display: flex; align-items: center; gap: 6px; }
+  .head-add-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 5px 10px; border-radius: var(--radius);
+    border: 2px solid var(--border-brand-subtle); background: var(--brand-softer);
+    font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px;
+    color: var(--text-brand-dim); cursor: pointer;
+    box-shadow: 0 3px 0 var(--shadow-brand);
+    transition: all 100ms ease-out;
+  }
+  .head-add-btn:hover { background: var(--brand-soft); }
+  .head-add-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--shadow-brand); }
+  .head-add-btn svg { width: 13px; height: 13px; }
+
+  /* ===== Comparison banner ===== */
+  .compare-banner {
+    background: #FFF8E0; border-bottom: 2px solid #FFE89B;
+    padding: 8px 20px; display: flex; align-items: center; gap: 10px;
+    font-size: 12.5px; font-weight: 600; color: #8A6F00; flex: 0 0 auto;
+  }
+  .compare-banner a { color: var(--text-brand); font-weight: 700; text-decoration: none; }
+  .compare-banner a:hover { text-decoration: underline; }
+
+  /* ===== SVG icons ===== */
+  svg.icon { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: 0 0 auto; }
+</style>
+</head>
+<body>
+
+<!-- Banner so sánh -->
+<div class="compare-banner">
+  ⚡ Demo thử nghiệm — Lingo Design System áp dụng lên KN-Space.
+  So sánh với <a href="index.html">→ index.html (H1 Chromatic)</a>
+</div>
+
+<!-- Topbar -->
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="logo">
+      <div class="logo-icon">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M9 9h6M9 12h6M9 15h4"/></svg>
+      </div>
+      KN-Space
+    </div>
+    <button class="space-switcher">
+      Cá nhân
+      <svg class="icon" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>
+  </div>
+  <div class="topbar-right">
+    <button class="btn btn-ghost btn-sm">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      Ẩn tất cả
+    </button>
+    <button class="btn btn-secondary btn-sm">
+      <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Cài đặt
+    </button>
+  </div>
+</div>
+
+<!-- Dashboard -->
+<div id="dashboard">
+  <div id="main-row">
+
+    <!-- Khối tổng hợp -->
+    <div class="block-combined" style="flex: 0 0 42%;">
+      <div class="combined-inner">
+
+        <!-- Việc cần làm -->
+        <div class="block" style="flex: 0 0 45%;">
+          <div class="block-head">
+            <h2 class="block-title">
+              <span class="block-icon brand">
+                <svg class="icon" viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              </span>
+              Việc cần làm
+            </h2>
+            <div class="head-actions">
+              <div class="filter-tabs">
+                <button class="filter-tab active">Tất cả</button>
+                <button class="filter-tab">Chưa xong</button>
+                <button class="filter-tab">Đã xong</button>
+              </div>
+              <button class="head-add-btn">
+                <svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Thêm
+              </button>
+            </div>
+          </div>
+          <div class="block-body">
+            <!-- Task rows -->
+            <div class="task-row">
+              <div class="task-check">
+                <svg class="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+              <div class="task-content">
+                <div class="task-title">Hoàn thành báo cáo tháng 6</div>
+                <div class="task-meta">
+                  <span class="badge badge-danger">⚠ Hôm nay</span>
+                  <span class="badge badge-brand">1 lần</span>
+                </div>
+              </div>
+            </div>
+            <div class="task-row">
+              <div class="task-check">
+                <svg class="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+              <div class="task-content">
+                <div class="task-title">Review pull request từ Nam</div>
+                <div class="task-meta">
+                  <span class="badge badge-teal">Lặp lại · Thứ 3</span>
+                </div>
+              </div>
+            </div>
+            <div class="task-row">
+              <div class="task-check">
+                <svg class="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+              <div class="task-content">
+                <div class="task-title">Cập nhật tài liệu kỹ thuật</div>
+                <div class="task-meta">
+                  <span class="badge badge-brand">1 lần</span>
+                </div>
+              </div>
+            </div>
+            <div class="task-row is-done">
+              <div class="task-check done">
+                <svg class="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+              <div class="task-content">
+                <div class="task-title">Họp standup buổi sáng</div>
+                <div class="task-meta">
+                  <span class="badge badge-teal">Lặp lại · Hằng ngày</span>
+                </div>
+              </div>
+            </div>
+            <div class="task-row is-done">
+              <div class="task-check done">
+                <svg class="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+              <div class="task-content">
+                <div class="task-title">Gửi invoice cho khách hàng</div>
+                <div class="task-meta">
+                  <span class="badge badge-brand">1 lần</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Nhắc việc + Thói quen -->
+        <div class="combined-bottom" style="flex: 1;">
+
+          <!-- Nhắc việc -->
+          <div class="block" style="flex: 50%;">
+            <div class="block-head">
+              <h2 class="block-title">
+                <span class="block-icon teal">
+                  <svg class="icon" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                </span>
+                Nhắc việc
+              </h2>
+              <button class="head-add-btn">
+                <svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Thêm
+              </button>
+            </div>
+            <div class="block-body">
+              <div class="reminder-row urgent">
+                <div class="reminder-dot notif"></div>
+                <div class="reminder-text">Uống thuốc buổi tối</div>
+                <div class="reminder-time">21:00</div>
+              </div>
+              <div class="reminder-row">
+                <div class="reminder-dot once"></div>
+                <div class="reminder-text">Nộp báo cáo cuối tháng</div>
+                <div class="reminder-time">30/06</div>
+              </div>
+              <div class="reminder-row">
+                <div class="reminder-dot recurring"></div>
+                <div class="reminder-text">Đặt lịch dentist định kỳ</div>
+                <div class="reminder-time">Hằng quý</div>
+              </div>
+              <div class="reminder-row">
+                <div class="reminder-dot once"></div>
+                <div class="reminder-text">Gia hạn domain KN-Space</div>
+                <div class="reminder-time">15/07</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Thói quen -->
+          <div class="block" style="flex: 50%;">
+            <div class="block-head">
+              <h2 class="block-title">
+                <span class="block-icon orange">
+                  <svg class="icon" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+                </span>
+                Thói quen
+              </h2>
+              <button class="head-add-btn">
+                <svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Thêm
+              </button>
+            </div>
+            <div class="block-body">
+              <div class="habit-row">
+                <div class="habit-title">🧘 Thiền buổi sáng</div>
+                <div class="streak-pill">🔥 12</div>
+                <div class="week-dots">
+                  <div class="week-dot filled"></div>
+                  <div class="week-dot filled"></div>
+                  <div class="week-dot filled"></div>
+                  <div class="week-dot filled"></div>
+                  <div class="week-dot today"></div>
+                  <div class="week-dot"></div>
+                  <div class="week-dot"></div>
+                </div>
+              </div>
+              <div class="habit-row">
+                <div class="habit-title">📖 Đọc sách 30 phút</div>
+                <div class="streak-pill">🔥 7</div>
+                <div class="week-dots">
+                  <div class="week-dot filled"></div>
+                  <div class="week-dot filled"></div>
+                  <div class="week-dot"></div>
+                  <div class="week-dot filled"></div>
+                  <div class="week-dot today"></div>
+                  <div class="week-dot"></div>
+                  <div class="week-dot"></div>
+                </div>
+              </div>
+              <div class="habit-row">
+                <div class="habit-title">💪 Tập gym</div>
+                <div class="streak-pill">🔥 4</div>
+                <div class="week-dots">
+                  <div class="week-dot"></div>
+                  <div class="week-dot filled"></div>
+                  <div class="week-dot"></div>
+                  <div class="week-dot filled"></div>
+                  <div class="week-dot today"></div>
+                  <div class="week-dot"></div>
+                  <div class="week-dot"></div>
+                </div>
+              </div>
+              <div class="habit-row">
+                <div class="habit-title">🚰 Uống đủ 2L nước</div>
+                <div class="streak-pill">🔥 21</div>
+                <div class="week-dots">
+                  <div class="week-dot filled"></div>
+                  <div class="week-dot filled"></div>
+                  <div class="week-dot filled"></div>
+                  <div class="week-dot filled"></div>
+                  <div class="week-dot today"></div>
+                  <div class="week-dot"></div>
+                  <div class="week-dot"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /combined-bottom -->
+      </div>
+    </div><!-- /block-combined -->
+
+    <!-- Khối Ghi chú -->
+    <div class="block" style="flex: 1;">
+      <div class="block-head">
+        <h2 class="block-title">
+          <span class="block-icon purple">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          </span>
+          Ghi chú
+        </h2>
+        <div class="head-actions">
+          <button class="head-add-btn">
+            <svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Thêm note
+          </button>
+        </div>
+      </div>
+      <div class="notes-toolbar">
+        <input type="text" placeholder="Tìm note..." />
+        <button class="btn-icon" title="Sắp xếp">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="notes-grid">
+
+        <div class="note-card">
+          <div class="note-card-top">
+            <div class="note-color-dot" style="background:#8549BA;"></div>
+            <span class="note-badge-pill" style="background:#F3E8FF; border-color:#DDD6FE; color:#8549BA;">ƯUTIÊN</span>
+          </div>
+          <div class="note-title">Setup CI/CD pipeline</div>
+          <div class="note-body">Dùng GitHub Actions, cần cấu hình staging env và production deploy với approval step.</div>
+          <div class="note-footer">
+            <span class="note-date">22 thg 6</span>
+          </div>
+        </div>
+
+        <div class="note-card">
+          <div class="note-card-top">
+            <div class="note-color-dot" style="background:#1CB0F6;"></div>
+          </div>
+          <div class="note-title">Ý tưởng side project</div>
+          <div class="note-body">App theo dõi chi tiêu cá nhân với AI phân tích thói quen — tích hợp với ngân hàng.</div>
+          <div class="note-footer">
+            <span class="note-date">20 thg 6</span>
+          </div>
+        </div>
+
+        <div class="note-card">
+          <div class="note-card-top">
+            <div class="note-color-dot" style="background:#58CC03;"></div>
+          </div>
+          <div class="note-title">Meeting notes — Sprint 12</div>
+          <div class="note-body">• Velocity 34 pts — tốt hơn sprint trước. • Backlog cần grooming trước thứ 4. • Designer off tuần tới.</div>
+          <div class="note-footer">
+            <span class="note-date">18 thg 6</span>
+          </div>
+        </div>
+
+        <div class="note-card">
+          <div class="note-card-top">
+            <div class="note-color-dot" style="background:#FF9600;"></div>
+            <span class="note-badge-pill" style="background:#FFF3E0; border-color:#FFD4A3; color:#C05200;">🔒 BẢO MẬT</span>
+          </div>
+          <div class="note-title">Credentials staging</div>
+          <div class="note-body">• • • • • • • • • • • • • •</div>
+          <div class="note-footer">
+            <span class="note-date">15 thg 6</span>
+          </div>
+        </div>
+
+        <div class="note-card">
+          <div class="note-card-top">
+            <div class="note-color-dot" style="background:#FF86D0;"></div>
+          </div>
+          <div class="note-title">Book list 2026</div>
+          <div class="note-body">Atomic Habits ✓, Deep Work ✓, The Pragmatic Programmer (đang đọc), Clean Architecture.</div>
+          <div class="note-footer">
+            <span class="note-date">10 thg 6</span>
+          </div>
+        </div>
+
+        <div class="note-card">
+          <div class="note-card-top">
+            <div class="note-color-dot" style="background:#00CD9C;"></div>
+          </div>
+          <div class="note-title">Checklist deploy production</div>
+          <div class="note-body">[ ] Backup DB [ ] Smoke test staging [ ] Notify team [ ] Tag release [ ] Monitor 1h sau deploy.</div>
+          <div class="note-footer">
+            <span class="note-date">08 thg 6</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Khối Thông báo -->
+    <div class="block" style="flex: 0 0 260px;">
+      <div class="block-head">
+        <h2 class="block-title">
+          <span class="block-icon pink">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          </span>
+          Thông báo
+        </h2>
+      </div>
+      <div class="block-body">
+
+        <div class="notif-row" style="background: var(--danger-soft); border-color: var(--danger-border);">
+          <div class="notif-dot" style="background: var(--danger);"></div>
+          <div class="notif-content">
+            <div class="notif-text" style="color: var(--danger-text);">Uống thuốc buổi tối</div>
+            <div class="notif-time">21:00 · Nhắc việc</div>
+          </div>
+          <span class="new-badge">MỚI</span>
+        </div>
+
+        <div class="notif-row">
+          <div class="notif-dot" style="background: var(--brand);"></div>
+          <div class="notif-content">
+            <div class="notif-text">Việc quá hạn: Hoàn thành báo cáo</div>
+            <div class="notif-time">Hôm nay · Việc cần làm</div>
+          </div>
+        </div>
+
+        <div class="notif-row">
+          <div class="notif-dot" style="background: #FF9600;"></div>
+          <div class="notif-content">
+            <div class="notif-text">Streak 12 ngày 🔥 — Thiền buổi sáng</div>
+            <div class="notif-time">Hôm nay · Thói quen</div>
+          </div>
+        </div>
+
+        <div class="notif-row">
+          <div class="notif-dot" style="background: #8549BA;"></div>
+          <div class="notif-content">
+            <div class="notif-text">Note mới: Setup CI/CD pipeline</div>
+            <div class="notif-time">22 thg 6 · Ghi chú</div>
+          </div>
+        </div>
+
+        <div class="notif-row">
+          <div class="notif-dot" style="background: #1CB0F6;"></div>
+          <div class="notif-content">
+            <div class="notif-text">Gia hạn domain KN-Space</div>
+            <div class="notif-time">15/07 · Nhắc việc</div>
+          </div>
+        </div>
+
+        <div class="notif-row">
+          <div class="notif-dot" style="background: #00CD9C;"></div>
+          <div class="notif-content">
+            <div class="notif-text">Đặt lịch dentist định kỳ</div>
+            <div class="notif-time">Hằng quý · Nhắc việc</div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /block-reminders -->
+
+  </div>
+</div>
+
+</body>
+</html>
