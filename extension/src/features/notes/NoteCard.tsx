@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Eye, EyeOff, GripVertical, Pencil, Trash2 } from 'lucide-react';
+import { Eye, EyeOff, GripVertical, Maximize2, Minimize2, Pencil, Trash2 } from 'lucide-react';
 import { useAppState } from '../../state/AppStateContext';
 import { formatNoteDate, hexToRgba, maskContent } from './noteUtils';
 import type { Note, NoteSortBy, NoteView } from '../../types';
@@ -37,6 +37,7 @@ export function NoteCard({
   const [dropHint, setDropHint] = useState<'before' | 'after' | null>(null);
 
   const isHidden = state.ui.hiddenNoteContentIds.has(note.id);
+  const isExpanded = view === 'list' && note.expanded;
   const noteAlpha = document.body.getAttribute('data-theme') === 'dark' ? 0.24 : 0.1;
   const bgStyle = hexToRgba(note.color, noteAlpha);
   const isDragging = draggedId === note.id;
@@ -84,13 +85,21 @@ export function NoteCard({
 
   const dropClass = dropHint === 'before' ? 'drop-before' : dropHint === 'after' ? 'drop-after' : '';
 
+  function handleCardClick() {
+    // Bôi đen để copy text trong card cũng kết thúc bằng 1 click — chỉ mở modal
+    // detail khi không có vùng text nào đang được chọn.
+    const selection = window.getSelection();
+    if (selection && selection.toString().length > 0) return;
+    onOpenView(note.id);
+  }
+
   return (
     <div
       ref={cardRef}
-      className={`note-card ${isDragging ? 'dragging' : ''} ${dropClass}`.trim()}
+      className={`note-card ${isDragging ? 'dragging' : ''} ${dropClass} ${isExpanded ? 'expanded' : ''}`.trim()}
       data-id={note.id}
       style={{ borderLeftColor: note.color, background: bgStyle }}
-      onClick={() => onOpenView(note.id)}
+      onClick={handleCardClick}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onDragOver={handleDragOver}
@@ -123,6 +132,17 @@ export function NoteCard({
           <button className="icon-btn" title="Xoá note" aria-label="Xoá note" onClick={() => onDelete(note)}>
             <Trash2 className="icon" size={13} />
           </button>
+          {view === 'list' && (
+            <button
+              className="icon-btn"
+              title={isExpanded ? 'Thu gọn' : 'Mở rộng'}
+              aria-label={isExpanded ? 'Thu gọn card' : 'Mở rộng card'}
+              aria-pressed={isExpanded}
+              onClick={() => dispatch({ type: 'NOTE_TOGGLE_EXPANDED', payload: { id: note.id } })}
+            >
+              {isExpanded ? <Minimize2 className="icon" size={13} /> : <Maximize2 className="icon" size={13} />}
+            </button>
+          )}
         </div>
       </div>
       <p className="nc-title">{note.title}</p>

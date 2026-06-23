@@ -49,7 +49,8 @@ export function NotesBlock({
   const sortWrapRef = useRef<HTMLDivElement>(null);
 
   const collapsed = state.settings.collapsedBlocks.notes;
-  const { noteSearch, noteSortBy, noteView } = state.ui;
+  const { noteView } = state.settings;
+  const { noteSearch, noteSortBy } = state.ui;
 
   useEffect(() => {
     function onMouseDown(e: MouseEvent) {

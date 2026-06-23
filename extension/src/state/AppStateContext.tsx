@@ -8,6 +8,7 @@ import {
   setFallbackListener,
   subscribeStorageChanges,
 } from '../storage/chromeStorage';
+import { defaultSettings } from './seed';
 import type { AppAction } from './appReducer';
 import { appReducer } from './appReducer';
 
@@ -20,18 +21,12 @@ interface AppStateContextValue {
 const AppStateContext = createContext<AppStateContextValue | null>(null);
 
 function emptyState(): AppState {
+  const settings = defaultSettings();
   return {
     spaces: [],
     currentSpaceId: '',
-    settings: {
-      theme: 'light',
-      accent: '#5b6cff',
-      background: 'plain',
-      layoutSizes: { combined: 45, notes: 35, tasks: 45, reminder: 50 },
-      mainBlockOrder: ['combined', 'notes', 'reminders'],
-      collapsedBlocks: { tasks: false, reminder: false, habits: false, notes: false, reminders: false },
-    },
-    ui: buildUiInitialState(),
+    settings,
+    ui: buildUiInitialState(settings.lastScreen),
     storageFallbackActive: false,
   };
 }

@@ -3,7 +3,7 @@
 ## 1. Mục tiêu
 Xây dựng **KN-Space** thành một **Chrome Extension Manifest V3** dạng dashboard full-tab cho cá nhân dùng trên desktop.
 
-Sản phẩm là dashboard năng suất cá nhân gồm 5 khối:
+Sản phẩm gồm 2 màn: **Home** (Tabliss-style, đồng hồ + lời chào + quote trên ảnh nền full-screen) là màn mở đầu, và **Dashboard** năng suất cá nhân gồm 5 khối:
 - Việc cần làm
 - Nhắc việc
 - Thói quen
@@ -21,9 +21,11 @@ Người dùng chấp nhận giới hạn đồng bộ của Chrome Sync và có
 Trong phạm vi:
 - Chrome Extension MV3, mở dashboard ở tab riêng/full-tab, không làm popup nhỏ.
 - Lưu dữ liệu bằng `chrome.storage.sync`, fallback `chrome.storage.local` khi vượt quota.
-- Full dashboard 5 khối: Việc cần làm, Nhắc việc, Thói quen, Ghi chú, Thông báo.
+- Màn **Home** (Tabliss-style): đồng hồ real-time, ngày, lời chào theo buổi, 1 quote/ngày, ảnh nền full-screen, nút "Vào Dashboard".
+- Ảnh nền dùng **link ảnh tĩnh cố định** (hotlink `images.unsplash.com`), không gọi API random/search ảnh.
+- Full dashboard 5 khối: Việc cần làm, Nhắc việc, Thói quen, Ghi chú, Thông báo, nổi trên ảnh nền chung với hiệu ứng kính mờ nhẹ.
 - Nhiều Space cục bộ trong dữ liệu của một người dùng.
-- Settings: theme, màu chủ đạo, ảnh nền, header tint, layout size, thứ tự khối, export/import.
+- Settings: theme, màu chủ đạo, ảnh nền Home (lưới preview + sửa link + tự động đổi ảnh theo thời gian), layout size, thứ tự khối, export/import.
 - Ẩn/hiện nội dung từng khối và ẩn/hiện tất cả.
 - Icon SVG nhất quán, modal tuỳ biến, accessibility cơ bản.
 - Chuyển mockup `docs/mockup/index.html` thành extension thật, có persistence.
@@ -37,6 +39,8 @@ Ngoài phạm vi Phase 1:
 - Đính kèm ảnh/file trong note.
 - Kanban.
 - Cỡ chữ tuỳ chỉnh trong Settings.
+- Ảnh nền theo API Unsplash random/search (cần Access Key, có rate-limit) — chỉ dùng link tĩnh cố định đóng gói sẵn + cho sửa link thủ công.
+- Setting "Màn mặc định khi mở tab" — đã bỏ, hành vi cố định là nhớ màn cuối user rời đi.
 
 ## 4. Layout Dashboard
 Dashboard gồm 3 khối chính xếp ngang trên desktop:
@@ -57,6 +61,29 @@ Yêu cầu layout:
 - Có nút **Khôi phục mặc định**.
 - Đổi thứ tự 3 khối chính bằng kéo-thả header (`block-head`).
 - Lưu tỉ lệ layout + thứ tự khối vào storage, dùng chung cho mọi Space.
+
+## 4.5 Màn Home (Tabliss-style)
+Home là màn đầu tiên khi mở tab mới, tách hoàn toàn khỏi Dashboard 5 khối.
+
+Nội dung Home:
+- Đồng hồ lớn giờ:phút:giây cập nhật real-time (giây hiển thị nhỏ hơn, kiểu superscript).
+- Ngày hiển thị dạng "Thứ X, ngày D tháng M năm YYYY".
+- Lời chào theo buổi: sáng (giờ < 11) / trưa (11–13) / chiều (14–17) / tối (từ 18h), có thể ghép tên người dùng nếu đã đặt (mặc định để trống).
+- 1 câu quote ngắn, lấy từ danh sách ~7 câu đóng gói cứng trong code, chọn theo **chỉ số ngày tính từ epoch modulo số câu** — cùng ngày luôn ra cùng câu, không gọi API quote ngoài.
+- Ảnh nền full-screen (xem mục 4.6), dùng chung layer với Dashboard.
+
+Điều hướng:
+- 1 nút CTA duy nhất **"Vào Dashboard"** để chuyển màn. Không có hint text, không có nút "Kéo xuống", không có cử chỉ scroll-wheel (đã loại bỏ qua nhiều vòng feedback vì dư thừa).
+- Phím tắt ngầm (không hiển thị gợi ý): `Enter` hoặc `Space` khi đang ở Home và không có input/textarea/select đang focus, không có modal mở → vào Dashboard.
+- Từ Dashboard: nút **Home** trên topbar hoặc phím `Esc` (khi không có modal mở) → quay lại Home.
+- Chuyển màn có transition fade (~0.45s), ảnh nền giữ nguyên không nháy/reload.
+- Mở tab mới luôn mở lại đúng màn cuối cùng user rời đi (Home hoặc Dashboard), lưu vào storage dưới dạng `lastScreen`. Đây là hành vi cố định, **không phải setting cho người dùng chọn**.
+
+## 4.6 Ảnh Nền Chung (Home + Dashboard)
+- Ảnh nền là **1 layer duy nhất** dùng chung cho cả Home và Dashboard — không đổi/nhảy ảnh khi chuyển màn, đảm bảo liền mạch.
+- Bộ ảnh mặc định gồm 6 link ảnh phong cảnh tĩnh (rừng/núi/hồ/đồi), hotlink trực tiếp tới `images.unsplash.com` qua URL cố định trong code, **không gọi API Unsplash random/search** (không cần Access Key, không rate-limit).
+- Ảnh đang dùng được chọn theo chỉ số ngày tính từ epoch khi mở app lần đầu trong ngày (đồng bộ cách chọn với quote), người dùng có thể đổi thủ công bất kỳ lúc nào.
+- Khi ảnh lỗi tải (link hỏng/offline): fallback sang 1 trong các gradient đóng gói sẵn trong code, không để màn trắng vỡ.
 
 ## 5. Tính Năng Chi Tiết
 
@@ -194,7 +221,7 @@ Khi chuyển Space:
 Settings dùng chung mọi Space:
 - Theme.
 - Màu chủ đạo.
-- Ảnh nền.
+- Ảnh nền (Home + Dashboard).
 - Tỉ lệ layout.
 - Thứ tự khối chính.
 
@@ -202,12 +229,19 @@ Settings dùng chung mọi Space:
 Settings gồm:
 - Theme Sáng/Tối.
 - Màu chủ đạo từ bảng màu có sẵn.
-- Ảnh nền/gradient đóng gói sẵn, không tải ảnh từ internet.
-- Header tint đổi theo tông ảnh nền, dùng màu đặc/pastel có kiểm soát tương phản.
+- Ảnh nền Home (xem chi tiết bên dưới).
 - Layout size bằng slider/input.
 - Khôi phục layout mặc định.
 - Export JSON.
 - Import JSON.
+
+Ảnh nền Home:
+- Lưới preview 6 ô, mỗi ô tương ứng 1 link trong bộ ảnh mặc định (mục 4.6).
+- Click vào ảnh trong ô để áp dụng ngay làm ảnh nền hiện tại (dùng chung Home + Dashboard).
+- Mỗi ô có input cho sửa trực tiếp link ảnh; áp dụng khi blur hoặc nhấn Enter.
+- Ô có link lỗi (load ảnh thất bại) hiện cảnh báo "Link lỗi" đè lên thumbnail, không tự đổi ảnh.
+- Có tuỳ chọn "Tự động đổi ảnh" theo khoảng thời gian: Tắt / Mỗi 1 phút / Mỗi 15 phút / Mỗi 1 giờ.
+- Đã gỡ hẳn mục Ảnh nền gradient/Trơn cũ và cơ chế "header tint đổi theo tông ảnh nền" — không còn dùng.
 
 Export/Import:
 - Export xuất toàn bộ spaces + settings ra file `.json`.
@@ -243,7 +277,7 @@ Yêu cầu:
   - Thông báo: hồng.
 - Card/khối có shadow nhẹ, viền mỏng.
 - Checkbox tuỳ biến, không dùng checkbox mặc định của OS.
-- Modal nền đặc, dễ đọc.
+- Modal nền đặc, dễ đọc (modal **không** áp dụng kính mờ).
 - Xác nhận xoá dùng modal tuỳ biến, không dùng `window.confirm()`.
 - Click ra ngoài modal để đóng, tương đương Hủy.
 - Hiệu ứng nhẹ:
@@ -251,7 +285,7 @@ Yêu cầu:
   - Drag item/block có opacity khi kéo.
   - Drop target có outline/nhấn nhẹ.
 - Không dùng phong cách Duolingo.
-- Không dùng glassmorphism/kính mờ cho khối.
+- **Dashboard dùng kính mờ nhẹ** (đảo ngược quyết định cũ "không glassmorphism"): từ khi Dashboard nổi trên ảnh nền chung, các khối chính/sub-block/topbar dùng nền bán-trong-suốt + `backdrop-filter: blur()`, alpha cao ~88-90% (đủ đọc rõ chữ, khác biệt với kính mờ trong suốt mạnh kiểu Duolingo). Ảnh nền lộ ra ở viền ngoài dashboard và khe (gap) giữa các khối. Quyết định này đã thử nghiệm qua nhiều vòng so sánh (gồm cả biến thể "nền đặc không kính mờ" và "kính mờ trong suốt cao"), chốt phương án kính mờ nhẹ vì giữ được độ rõ chữ tốt nhất trong khi vẫn tạo cảm giác khối "nổi trên" ảnh.
 
 Accessibility cơ bản:
 - Nút chỉ có icon phải có `title` và `aria-label`.
@@ -264,6 +298,7 @@ Extension:
 - Chrome Extension Manifest V3.
 - Desktop-only.
 - Permission tối thiểu: `storage`.
+- `host_permissions` cho `https://images.unsplash.com/*` — cần vì Home/Dashboard tải ảnh nền qua `<img>`/CSS `background-image` hotlink tới domain ngoài (link tĩnh, không phải fetch ảnh qua code/API key).
 - Icon extension mở/focus tab dashboard.
 - Không popup nhỏ.
 - Không backend/auth/hosting.
@@ -276,6 +311,7 @@ MV3 CSP:
 - Bản extension không được dùng inline handler trong HTML build output.
 - React event handlers hợp lệ vì nằm trong JS bundle external.
 - Vite build không được cần `eval` hoặc remote script.
+- Ảnh nền hotlink từ `images.unsplash.com` cần được CSP cho phép ở `img-src`/`connect-src` tương ứng trong manifest.
 
 Storage:
 - `chrome.storage.sync` là nguồn chính.
@@ -285,6 +321,7 @@ Storage:
 - Cần debounce khi ghi storage.
 - Seed dữ liệu demo chỉ khi storage rỗng lần đầu.
 - Sau lần đầu, reload phải đọc dữ liệu thật từ storage.
+- Lưu thêm `lastScreen` (Home/Dashboard) và cấu hình ảnh nền (6 link hiện tại + chỉ số đang chọn + khoảng tự động đổi ảnh) vào storage.
 
 Drag & drop:
 - Khối chính và card note đều có drag/drop độc lập.
@@ -315,11 +352,11 @@ extension/
 ```
 
 Vai trò:
-- `manifest.json`: MV3, permission `storage`, action, background service worker, icons.
+- `manifest.json`: MV3, permission `storage`, `host_permissions` cho `images.unsplash.com`, action, background service worker, icons.
 - `background.js`: click icon mở/focus tab dashboard.
 - `index.html`: entry HTML cho React app, không inline script.
-- `src/main.tsx` + `src/App.tsx`: bootstrap và shell dashboard.
-- `src/features/`: UI/logic theo từng khối chức năng.
+- `src/main.tsx` + `src/App.tsx`: bootstrap và shell dashboard, gồm cả màn Home.
+- `src/features/`: UI/logic theo từng khối chức năng (bao gồm Home).
 - `src/storage/chromeStorage.ts`: load/seed/save debounce, sync + local fallback.
 - `lucide-react`: icon UI line-icon nhất quán trong dashboard.
 - `icons/`: icon 16/32/48/128.
@@ -330,10 +367,15 @@ Dev cần kiểm tra:
 - Click icon mở/focus dashboard full-tab.
 - `npm run build` thành công.
 - Console không có lỗi CSP/runtime.
+- Mở tab mới hiện đúng màn Home/Dashboard theo `lastScreen` đã lưu.
+- Home: đồng hồ chạy đúng giờ máy, quote/ảnh nền cùng ngày ra cùng kết quả, nút "Vào Dashboard" + phím Enter/Space hoạt động, Esc từ Dashboard quay lại Home.
+- Ảnh nền lỗi/offline rơi về gradient fallback, không vỡ layout.
+- Đổi/sửa link ảnh nền trong Settings áp dụng đúng, ô lỗi link hiện cảnh báo.
+- Tự động đổi ảnh theo khoảng thời gian đã chọn hoạt động.
 - CRUD đủ 5 khối.
 - Tạo/đổi tên/xoá/sắp xếp Space.
 - Bật/tắt khối theo Space.
-- Đổi theme/màu/ảnh nền/layout/thứ tự khối.
+- Đổi theme/màu/layout/thứ tự khối.
 - Reload tab vẫn giữ dữ liệu.
 - Export JSON tải file đúng.
 - Import JSON khôi phục đúng sau xác nhận.

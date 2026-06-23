@@ -1,13 +1,21 @@
 import type { Settings, Space } from '../types';
+import { DEFAULT_HOME_IMAGES, dayIndex } from '../features/home/homeContent';
 
 export function defaultSettings(): Settings {
   return {
     theme: 'light',
     accent: '#5b6cff',
-    background: 'plain',
+    homeBackground: {
+      images: [...DEFAULT_HOME_IMAGES],
+      // Chỉ số ngày tính từ epoch — đồng bộ cách chọn với quote, đổi mỗi ngày tự nhiên.
+      index: dayIndex(DEFAULT_HOME_IMAGES.length),
+      autoRotateMs: 0,
+    },
     layoutSizes: { combined: 45, notes: 35, tasks: 45, reminder: 50 },
     mainBlockOrder: ['combined', 'notes', 'reminders'],
     collapsedBlocks: { tasks: false, reminder: false, habits: false, notes: false, reminders: false },
+    noteView: 'grid',
+    lastScreen: 'home',
   };
 }
 

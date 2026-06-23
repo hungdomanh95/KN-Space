@@ -195,21 +195,36 @@ function normalizeSpace(space: Space): Space {
     tasks: Array.isArray(space.tasks) ? space.tasks : [],
     reminders: Array.isArray(space.reminders) ? space.reminders : [],
     habits: Array.isArray(space.habits) ? space.habits : [],
-    notes: Array.isArray(space.notes) ? space.notes : [],
+    notes: Array.isArray(space.notes) ? space.notes.map((n) => ({ ...n, expanded: n.expanded ?? false })) : [],
   };
 }
 
-function normalizeSettings(settings: Settings): Settings {
+const VALID_AUTO_ROTATE_MS = new Set([0, 60_000, 900_000, 3_600_000]);
+
+function normalizeHomeBackground(raw: Settings['homeBackground'] | undefined, fallback: Settings['homeBackground']): Settings['homeBackground'] {
+  const images = Array.isArray(raw?.images) && raw.images.length === fallback.images.length
+    ? raw.images.map((url, i) => (typeof url === 'string' && url.trim() ? url : fallback.images[i]))
+    : fallback.images;
+  const index = typeof raw?.index === 'number' && raw.index >= 0 && raw.index < images.length ? raw.index : fallback.index;
+  const autoRotateMs = VALID_AUTO_ROTATE_MS.has(raw?.autoRotateMs as number)
+    ? (raw!.autoRotateMs as Settings['homeBackground']['autoRotateMs'])
+    : fallback.autoRotateMs;
+  return { images, index, autoRotateMs };
+}
+
+export function normalizeSettings(settings: Settings): Settings {
   const fallback = defaultSettings();
   return {
     theme: settings.theme ?? fallback.theme,
     accent: settings.accent ?? fallback.accent,
-    background: settings.background ?? fallback.background,
+    homeBackground: normalizeHomeBackground(settings.homeBackground, fallback.homeBackground),
     layoutSizes: { ...fallback.layoutSizes, ...settings.layoutSizes },
     mainBlockOrder: Array.isArray(settings.mainBlockOrder) && settings.mainBlockOrder.length === 3
       ? settings.mainBlockOrder
       : fallback.mainBlockOrder,
     collapsedBlocks: { ...fallback.collapsedBlocks, ...settings.collapsedBlocks },
+    noteView: settings.noteView ?? fallback.noteView,
+    lastScreen: settings.lastScreen === 'dashboard' ? 'dashboard' : 'home',
   };
 }
 
@@ -297,13 +312,18 @@ export async function forceFlush(): Promise<void> {
   await flushPendingSave();
 }
 
-export function buildUiInitialState(): UiState {
+/**
+ * `currentScreen` ephemeral được khởi tạo từ `lastScreen` đã persist (chỉ lúc HYDRATE) —
+ * sau đó user điều hướng Home/Dashboard trong phiên không ghi storage lại liên tục,
+ * mà chỉ ghi khi `lastScreen` thực sự đổi (xem appReducer SCREEN_SET).
+ */
+export function buildUiInitialState(lastScreen: UiState['currentScreen'] = 'home'): UiState {
   return {
     taskFilter: 'all',
     noteSearch: '',
     noteSortBy: 'order',
-    noteView: 'grid',
     hiddenNoteContentIds: new Set(),
+    currentScreen: lastScreen,
   };
 }
 

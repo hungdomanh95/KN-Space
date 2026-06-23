@@ -40,7 +40,8 @@
   html, body { height: 100%; margin: 0; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: var(--bg);
+    /* Trong suốt: ảnh nền chung do #app-bg lo (cả Home lẫn Dashboard). */
+    background: transparent;
     color: var(--text);
     display: flex;
     flex-direction: column;
@@ -59,7 +60,19 @@
     padding: 11px 22px; background: var(--panel-bg);
     border-bottom: 1px solid rgba(var(--accent-rgb), .2);
     flex: 0 0 auto;
+    position: relative; z-index: 70;
+    transition: background .25s ease, border-color .25s ease;
   }
+  /* Khi ở Dashboard: topbar BÁN TRONG + blur để lộ ảnh nền phía sau (cảm giác nổi
+     trên ảnh, đồng bộ với các khối). Ở Home topbar bị #home-screen che nên không ảnh hưởng. */
+  body.home-hidden .topbar {
+    background: color-mix(in srgb, var(--panel-bg) 82%, transparent);
+    backdrop-filter: blur(14px) saturate(1.15);
+    -webkit-backdrop-filter: blur(14px) saturate(1.15);
+    border-bottom-color: rgba(255,255,255,.18);
+  }
+  [data-theme="dark"] body.home-hidden .topbar,
+  body.home-hidden[data-theme="dark"] .topbar { border-bottom-color: rgba(255,255,255,.08); }
   .brand { display:flex; align-items:center; gap:10px; }
   .brand-mark {
     width: 30px; height: 30px; border-radius: 9px;
@@ -330,7 +343,7 @@
   .notes-list .note-card.drop-after { box-shadow: 0 3px 0 -1px var(--accent); }
 
   /* ===== Modal (luôn nền đặc — dễ đọc, không kính mờ) ===== */
-  .overlay { position: fixed; inset: 0; background: rgba(20,20,30,.45); display: flex; align-items: center; justify-content: center; z-index: 50; backdrop-filter: blur(2px); }
+  .overlay { position: fixed; inset: 0; background: rgba(20,20,30,.45); display: flex; align-items: center; justify-content: center; z-index: 80; backdrop-filter: blur(2px); }
   .modal { background: var(--modal-bg); border: 1px solid var(--border); border-radius: 16px; width: 440px; max-width: 90vw; padding: 22px; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
   .modal-settings { width: 760px; max-width: 92vw; }
   .modal-note { width: 620px; max-width: 92vw; }
@@ -372,12 +385,28 @@
   .color-palette { display: flex; gap: 11px; }
   .swatch { width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; box-shadow: 0 0 0 1px var(--border) inset; }
   .swatch.active { border-color: var(--text); }
-  .swatch:focus-visible, .bg-thumb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .swatch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-  .bg-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 8px; }
-  .bg-thumb { height: 46px; border-radius: 10px; border: 2px solid transparent; cursor: pointer; box-shadow: 0 0 0 1px var(--border) inset; }
-  .bg-thumb.active { border-color: var(--accent); }
-  .bg-thumb.plain { display:flex; align-items:center; justify-content:center; font-size:12.5px; color: var(--text-dim); background: var(--raised); font-weight: 600; }
+  /* Lưới preview ảnh nền Home — mỗi ô = 1 ảnh trong HOME_IMAGES, sửa link trực tiếp tại ô đó. */
+  .home-bg-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 4px; }
+  .home-bg-item { display: flex; flex-direction: column; gap: 6px; }
+  .home-bg-item .home-bg-thumb {
+    height: 64px; border-radius: 10px; border: 2px solid transparent;
+    box-shadow: 0 0 0 1px var(--border) inset; background-size: cover; background-position: center;
+    background-color: var(--raised); position: relative; overflow: hidden; cursor: pointer;
+    transition: border-color .12s, transform .12s;
+  }
+  .home-bg-item .home-bg-thumb:hover { transform: scale(1.02); }
+  .home-bg-item .home-bg-thumb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .home-bg-item .home-bg-thumb.active-slot { border-color: var(--accent); }
+  .home-bg-item .home-bg-thumb.broken::after {
+    content: 'Link lỗi'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600; color: #fff; background: rgba(220,60,60,.55);
+  }
+  .home-bg-item input {
+    font-size: 11.5px; padding: 5px 7px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--raised); color: var(--text); width: 100%;
+  }
   .hint { font-size: 12.5px; color: var(--text-dim); line-height: 1.5; margin: 0; }
   .export-import button { flex: 1; }
 
@@ -403,9 +432,359 @@
     .modal-note #note-content { min-height: 220px; }
     .modal-note-view { width: 94vw; }
   }
+
+  /* ========================================================================
+     KHẢO SÁT PHONG CÁCH NỀN — DEMO RIÊNG, KHÔNG liên quan code thật/requirements.
+     4 hướng A/B/C/D mô phỏng "ảnh thiên nhiên rực rỡ + card kính mờ" lấy cảm hứng
+     từ sản phẩm tham khảo "Personal Tracker". A/C vẫn dùng CSS gradient-mesh giả lập
+     (chỉ cần test contrast, không cần ảnh thật). B/D (đã chốt ổn) dùng ẢNH THẬT
+     public domain/CC0 đóng gói sẵn trong assets/ — xem khối override ngay dưới đây.
+     Bật/tắt qua segmented control nổi góc trên-phải. Mặc định = giữ nguyên hiện trạng.
+     ======================================================================== */
+
+  /* --- Nền gradient-mesh mô phỏng "ảnh thiên nhiên rực rỡ" (cam-hồng-tím-xanh) --- */
+  .style-mesh-bg {
+    background-color: #6a5acd;
+    background-image:
+      radial-gradient(circle at 12% 18%, rgba(255,170,60,.95), transparent 42%),
+      radial-gradient(circle at 85% 10%, rgba(255,90,150,.9), transparent 45%),
+      radial-gradient(circle at 78% 75%, rgba(80,170,255,.92), transparent 48%),
+      radial-gradient(circle at 18% 82%, rgba(120,220,170,.85), transparent 45%),
+      radial-gradient(circle at 50% 45%, rgba(180,90,255,.8), transparent 55%),
+      linear-gradient(135deg, #ff8a3d 0%, #ff5d7a 28%, #8b5cf6 58%, #0ea5e9 100%);
+    background-attachment: fixed !important;
+  }
+  /* Hướng A: ảnh nền đã làm mờ/giảm bão hoà mạnh — gần như gradient lớn, dịu hơn nhiều */
+  .style-mesh-bg.mesh-a { filter: blur(38px) saturate(.55) brightness(1.04); transform: scale(1.08); }
+  /* Hướng B/C: ảnh rực rỡ thật, không xử lý mờ */
+  .style-mesh-bg.mesh-bc { filter: saturate(1.08); }
+  /* Hướng D: chỉ giảm bão hoà nhẹ (~30-40%), không cần blur — gần với gradient nhạt sẵn có */
+  .style-mesh-bg.mesh-d { filter: saturate(.62) brightness(1.05); }
+
+  /* --- B/D đã chốt dùng ẢNH THẬT (public domain / CC0, đóng gói local trong assets/,
+     KHÔNG tải từ internet lúc runtime) thay cho gradient-mesh mô phỏng ở trên.
+     Dùng #id để override đúng background-image/filter của .style-mesh-bg phía trên. ---
+     - bg-coral-reef.jpg: public domain (Jim E Maragos, U.S. Fish & Wildlife Service) — Hướng B, giữ rực rỡ y gốc.
+     - bg-forest-sunrise.jpg: CC0 — Hướng D, giảm bão hoà nhẹ cho dịu hơn. */
+  body[data-style-mode="b"] #style-mesh-layer {
+    background-image: url('assets/bg-coral-reef.jpg');
+    background-size: cover; background-position: center; background-color: transparent;
+    filter: saturate(1.05);
+  }
+  body[data-style-mode="d"] #style-mesh-layer {
+    background-image: url('assets/bg-forest-sunrise.jpg');
+    background-size: cover; background-position: center; background-color: transparent;
+    filter: saturate(.68) brightness(1.02);
+  }
+
+  #style-mesh-layer {
+    position: fixed; inset: 0; z-index: -1; pointer-events: none; display: none;
+  }
+  body[data-style-mode="a"] #style-mesh-layer,
+  body[data-style-mode="b"] #style-mesh-layer,
+  body[data-style-mode="c"] #style-mesh-layer,
+  body[data-style-mode="d"] #style-mesh-layer { display: block; }
+  /* Khi có mesh nền riêng, vô hiệu hoá nền/ảnh nền cũ của body để khỏi chồng lệch */
+  body[data-style-mode="a"], body[data-style-mode="b"],
+  body[data-style-mode="c"], body[data-style-mode="d"] { background: transparent !important; }
+
+  /* --- Hướng A: card kính mờ độ trong THẤP (alpha cao ~88%, vẫn đọc tốt) --- */
+  body[data-style-mode="a"] .main-block,
+  body[data-style-mode="a"] .sub-block {
+    background: rgba(249,249,255,.9); backdrop-filter: blur(14px) saturate(1.1);
+    border: 1px solid rgba(255,255,255,.55);
+  }
+  body[data-style-mode="a"][data-theme="dark"] .main-block,
+  body[data-style-mode="a"][data-theme="dark"] .sub-block {
+    background: rgba(20,21,38,.86); backdrop-filter: blur(14px) saturate(1.1);
+    border: 1px solid rgba(255,255,255,.08);
+  }
+  body[data-style-mode="a"] .note-card { backdrop-filter: blur(6px); }
+
+  /* --- Hướng B: ảnh rực rỡ thật, card vẫn nền ĐẶC (không kính mờ) — chỉ "ngắm" ảnh
+     ở phần nền hở giữa các khối (gap của #dashboard/#main-row) --- */
+  body[data-style-mode="b"] #dashboard { background: transparent; }
+  body[data-style-mode="b"] .main-block,
+  body[data-style-mode="b"] .sub-block { background: var(--panel-bg); backdrop-filter: none; }
+  body[data-style-mode="b"] .topbar { background: var(--panel-bg) !important; }
+
+  /* --- Hướng C: glassmorphism đầy đủ — kính mờ trong suốt CAO (alpha thấp ~65%),
+     viền sáng mỏng, backdrop-blur mạnh hơn A --- */
+  body[data-style-mode="c"] .main-block,
+  body[data-style-mode="c"] .sub-block {
+    background: rgba(255,255,255,.42); backdrop-filter: blur(22px) saturate(1.3);
+    border: 1px solid rgba(255,255,255,.65);
+    box-shadow: 0 8px 32px rgba(20,20,80,.18), inset 0 1px 0 rgba(255,255,255,.4);
+  }
+  body[data-style-mode="c"][data-theme="dark"] .main-block,
+  body[data-style-mode="c"][data-theme="dark"] .sub-block {
+    background: rgba(20,18,40,.45); backdrop-filter: blur(22px) saturate(1.3);
+    border: 1px solid rgba(255,255,255,.14);
+    box-shadow: 0 8px 32px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.06);
+  }
+  body[data-style-mode="c"] .topbar {
+    background: rgba(255,255,255,.38) !important; backdrop-filter: blur(18px);
+    border-bottom-color: rgba(255,255,255,.4);
+  }
+  body[data-style-mode="c"][data-theme="dark"] .topbar {
+    background: rgba(20,18,40,.4) !important; border-bottom-color: rgba(255,255,255,.1);
+  }
+  body[data-style-mode="c"] .note-card { backdrop-filter: blur(10px); border-color: rgba(255,255,255,.5); }
+  /* Vấn đề cố ý để LỘ trong demo: ở Hướng C, alpha thấp khiến màu riêng từng note-card
+     (--note-card-bg pha theo --note-alpha) bị pha trộn mạnh với màu nền sặc sỡ phía sau
+     → các note mất khả năng phân biệt màu, đây là trade-off cần chủ dự án tự đánh giá. */
+
+  /* --- Hướng D: giữ 100% card/chữ mặc định, chỉ đổi ảnh nền (nhẹ, không blur card) --- */
+  body[data-style-mode="d"] .main-block,
+  body[data-style-mode="d"] .sub-block { backdrop-filter: none; }
+
+  /* ===== Segmented control nổi để chuyển 4 hướng — chỉ phục vụ demo này ===== */
+  #style-mode-switcher {
+    position: fixed; top: 14px; right: 18px; z-index: 999;
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(20,20,30,.78); backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,.18); border-radius: 12px;
+    padding: 7px 10px; box-shadow: 0 8px 24px rgba(0,0,0,.3);
+    font-size: 12px; color: #fff;
+  }
+  #style-mode-switcher .smw-label { font-weight: 700; opacity: .85; white-space: nowrap; margin-right: 2px; }
+  #style-mode-switcher .smw-btns { display: flex; gap: 4px; }
+  #style-mode-switcher button {
+    background: rgba(255,255,255,.12); color: #fff; border: 1px solid transparent;
+    border-radius: 7px; padding: 5px 9px; font-size: 12px; font-weight: 600; cursor: pointer;
+    transition: background .12s, border-color .12s;
+  }
+  #style-mode-switcher button:hover { background: rgba(255,255,255,.22); }
+  #style-mode-switcher button.active { background: #fff; color: #1c1c1e; border-color: #fff; }
+  #style-mode-note {
+    position: fixed; top: 60px; right: 18px; z-index: 998; max-width: 280px;
+    background: rgba(20,20,30,.78); backdrop-filter: blur(8px); color: #fff;
+    border: 1px solid rgba(255,255,255,.18); border-radius: 10px; padding: 9px 12px;
+    font-size: 12px; line-height: 1.5; display: none;
+  }
+  #style-mode-note.visible { display: block; }
+
+  /* ============================================================
+     MÀN HOME (Tabliss-style) — lớp phủ toàn trang, đặt TRÊN dashboard
+     nhưng DƯỚI modal (.overlay z-index 50) để modal vẫn hoạt động.
+     ============================================================ */
+  /* ============================================================
+     APP BACKGROUND — LỚP ẢNH NỀN DÙNG CHUNG cho CẢ Home và Dashboard.
+     Đặt fixed, dưới mọi thứ (z-index -2). Ảnh được set 1 lần và GIỮ NGUYÊN
+     khi chuyển Home<->Dashboard → cảm giác liền mạch, ảnh không "nhảy"/reload.
+     ============================================================ */
+  #app-bg {
+    position: fixed; inset: 0; z-index: -2; pointer-events: none;
+    background-size: cover; background-position: center;
+    /* gradient fallback luôn nằm dưới — nếu ảnh lỗi/đang tải không vỡ màn trắng */
+    background-color: #1e3c72;
+    background-image: linear-gradient(135deg, #1e3c72 0%, #2a5298 45%, #6a82fb 100%);
+  }
+  /* lớp ảnh thật fade-in đè lên gradient fallback của #app-bg */
+  #app-bg::after {
+    content: ''; position: absolute; inset: 0;
+    background-image: var(--app-bg-img, none);
+    background-size: cover; background-position: center;
+    opacity: 0; transition: opacity .6s ease;
+  }
+  #app-bg.loaded::after { opacity: 1; }
+
+  /* Overlay riêng cho DASHBOARD (nhạt hơn overlay Home) — ổn định contrast nền
+     sau card bất kể ảnh sáng/tối, nhưng vẫn để gap/viền lộ ảnh đẹp.
+     Chỉ hiện khi đang ở Dashboard (body.home-hidden). z-index -1 = trên ảnh, dưới UI. */
+  #dashboard-bg-overlay {
+    position: fixed; inset: 0; z-index: -1; pointer-events: none;
+    background: linear-gradient(180deg, rgba(10,12,28,.34) 0%, rgba(10,12,28,.22) 50%, rgba(10,12,28,.40) 100%);
+    opacity: 0; transition: opacity .45s ease;
+  }
+  body.home-hidden #dashboard-bg-overlay { opacity: 1; }
+  /* theme tối: overlay đậm hơn chút để card tối nổi rõ trên ảnh */
+  [data-theme="dark"] #dashboard-bg-overlay {
+    background: linear-gradient(180deg, rgba(4,5,16,.50) 0%, rgba(4,5,16,.40) 50%, rgba(4,5,16,.56) 100%);
+  }
+
+  #home-screen {
+    position: fixed; inset: 0; z-index: 40;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    color: #fff;
+    opacity: 1; visibility: visible;
+    transition: opacity .45s ease, visibility .45s ease;
+    overflow: hidden;
+    /* Trong suốt — ảnh nền giờ do #app-bg lo. Khi Home->Dashboard chỉ #home-screen
+       (content + overlay riêng của Home) mờ đi, ẢNH ĐỨNG YÊN phía sau. */
+    background: transparent;
+  }
+  body.home-hidden #home-screen { opacity: 0; visibility: hidden; pointer-events: none; }
+
+  /* overlay tối mờ RIÊNG của Home (đậm hơn overlay Dashboard vì chữ Home to/ít,
+     cần nền tối hơn cho cảm giác "cinematic"; tách biệt overlay Dashboard) */
+  #home-overlay {
+    position: absolute; inset: 0; z-index: 1;
+    background: linear-gradient(180deg, rgba(0,0,0,.30) 0%, rgba(0,0,0,.14) 35%, rgba(0,0,0,.46) 100%);
+  }
+  #home-content {
+    position: relative; z-index: 2;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 6px; text-align: center; padding: 0 24px;
+    text-shadow: 0 2px 12px rgba(0,0,0,.45), 0 1px 2px rgba(0,0,0,.4);
+  }
+  #home-clock {
+    font-size: clamp(64px, 13vw, 150px); font-weight: 300; letter-spacing: -.02em;
+    line-height: 1; font-variant-numeric: tabular-nums;
+  }
+  #home-clock .sec { font-size: .42em; font-weight: 400; opacity: .8; margin-left: .1em; vertical-align: super; }
+  #home-date { font-size: clamp(15px, 2vw, 20px); font-weight: 500; opacity: .92; margin-top: 6px; }
+  #home-greeting { font-size: clamp(20px, 3vw, 30px); font-weight: 600; margin-top: 22px; }
+  #home-quote {
+    font-size: clamp(14px, 1.7vw, 18px); font-weight: 400; font-style: italic;
+    opacity: .9; max-width: 620px; margin-top: 14px; line-height: 1.55;
+  }
+
+  /* nút "Vào Dashboard" — to, rõ, center-bottom, ít friction */
+  #home-enter-btn {
+    position: relative; z-index: 2; margin-top: 46px;
+    display: inline-flex; align-items: center; gap: 9px;
+    background: rgba(255,255,255,.16); color: #fff;
+    border: 1px solid rgba(255,255,255,.45); border-radius: 999px;
+    padding: 13px 26px; font-size: 15.5px; font-weight: 600;
+    backdrop-filter: blur(10px); cursor: pointer;
+    box-shadow: 0 6px 24px rgba(0,0,0,.22);
+    transition: background .15s, transform .15s, border-color .15s;
+  }
+  #home-enter-btn:hover { background: rgba(255,255,255,.30); border-color: #fff; transform: translateY(-2px); }
+  #home-enter-btn:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+  #home-enter-btn svg.icon { width: 17px; height: 17px; }
+
+  /* nút đổi ảnh + chú thích demo — góc trên phải */
+  #home-corner {
+    position: absolute; top: 18px; right: 18px; z-index: 3;
+    display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+  }
+  .home-corner-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: rgba(0,0,0,.32); color: #fff; border: 1px solid rgba(255,255,255,.28);
+    border-radius: 9px; padding: 7px 12px; font-size: 12.5px; font-weight: 600;
+    backdrop-filter: blur(8px); cursor: pointer; transition: background .15s;
+  }
+  .home-corner-btn:hover { background: rgba(0,0,0,.5); }
+  .home-corner-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+  .home-corner-btn svg.icon { width: 14px; height: 14px; }
+  #home-demo-note {
+    background: rgba(0,0,0,.32); color: #fff; border: 1px solid rgba(255,255,255,.2);
+    border-radius: 8px; padding: 6px 11px; font-size: 11px; font-weight: 500; max-width: 260px;
+    text-align: right; line-height: 1.45; backdrop-filter: blur(8px);
+  }
+
+  /* nút quay về Home trên topbar dashboard */
+  #btn-home {
+    background: var(--raised); border: 1px solid var(--border); border-radius: 9px;
+    width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center;
+    color: var(--text-dim); transition: color .12s, border-color .12s;
+  }
+  #btn-home:hover { color: var(--accent); border-color: var(--accent); }
+  #btn-home svg.icon { width: 16px; height: 16px; }
+
+  /* ============================================================
+     DASHBOARD NỔI TRÊN ẢNH NỀN CHUNG
+     #dashboard trong suốt → lộ ảnh ở viền ngoài + gap giữa các khối.
+     Đã chốt dùng CỐ ĐỊNH biến thể "Kính mờ nhẹ" (card bán trong + backdrop-blur,
+     "nổi trên ảnh" rõ hơn, vẫn đọc tốt) — bỏ hẳn lựa chọn "Đặc" + toggle so sánh.
+     ============================================================ */
+  #dashboard {
+    background: transparent;
+    opacity: 1; visibility: visible;
+    transition: opacity .45s ease, visibility .45s ease;
+  }
+  /* Ở Home, #home-screen che phủ bằng z-index NHƯNG khi nó fade ra (opacity:0;
+     visibility:hidden) thì không còn che gì nữa — nếu #dashboard không tự ẩn,
+     5 khối Dashboard (đứng sau trong DOM, không có z-index riêng) sẽ lộ ra đè
+     lên Home đang fade. Phải ẩn hẳn #dashboard (+ topbar liên quan) khi CHƯA
+     có body.home-hidden, để nó không bao giờ hiện cùng lúc với Home. */
+  #dashboard, .topbar {
+    opacity: 0; visibility: hidden; pointer-events: none;
+    transition: opacity .45s ease, visibility .45s ease;
+  }
+  body.home-hidden #dashboard,
+  body.home-hidden .topbar {
+    opacity: 1; visibility: visible; pointer-events: auto;
+  }
+
+  /* --- Kính mờ nhẹ (cố định): alpha cao 88-90% + blur nhẹ, vẫn đọc rõ --- */
+  .main-block, .sub-block {
+    background: color-mix(in srgb, var(--panel-bg) 90%, transparent);
+    backdrop-filter: blur(16px) saturate(1.18);
+    -webkit-backdrop-filter: blur(16px) saturate(1.18);
+    border-color: rgba(255,255,255,.30);
+  }
+  [data-theme="dark"] .main-block,
+  [data-theme="dark"] .sub-block {
+    background: color-mix(in srgb, var(--panel-bg) 88%, transparent);
+    border-color: rgba(255,255,255,.10);
+  }
+  /* block-head dùng border ngăn cách nhạt hơn trên kính mờ để liền mạch */
+  .block-head, .notes-toolbar { border-bottom-color: rgba(128,128,160,.22); }
+
+  /* Bóng đổ rõ hơn khi nổi trên ảnh — tạo cảm giác "đặt trên" ảnh */
+  body.home-hidden .main-block,
+  body.home-hidden .sub-block {
+    box-shadow: 0 4px 14px rgba(10,12,40,.22), 0 14px 40px rgba(10,12,40,.26);
+  }
+
+  /* Thanh khảo sát nền A/B/C/D cũ + layer mesh đã ĐƯỢC GỠ khỏi demo (ý tưởng nền
+     Dashboard giờ dùng chung ảnh Home) để tránh nhiễu/xung đột. */
+  #style-mode-switcher, #style-mode-note, #style-mesh-layer { display: none !important; }
 </style>
 </head>
 <body data-theme="light">
+
+  <!-- Lớp ẢNH NỀN dùng chung cho cả Home và Dashboard (đứng dưới mọi thứ) -->
+  <div id="app-bg" aria-hidden="true"></div>
+  <!-- Overlay riêng cho Dashboard (nhạt hơn Home) — ổn định contrast nền sau card -->
+  <div id="dashboard-bg-overlay" aria-hidden="true"></div>
+
+  <!-- ============================================================
+       MÀN HOME (Tabliss-style) — THỬ NGHIỆM. Mở tab mới thấy màn này
+       trước, bấm/nhấn để vào Dashboard 5 khối. Demo tĩnh, chưa phải
+       code thật extension.
+       ============================================================ -->
+  <div id="home-screen" role="region" aria-label="Màn hình Home">
+    <div id="home-overlay" aria-hidden="true"></div>
+
+    <div id="home-corner">
+      <p id="home-demo-note">Màn Home thử nghiệm (Tabliss-style) — demo để cảm nhận. Bấm "Vào Dashboard" hoặc nhấn Enter.</p>
+      <button class="home-corner-btn" id="home-shuffle-btn" onclick="shuffleHomeBg()" title="Đổi ảnh nền khác" aria-label="Đổi ảnh nền khác">
+        <span id="home-shuffle-icon"></span><span>Đổi ảnh</span>
+      </button>
+    </div>
+
+    <div id="home-content">
+      <div id="home-clock" aria-live="off">--:--</div>
+      <div id="home-date"></div>
+      <div id="home-greeting"></div>
+      <div id="home-quote"></div>
+    </div>
+
+    <button id="home-enter-btn" onclick="goToDashboard()" aria-label="Vào Dashboard">
+      <span>Vào Dashboard</span><span id="home-enter-icon"></span>
+    </button>
+  </div>
+
+  <!-- ===== KHẢO SÁT PHONG CÁCH NỀN (demo riêng, không phải tính năng chính thức) =====
+       Layer nền gradient-mesh mô phỏng "ảnh thiên nhiên" — chỉ hiện khi chọn A/B/C/D -->
+  <div id="style-mesh-layer" class="style-mesh-bg" aria-hidden="true"></div>
+
+  <div id="style-mode-switcher" role="group" aria-label="Chọn hướng khảo sát phong cách nền">
+    <span class="smw-label">Khảo sát nền:</span>
+    <div class="smw-btns">
+      <button type="button" data-mode="default" class="active" onclick="setStyleMode('default', this)">Mặc định</button>
+      <button type="button" data-mode="a" onclick="setStyleMode('a', this)">A</button>
+      <button type="button" data-mode="b" onclick="setStyleMode('b', this)">B</button>
+      <button type="button" data-mode="c" onclick="setStyleMode('c', this)">C</button>
+      <button type="button" data-mode="d" onclick="setStyleMode('d', this)">D</button>
+    </div>
+  </div>
+  <div id="style-mode-note"></div>
 
   <div class="topbar">
     <div class="brand">
@@ -423,7 +802,8 @@
         <div class="space-menu" id="space-menu" style="display:none;"></div>
       </div>
     </div>
-    <div style="display:flex; gap:10px;">
+    <div style="display:flex; gap:10px; align-items:center;">
+      <button id="btn-home" onclick="goToHome()" title="Quay về màn Home" aria-label="Quay về màn Home"></button>
       <button class="btn-ghost" id="btn-hide-all" onclick="toggleCollapseAll()"></button>
       <button class="btn-ghost" id="btn-settings" onclick="openSettings()"></button>
     </div>
@@ -693,16 +1073,19 @@
         </div>
 
         <div class="setting-block span-2">
-          <label id="lbl-bg"></label>
-          <div class="bg-grid">
-            <div class="bg-thumb plain active" data-bg="plain" onclick="setBackground('plain', this)" title="Nền trơn (không ảnh)" aria-label="Chọn nền trơn" role="button" tabindex="0">Trơn</div>
-            <div class="bg-thumb" data-bg="g1" style="background:linear-gradient(135deg,#a8e6cf,#56c596)" onclick="setBackground('g1', this)" title="Nền gradient xanh lá" aria-label="Chọn nền gradient xanh lá" role="button" tabindex="0"></div>
-            <div class="bg-thumb" data-bg="g2" style="background:linear-gradient(135deg,#a1c4fd,#c2e9fb)" onclick="setBackground('g2', this)" title="Nền gradient xanh dương" aria-label="Chọn nền gradient xanh dương" role="button" tabindex="0"></div>
-            <div class="bg-thumb" data-bg="g3" style="background:linear-gradient(135deg,#fbc2eb,#a6c1ee)" onclick="setBackground('g3', this)" title="Nền gradient hồng tím" aria-label="Chọn nền gradient hồng tím" role="button" tabindex="0"></div>
-            <div class="bg-thumb" data-bg="g4" style="background:linear-gradient(135deg,#fdcb82,#fc8181)" onclick="setBackground('g4', this)" title="Nền gradient cam đỏ" aria-label="Chọn nền gradient cam đỏ" role="button" tabindex="0"></div>
-            <div class="bg-thumb" data-bg="g5" style="background:linear-gradient(135deg,#84fab0,#8fd3f4)" onclick="setBackground('g5', this)" title="Nền gradient xanh ngọc" aria-label="Chọn nền gradient xanh ngọc" role="button" tabindex="0"></div>
+          <label id="lbl-home-bg">Ảnh nền Home (link ảnh)</label>
+          <div class="home-bg-grid" id="home-bg-grid"></div>
+          <p class="hint" id="home-bg-url-status" style="margin-top:8px;">Click vào ảnh để dùng ngay; sửa link rồi nhấn Enter (hoặc click ra ngoài) để áp dụng cho ô đó.</p>
+          <div style="display:flex; align-items:center; gap:10px; margin-top:12px;">
+            <label for="auto-rotate-select" style="margin-bottom:0; font-weight:600; font-size:13px;">Tự động đổi ảnh</label>
+            <select id="auto-rotate-select" onchange="setAutoRotate(this.value)" style="padding:6px 10px; border-radius:7px; border:1px solid var(--border); background:var(--raised); color:var(--text); font-size:13px;">
+              <option value="0">Tắt</option>
+              <option value="15000">Mỗi 15 giây (demo)</option>
+              <option value="60000">Mỗi 1 phút</option>
+              <option value="900000">Mỗi 15 phút</option>
+              <option value="3600000">Mỗi 1 giờ</option>
+            </select>
           </div>
-          <p class="hint">Đóng gói sẵn vài gradient/màu cố định trong extension — không tải ảnh từ internet.</p>
         </div>
 
         <div class="setting-block span-2">
@@ -787,6 +1170,10 @@ const ICON_PATHS = {
   columns: '<rect x="4" y="4" width="6.5" height="16" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="16" rx="1.5"/>',
   rows: '<rect x="4" y="5" width="16" height="4.5" rx="1.5"/><rect x="4" y="14.5" width="16" height="4.5" rx="1.5"/>',
   grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+  arrowRight: '<line x1="4" y1="12" x2="20" y2="12"/><polyline points="14,6 20,12 14,18"/>',
+  shuffle: '<path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/>',
+  chevronsDown: '<polyline points="6,8 12,14 18,8"/><polyline points="6,14 12,20 18,14"/>',
+  home: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 001 1h12a1 1 0 001-1V10"/><path d="M9 21v-6h6v6"/>',
 };
 function svgIcon(name, extraClass){
   const inner = ICON_PATHS[name] || '';
@@ -931,6 +1318,9 @@ function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'
 function renderStaticIcons(){
   document.getElementById('ic-brand').innerHTML = svgIcon('notebook');
   document.getElementById('btn-settings').innerHTML = svgIcon('settings') + ' Cài đặt';
+  document.getElementById('btn-home').innerHTML = svgIcon('home');
+  document.getElementById('home-enter-icon').innerHTML = svgIcon('arrowRight');
+  document.getElementById('home-shuffle-icon').innerHTML = svgIcon('shuffle');
   document.getElementById('space-switcher-icon').innerHTML = svgIcon('layers');
   document.getElementById('space-switcher-chevron').innerHTML = svgIcon('chevronDown');
   document.getElementById('sort-switcher-chevron').innerHTML = svgIcon('chevronDown');
@@ -974,7 +1364,6 @@ function renderStaticIcons(){
   document.getElementById('theme-light-btn').innerHTML = svgIcon('sun') + ' Sáng';
   document.getElementById('theme-dark-btn').innerHTML = svgIcon('moon') + ' Tối';
   document.getElementById('lbl-color').innerHTML = svgIcon('layout') + ' Màu chủ đạo';
-  document.getElementById('lbl-bg').innerHTML = svgIcon('notebook') + ' Ảnh nền';
   document.getElementById('lbl-layout').innerHTML = svgIcon('layout') + ' Bố cục — kích thước khối';
   document.getElementById('btn-reset-layout').innerHTML = svgIcon('repeat') + ' Khôi phục mặc định';
   document.getElementById('lbl-data').innerHTML = svgIcon('database') + ' Dữ liệu';
@@ -1552,7 +1941,6 @@ function buildExportPayload(){
     settings: {
       theme: document.body.getAttribute('data-theme'),
       accent: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(),
-      background: currentBg,
       sizes: { combined: sizeCombined, notes: sizeNotes, tasks: sizeTasks, reminder: sizeReminder },
     },
   };
@@ -1619,11 +2007,6 @@ function importData(event){
               el.classList.toggle('active', el.style.background === s.accent || rgbToHexLoose(el.style.background) === s.accent);
             });
           }
-          if (s.background) {
-            currentBg = s.background;
-            const thumb = document.querySelector(`.bg-thumb[data-bg="${s.background}"]`);
-            if (thumb) setBackground(s.background, thumb);
-          }
           if (s.sizes) {
             sizeCombined = s.sizes.combined ?? sizeCombined;
             sizeNotes = s.sizes.notes ?? sizeNotes;
@@ -1656,7 +2039,6 @@ function applyTheme(mode){
   document.body.setAttribute('data-theme', mode);
   document.getElementById('theme-light-btn').classList.toggle('active', mode === 'light');
   document.getElementById('theme-dark-btn').classList.toggle('active', mode === 'dark');
-  applyHeaderTint();
   renderNotes();
 }
 function setTheme(mode, btn){
@@ -1668,29 +2050,6 @@ function setAccent(color, el){
   document.documentElement.style.setProperty('--accent-rgb', `${parseInt(av.slice(0,2),16)},${parseInt(av.slice(2,4),16)},${parseInt(av.slice(4,6),16)}`);
   el.parentElement.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
   el.classList.add('active');
-}
-/* Header KHÔNG để trong suốt (lộ gradient gốc rất rực, mất kiểm soát tương phản) — thay vào đó
-   dùng 1 màu pastel nhạt "rút ra" từ tông của gradient đã chọn, vẫn nền đặc để chữ/icon luôn
-   rõ ràng, nhưng có sắc thái đồng bộ với nền trang thay vì trắng/đen trơ */
-const HEADER_TINTS_LIGHT = {
-  g1: '#eafaf1', g2: '#eaf3ff', g3: '#fbeef9', g4: '#fff1ea', g5: '#eafffa',
-};
-const HEADER_TINTS_DARK = {
-  g1: '#1a2620', g2: '#19222e', g3: '#241c28', g4: '#291f1a', g5: '#172625',
-};
-let currentBg = 'plain';
-function setBackground(bg, el){
-  currentBg = bg;
-  document.body.style.background = bg === 'plain' ? '' : el.style.background;
-  if (bg !== 'plain') document.body.style.backgroundAttachment = 'fixed';
-  applyHeaderTint();
-  el.parentElement.querySelectorAll('.bg-thumb').forEach(t => t.classList.remove('active'));
-  el.classList.add('active');
-}
-function applyHeaderTint(){
-  const isDark = document.body.getAttribute('data-theme') === 'dark';
-  const tints = isDark ? HEADER_TINTS_DARK : HEADER_TINTS_LIGHT;
-  document.querySelector('.topbar').style.background = tints[currentBg] || '';
 }
 
 /* ========================================================================
@@ -2051,6 +2410,225 @@ document.addEventListener('mousedown', (e) => {
   if (sortMenu.style.display !== 'none' && !sortSwitcher.contains(e.target)) sortMenu.style.display = 'none';
 });
 
+/* ========================================================================
+   KHẢO SÁT PHONG CÁCH NỀN — A/B/C/D (chỉ demo, không phải logic sản phẩm thật)
+   Chuyển đổi qua data-style-mode trên <body>; mọi data/tương tác (task/note/...)
+   không bị ảnh hưởng vì chỉ đổi CSS, không đổi state.
+   ======================================================================== */
+const STYLE_MODE_NOTES = {
+  default: '',
+  a: 'Hướng A — Ảnh nền đã làm mờ/giảm bão hoà mạnh (gần như gradient lớn) + card kính mờ độ trong THẤP (alpha ~88-92%). An toàn, dễ đọc, gần style hiện có nhất.',
+  b: 'Hướng B — Ảnh thật (public domain, ảnh san hô) không xử lý mờ, card vẫn nền ĐẶC (không kính mờ). Chỉ "ngắm" ảnh ở phần nền hở giữa các khối (khoảng gap).',
+  c: 'Hướng C — Glassmorphism đầy đủ: nền gradient-mesh giả lập rực rỡ + card kính mờ trong suốt CAO (alpha ~60-65%, backdrop-blur mạnh, viền sáng mỏng). Lưu ý: màu riêng từng note-card dễ bị pha trộn mất phân biệt khi nền quá sặc sỡ — quan sát kỹ khối Ghi chú.',
+  d: 'Hướng D — Giữ 100% card/chữ như mặc định hiện tại, chỉ đổi ảnh nền (ảnh thật CC0 rừng, giảm bão hoà nhẹ ~32%, không blur, không đổi CSS card).',
+};
+function setStyleMode(mode, btn){
+  document.body.setAttribute('data-style-mode', mode === 'default' ? '' : mode);
+  const layer = document.getElementById('style-mesh-layer');
+  layer.classList.remove('mesh-a', 'mesh-bc', 'mesh-d');
+  if (mode === 'a') layer.classList.add('mesh-a');
+  else if (mode === 'b' || mode === 'c') layer.classList.add('mesh-bc');
+  else if (mode === 'd') layer.classList.add('mesh-d');
+
+  document.querySelectorAll('#style-mode-switcher button').forEach(b => b.classList.toggle('active', b === btn));
+  const noteEl = document.getElementById('style-mode-note');
+  const text = STYLE_MODE_NOTES[mode] || '';
+  noteEl.textContent = text;
+  noteEl.classList.toggle('visible', !!text);
+}
+
+/* ========================================================================
+   MÀN HOME (Tabliss-style) — DEMO TĨNH, không gọi API.
+   - Đồng hồ/ngày/lời chào cập nhật real-time.
+   - Quote & ảnh nền đóng gói sẵn trong JS; ảnh hotlink Unsplash, lỗi → fallback gradient.
+   - Chuyển màn: nút "Vào Dashboard" (CTA duy nhất, hiển thị) + Esc để về Home.
+     Enter/Space vẫn hoạt động ngầm như shortcut tương đương nút (không hiện hint, tránh
+     dư thừa 3 lối vào như bản trước — đã bỏ luôn cử chỉ scroll-xuống đi cùng nó).
+   - Mở tab mới luôn nhớ màn cuối (lastScreen) — không còn là setting cho chọn.
+   ======================================================================== */
+
+/* Ảnh nền landscape/thiên nhiên chất lượng cao — hotlink LINK CỐ ĐỊNH (không phải Unsplash
+   API/random) tới images.unsplash.com. Link tĩnh KHÔNG cần Access Key (chỉ API
+   search/random ảnh mới cần đăng ký key), không rate-limit. Lúc lên code thật vẫn cần khai
+   host_permissions cho images.unsplash.com trong manifest + fallback gradient khi offline
+   (đã có cơ chế applyHomeBg/img.onerror xử lý sẵn dưới đây). */
+const HOME_IMAGES = [
+  'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=2000&q=80', // rừng nắng xuyên cây
+  'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=2000&q=80', // rừng sương mù
+  'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=2000&q=80', // núi + tia nắng
+  'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=2000&q=80', // hồ phản chiếu
+  'https://images.unsplash.com/photo-1518173946687-a4c8892bbd9f?auto=format&fit=crop&w=2000&q=80', // đồi xanh
+  'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=2000&q=80', // hồ + núi
+];
+/* Gradient fallback đóng gói sẵn — dùng khi ảnh load lỗi hoặc offline (demo tình huống không mạng). */
+const HOME_GRADIENTS = [
+  'linear-gradient(135deg,#1e3c72 0%,#2a5298 50%,#6a82fb 100%)',
+  'linear-gradient(135deg,#0f2027 0%,#203a43 50%,#2c5364 100%)',
+  'linear-gradient(135deg,#42275a 0%,#734b6d 100%)',
+  'linear-gradient(135deg,#134e5e 0%,#71b280 100%)',
+];
+/* Vài câu quote ngắn đóng gói cứng — random theo NGÀY (cùng ngày luôn ra 1 câu), không gọi API. */
+const HOME_QUOTES = [
+  'Một bước nhỏ mỗi ngày tạo nên hành trình lớn.',
+  'Tập trung vào việc quan trọng, bỏ qua việc khẩn cấp giả.',
+  'Bắt đầu từ nơi bạn đang đứng, dùng những gì bạn có.',
+  'Kỷ luật là cây cầu giữa mục tiêu và thành quả.',
+  'Hôm nay là trang giấy trắng — hãy viết điều tử tế lên đó.',
+  'Việc khó nhất thường là việc đáng làm nhất.',
+  'Đơn giản hoá. Rồi làm cho xong.',
+];
+const HOME_NAME = ''; // để trống cũng được; có thể đặt 1 tên mẫu, vd 'Hùng'
+
+let homeBgIndex = 0;
+let homeClockTimer = null;
+
+/* Mở tab mới = nhớ màn cuối (không còn là setting cho chọn) — extension thật lưu
+   lastScreen vào storage, đọc lại lúc mở tab mới để quyết hiện Home hay Dashboard. */
+let lastScreen = 'home';
+
+function dayIndex(len){
+  // số ngày từ epoch — đảm bảo cùng 1 ngày ra cùng kết quả
+  return Math.floor(Date.now() / 86400000) % len;
+}
+function pad2(n){ return String(n).padStart(2, '0'); }
+
+function updateHomeClock(){
+  const now = new Date();
+  document.getElementById('home-clock').innerHTML =
+    `${pad2(now.getHours())}:${pad2(now.getMinutes())}<span class="sec">${pad2(now.getSeconds())}</span>`;
+  const days = ['Chủ nhật','Thứ Hai','Thứ Ba','Thứ Tư','Thứ Năm','Thứ Sáu','Thứ Bảy'];
+  document.getElementById('home-date').textContent =
+    `${days[now.getDay()]}, ngày ${now.getDate()} tháng ${now.getMonth()+1} năm ${now.getFullYear()}`;
+  const h = now.getHours();
+  const part = h < 11 ? 'Chào buổi sáng' : h < 14 ? 'Chào buổi trưa' : h < 18 ? 'Chào buổi chiều' : 'Chào buổi tối';
+  document.getElementById('home-greeting').textContent = HOME_NAME ? `${part}, ${HOME_NAME}` : part;
+}
+
+/* Ảnh nền giờ áp lên #app-bg (lớp dùng CHUNG cho Home + Dashboard). Đổi ảnh chỉ
+   fade lại #app-bg::after — KHÔNG reload/nhảy khi chuyển màn vì cùng 1 layer. */
+
+/* Hàm tải+áp dụng chung. gradientFallback luôn hiện ngay (không để màn trắng vỡ lúc ảnh tải/lỗi). */
+function loadAndApplyBg(url, gradientFallback, onResult){
+  const appBg = document.getElementById('app-bg');
+  appBg.classList.remove('loaded');
+  appBg.style.backgroundImage = gradientFallback;
+  const img = new Image();
+  img.onload = () => {
+    appBg.style.setProperty('--app-bg-img', `url("${url}")`);
+    appBg.classList.add('loaded');
+    onResult && onResult(true);
+  };
+  img.onerror = () => {
+    appBg.style.setProperty('--app-bg-img', 'none');
+    appBg.classList.remove('loaded');
+    onResult && onResult(false);
+  };
+  img.src = url;
+}
+
+function applyHomeBg(index){
+  homeBgIndex = (index + HOME_IMAGES.length) % HOME_IMAGES.length;
+  loadAndApplyBg(HOME_IMAGES[homeBgIndex], HOME_GRADIENTS[homeBgIndex % HOME_GRADIENTS.length]);
+  highlightActiveHomeBgSlot();
+}
+function shuffleHomeBg(){ applyHomeBg(homeBgIndex + 1); }
+
+/* ----- Tự động đổi ảnh sau mỗi N ms (demo dùng setInterval; extension thật có thể
+   dùng chrome.alarms để không phụ thuộc tab đang mở). 0 = tắt. ----- */
+let autoRotateTimer = null;
+let autoRotateMs = 0;
+function setAutoRotate(ms){
+  autoRotateMs = Number(ms) || 0;
+  if (autoRotateTimer) { clearInterval(autoRotateTimer); autoRotateTimer = null; }
+  if (autoRotateMs > 0) {
+    autoRotateTimer = setInterval(shuffleHomeBg, autoRotateMs);
+  }
+}
+
+/* ----- Lưới preview ảnh nền trong Settings: mỗi ô = 1 link trong HOME_IMAGES,
+   sửa trực tiếp tại ô đó (không cần đổi code) ----- */
+function renderHomeBgGrid(){
+  const grid = document.getElementById('home-bg-grid');
+  grid.innerHTML = HOME_IMAGES.map((url, i) => `
+    <div class="home-bg-item">
+      <div class="home-bg-thumb" id="home-bg-thumb-${i}" style="background-image:url('${url}')"
+        onclick="applyHomeBg(${i})" title="Dùng ảnh này ngay" role="button" tabindex="0"
+        onkeydown="if(event.key==='Enter') applyHomeBg(${i})"></div>
+      <input type="url" value="${url}" id="home-bg-input-${i}"
+        onchange="updateHomeBgSlot(${i}, this.value)"
+        onkeydown="if(event.key==='Enter') this.blur()" />
+    </div>
+  `).join('');
+  highlightActiveHomeBgSlot();
+}
+function highlightActiveHomeBgSlot(){
+  HOME_IMAGES.forEach((_, i) => {
+    const thumb = document.getElementById(`home-bg-thumb-${i}`);
+    if (thumb) thumb.classList.toggle('active-slot', i === homeBgIndex);
+  });
+}
+function updateHomeBgSlot(index, newUrl){
+  const url = newUrl.trim();
+  if (!url) return;
+  const thumb = document.getElementById(`home-bg-thumb-${index}`);
+  const img = new Image();
+  img.onload = () => {
+    HOME_IMAGES[index] = url;
+    thumb.style.backgroundImage = `url('${url}')`;
+    thumb.classList.remove('broken');
+    if (index === homeBgIndex) applyHomeBg(homeBgIndex); // đang hiện đúng ô này -> áp ngay
+  };
+  img.onerror = () => { thumb.classList.add('broken'); };
+  img.src = url;
+}
+
+function initHomeContent(){
+  document.getElementById('home-quote').textContent = HOME_QUOTES[dayIndex(HOME_QUOTES.length)];
+  applyHomeBg(dayIndex(HOME_IMAGES.length));
+  updateHomeClock();
+  renderHomeBgGrid();
+}
+
+/* ----- Chuyển màn Home <-> Dashboard (transition fade qua class .home-hidden) ----- */
+function isHomeVisible(){ return !document.body.classList.contains('home-hidden'); }
+function isAnyModalOpen(){
+  return [...document.querySelectorAll('.overlay')].some(o => o.style.display !== 'none' && o.style.display !== '');
+}
+function goToDashboard(){
+  if (!isHomeVisible()) return;
+  document.body.classList.add('home-hidden');
+  lastScreen = 'dashboard';
+  // focus hợp lý: đưa focus về nút quay-Home để bàn phím tiếp tục dùng được
+  setTimeout(() => { const b = document.getElementById('btn-home'); if (b) b.focus(); }, 80);
+}
+function goToHome(){
+  if (isHomeVisible()) return;
+  document.body.classList.remove('home-hidden');
+  lastScreen = 'home';
+  updateHomeClock();
+  setTimeout(() => { const b = document.getElementById('home-enter-btn'); if (b) b.focus(); }, 80);
+}
+
+/* ----- Phím tắt: Enter/Space vào dashboard, Esc về Home -----
+   KHÔNG nuốt phím khi đang gõ trong input/textarea/select, hoặc khi có modal đang mở. */
+function isTypingTarget(el){
+  if (!el) return false;
+  const tag = el.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
+}
+document.addEventListener('keydown', (e) => {
+  if (isTypingTarget(e.target)) return;
+  if (isHomeVisible()) {
+    if (isAnyModalOpen()) return; // để Esc đóng modal nếu lỡ mở
+    if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+      e.preventDefault(); goToDashboard();
+    }
+  } else {
+    if (isAnyModalOpen()) return; // Esc ưu tiên đóng modal
+    if (e.key === 'Escape') { e.preventDefault(); goToHome(); }
+  }
+});
+
 renderStaticIcons();
 setupReorder();
 setupOverlayClickClose();
@@ -2058,6 +2636,10 @@ updateSpaceSwitcherLabel();
 renderAll();
 updateHideAllBtn();
 applyTheme('light');
+
+/* khởi tạo Home + đồng hồ chạy real-time */
+initHomeContent();
+homeClockTimer = setInterval(updateHomeClock, 1000);
 </script>
 </body>
 </html>

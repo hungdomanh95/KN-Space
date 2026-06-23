@@ -50,6 +50,7 @@ export interface Note {
   color: string;
   updatedAt: number; // epoch ms
   order: number;
+  expanded: boolean; // view list: show hết nội dung thay vì clamp 4 dòng
 }
 
 export interface EnabledBlocks {
@@ -73,7 +74,17 @@ export interface Space {
 
 export type ThemeMode = 'light' | 'dark';
 
-export type BackgroundKey = 'plain' | 'g1' | 'g2' | 'g3' | 'g4' | 'g5';
+export type Screen = 'home' | 'dashboard';
+
+/** Khoảng tự động đổi ảnh nền Home/Dashboard, ms. 0 = tắt. */
+export type HomeBgAutoRotateMs = 0 | 60_000 | 900_000 | 3_600_000;
+
+/** Ảnh nền dùng chung Home + Dashboard: 6 link tĩnh, chỉ số đang chọn, khoảng tự đổi. */
+export interface HomeBackground {
+  images: string[]; // luôn 6 link cố định, sửa được qua Settings
+  index: number; // chỉ số ảnh đang dùng trong `images`
+  autoRotateMs: HomeBgAutoRotateMs;
+}
 
 export interface LayoutSizes {
   combined: number; // % chiều rộng khối tổng hợp
@@ -92,26 +103,33 @@ export interface CollapsedBlocks {
   reminders: boolean;
 }
 
-export interface Settings {
-  theme: ThemeMode;
-  accent: string;
-  background: BackgroundKey;
-  layoutSizes: LayoutSizes;
-  mainBlockOrder: MainBlockKey[];
-  collapsedBlocks: CollapsedBlocks;
-}
-
 export type TaskFilter = 'all' | 'pending' | 'done';
 export type NoteSortBy = 'order' | 'title' | 'recent';
 export type NoteView = 'grid' | 'list';
+
+export interface Settings {
+  theme: ThemeMode;
+  accent: string;
+  homeBackground: HomeBackground;
+  layoutSizes: LayoutSizes;
+  mainBlockOrder: MainBlockKey[];
+  collapsedBlocks: CollapsedBlocks;
+  noteView: NoteView;
+  /**
+   * Màn cuối cùng user rời đi (Home/Dashboard) — PHẢI persist để mở tab mới
+   * luôn mở lại đúng màn cuối (yêu cầu cố định, không phải setting cho chọn).
+   */
+  lastScreen: Screen;
+}
 
 /** UI state ephemeral — KHÔNG persist xuống storage. */
 export interface UiState {
   taskFilter: TaskFilter;
   noteSearch: string;
   noteSortBy: NoteSortBy;
-  noteView: NoteView;
   hiddenNoteContentIds: Set<string>;
+  /** Màn hiện tại đang hiển thị — khởi tạo từ settings.lastScreen lúc HYDRATE, sau đó ephemeral. */
+  currentScreen: Screen;
 }
 
 export interface AppState {

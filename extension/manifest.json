@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "description": "Dashboard năng suất cá nhân: việc cần làm, nhắc việc, thói quen, ghi chú, thông báo.",
   "permissions": ["storage"],
+  "host_permissions": ["https://images.unsplash.com/*"],
   "chrome_url_overrides": {
     "newtab": "index.html"
   },

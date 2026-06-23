@@ -4,7 +4,7 @@ import { Modal } from '../../components/Modal';
 import { useAppState } from '../../state/AppStateContext';
 import { useConfirm } from '../../components/ConfirmContext';
 import { buildExportPayload, downloadExportFile, parseImportFile } from './exportImport';
-import { BACKGROUND_OPTIONS } from './backgroundOptions';
+import { HomeBackgroundSettings } from './HomeBackgroundSettings';
 import type { ThemeMode } from '../../types';
 
 interface SettingsModalProps {
@@ -144,25 +144,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
           )}
         </div>
 
-        <div className="setting-block span-2">
-          <label>Ảnh nền</label>
-          <div className="bg-grid">
-            {BACKGROUND_OPTIONS.map((bg) => (
-              <button
-                key={bg.key}
-                type="button"
-                className={`bg-thumb ${bg.key === 'plain' ? 'plain' : ''} ${settings.background === bg.key ? 'active' : ''}`}
-                style={bg.css ? { background: bg.css } : undefined}
-                title={bg.title}
-                aria-label={bg.title}
-                onClick={() => dispatch({ type: 'SETTINGS_SET_BACKGROUND', payload: { background: bg.key } })}
-              >
-                {bg.key === 'plain' ? 'Trơn' : ''}
-              </button>
-            ))}
-          </div>
-          <p className="hint">Đóng gói sẵn vài gradient/màu cố định trong extension — không tải ảnh từ internet.</p>
-        </div>
+        <HomeBackgroundSettings />
 
         <div className="setting-block span-2">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
