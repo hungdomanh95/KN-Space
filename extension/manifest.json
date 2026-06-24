@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "KN-Space",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Dashboard năng suất cá nhân: việc cần làm, nhắc việc, thói quen, ghi chú, thông báo.",
-  "permissions": ["storage"],
+  "permissions": ["storage", "unlimitedStorage"],
   "host_permissions": ["https://images.unsplash.com/*"],
   "chrome_url_overrides": {
     "newtab": "index.html"

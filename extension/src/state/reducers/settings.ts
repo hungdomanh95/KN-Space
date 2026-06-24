@@ -6,6 +6,8 @@ export type SettingsAction =
   | { type: 'SETTINGS_SET_ACCENT'; payload: { accent: string } }
   | { type: 'SETTINGS_SET_HOME_BG_INDEX'; payload: { index: number } }
   | { type: 'SETTINGS_SET_HOME_BG_IMAGE'; payload: { index: number; url: string } }
+  | { type: 'SETTINGS_SET_HOME_BG_UPLOAD'; payload: { index: number; dataUrl: string } }
+  | { type: 'SETTINGS_HOME_BG_USE_LINK_MODE'; payload: { index: number } }
   | { type: 'SETTINGS_SET_HOME_BG_AUTO_ROTATE'; payload: { ms: HomeBgAutoRotateMs } }
   | { type: 'SETTINGS_HOME_BG_ROTATE_NEXT' }
   | { type: 'SETTINGS_SET_LAST_SCREEN'; payload: { screen: Screen } }
@@ -26,7 +28,20 @@ export function settingsReducer(settings: Settings, action: SettingsAction): Set
       return { ...settings, homeBackground: { ...settings.homeBackground, index: action.payload.index } };
     case 'SETTINGS_SET_HOME_BG_IMAGE': {
       const images = [...settings.homeBackground.images];
-      images[action.payload.index] = action.payload.url;
+      images[action.payload.index] = { type: 'url', value: action.payload.url };
+      return { ...settings, homeBackground: { ...settings.homeBackground, images } };
+    }
+    case 'SETTINGS_SET_HOME_BG_UPLOAD': {
+      const images = [...settings.homeBackground.images];
+      images[action.payload.index] = { type: 'upload', value: action.payload.dataUrl };
+      return { ...settings, homeBackground: { ...settings.homeBackground, images } };
+    }
+    case 'SETTINGS_HOME_BG_USE_LINK_MODE': {
+      // Chuyển slot về dạng 'url' nhưng GIỮ NGUYÊN ảnh (data-URL) hiện tại cho tới khi
+      // người dùng gõ link mới đè lên (yêu cầu UX — không xoá ảnh upload ngay lập tức).
+      const images = [...settings.homeBackground.images];
+      const current = images[action.payload.index];
+      images[action.payload.index] = { type: 'url', value: current.value };
       return { ...settings, homeBackground: { ...settings.homeBackground, images } };
     }
     case 'SETTINGS_SET_HOME_BG_AUTO_ROTATE':

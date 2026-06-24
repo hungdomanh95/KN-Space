@@ -81,7 +81,7 @@ function Shell() {
     );
   }
 
-  const imageUrl = settings.homeBackground.images[settings.homeBackground.index] ?? '';
+  const imageUrl = settings.homeBackground.images[settings.homeBackground.index]?.value ?? '';
 
   return (
     <>

@@ -5,36 +5,48 @@
 <title>KN-Space — Mockup</title>
 <style>
   :root {
-    --accent: #5b6cff;
-    --accent-rgb: 91,108,255;
-    --bg: #e9eaf5;
-    --panel-bg: #f9f9ff;
-    --modal-bg: #f9f9ff;
-    --raised: #eff0fc;
-    --text: #1c1c1e;
-    --text-dim: #8a8f98;
-    --border: #d2d4ec;
-    --note-color: #8b5cf6;
+    /* Accent tinh chỉnh ấm/sang hơn bản gốc #5b6cff: hơi nghiêng về indigo, giảm độ "tươi" điện tử */
+    --accent: #5457d6;
+    --accent-rgb: 84,87,214;
+    /* Nền trung tính — gần trắng, độ ngả vàng-nâu giảm mạnh so với bản trước để card
+       có cảm giác sáng/nhẹ (phù hợp hiệu ứng kính mờ trên ảnh nền), vẫn không phải pure #fff. */
+    --bg: #f3f2ef;
+    --panel-bg: #fdfdfc;
+    --modal-bg: #fdfdfc;
+    --raised: #f5f4f1;
+    --text: #232220;
+    --text-dim: #8a857c;
+    --border: #e7e5e0;
+    /* Hairline border riêng cho card chính — nhạt hơn --border, dùng cho viền 1px tối giản */
+    --border-hairline: rgba(35,34,32,.10);
+    /* Màu phân loại theo block/note: GIỮ TONE nhưng dùng làm border/tag accent (nhạt),
+       không fill full-saturation tràn lan như bản cũ */
+    --note-color: #8b7cf6;
     --task-color: var(--accent);
-    --recurring-color: #14b8a6;
-    --habit-color: #ff8a3d;
-    --reminder-color: #ff5d7a;
-    --done: #1fb874;
-    --shadow: 0 1px 4px rgba(20,20,80,.07), 0 8px 26px rgba(20,20,80,.11);
-    --note-card-bg: #eaecff;
-    --note-alpha: 0.1;
+    --recurring-color: #0f9e8e;
+    --habit-color: #e8873d;
+    --reminder-color: #e2566f;
+    --done: #2fa86b;
+    --shadow: 0 2px 8px rgba(30,28,20,.04), 0 1px 2px rgba(30,28,20,.03);
+    --note-card-bg: #f8f7f4;
+    --note-alpha: 0.07;
+    /* Custom easing thống nhất cho modal/collapse/hover — chỉ animate transform/opacity */
+    --ease-standard: cubic-bezier(0.32,0.72,0,1);
   }
   [data-theme="dark"] {
-    --bg: #0d0e18;
-    --panel-bg: #16182c;
-    --modal-bg: #1e2036;
-    --raised: #21243d;
-    --text: #f1f1f3;
-    --text-dim: #8d909c;
-    --border: #2c2f52;
-    --shadow: 0 2px 6px rgba(5,5,28,.62), 0 12px 32px rgba(5,5,28,.70);
-    --note-card-bg: #17192e;
-    --note-alpha: 0.24;
+    /* Nền trung tính ấm bản tối — off-black, không pure #000 */
+    --bg: #15140f;
+    --panel-bg: #1c1b16;
+    --modal-bg: #232119;
+    --raised: #272519;
+    --text: #efece4;
+    --text-dim: #9a9588;
+    /* Border dark mode TĂNG contrast rõ rệt so với bản cũ (rgba(255,255,255,.08) quá mờ) */
+    --border: #3a3729;
+    --border-hairline: rgba(255,253,245,.14);
+    --shadow: 0 2px 10px rgba(0,0,0,.45), 0 1px 3px rgba(0,0,0,.3);
+    --note-card-bg: #211f17;
+    --note-alpha: 0.16;
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
@@ -54,37 +66,8 @@
   button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   svg.icon { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; display: block; flex: 0 0 auto; }
 
-  /* ===== Top bar ===== */
-  .topbar {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 11px 22px; background: var(--panel-bg);
-    border-bottom: 1px solid rgba(var(--accent-rgb), .2);
-    flex: 0 0 auto;
-    position: relative; z-index: 70;
-    transition: background .25s ease, border-color .25s ease;
-  }
-  /* Khi ở Dashboard: topbar BÁN TRONG + blur để lộ ảnh nền phía sau (cảm giác nổi
-     trên ảnh, đồng bộ với các khối). Ở Home topbar bị #home-screen che nên không ảnh hưởng. */
-  body.home-hidden .topbar {
-    background: color-mix(in srgb, var(--panel-bg) 82%, transparent);
-    backdrop-filter: blur(14px) saturate(1.15);
-    -webkit-backdrop-filter: blur(14px) saturate(1.15);
-    border-bottom-color: rgba(255,255,255,.18);
-  }
-  [data-theme="dark"] body.home-hidden .topbar,
-  body.home-hidden[data-theme="dark"] .topbar { border-bottom-color: rgba(255,255,255,.08); }
-  .brand { display:flex; align-items:center; gap:10px; }
-  .brand-mark {
-    width: 30px; height: 30px; border-radius: 9px;
-    background-color: var(--accent);
-    background-image: linear-gradient(135deg, rgba(255,255,255,.32), rgba(255,255,255,0));
-    display: flex; align-items: center; justify-content: center; color: white;
-  }
-  .brand-mark svg.icon { width: 17px; height: 17px; stroke-width: 2.1; }
-  .brand h1 { font-size: 16.5px; margin: 0; font-weight: 700; letter-spacing: -.01em; }
-  .brand .sub { font-size: 12.5px; color: var(--text-dim); font-weight: 500; }
-
-  /* ===== Bộ chuyển đổi Space — dropdown cạnh logo ===== */
+  /* ===== Bộ chuyển đổi Space — dropdown (dùng trong Home #home-corner và trong
+     widget góc dưới-phải #dashboard-corner ở Dashboard; KHÔNG còn topbar ngang) ===== */
   .space-switcher { position: relative; margin-left: 6px; }
   .space-switcher-btn {
     display: flex; align-items: center; gap: 6px; background: var(--raised); border: 1px solid var(--border);
@@ -99,11 +82,28 @@
     box-shadow: 0 14px 40px rgba(0,0,0,.18); padding: 6px; max-height: 320px; overflow-y: auto;
   }
   .space-menu-item {
-    display: flex; align-items: center; gap: 8px; padding: 8px 9px; border-radius: 8px; cursor: pointer; font-size: 13.5px;
+    display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-radius: 8px; cursor: pointer; font-size: 13.5px;
   }
   .space-menu-item:hover { background: var(--raised); }
   .space-menu-item.active { color: var(--accent); font-weight: 700; }
-  .space-menu-item .space-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Dot màu trước tên — xoay vòng theo SPACE_DOT_PALETTE (1 màu cố định/space theo index,
+     không đổi khi sắp xếp lại thứ tự vì gán theo id, xem spaceDotColor()) */
+  .space-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+  .space-menu-item .space-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  .space-menu-item .space-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Dòng phụ nhỏ mờ: "X việc hôm nay · Y note" — không in đậm/đổi màu accent dù item active,
+     để không cạnh tranh với tên space */
+  .space-menu-item .space-meta {
+    font-size: 11px; font-weight: 500; color: var(--text-dim); overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; opacity: .85;
+  }
+  .space-menu-item.active .space-meta { color: var(--text-dim); }
+  /* Gợi ý phím tắt cuối mỗi item — chỉ hiện cho 9 space đầu (Alt/Cmd+1..9) */
+  .space-shortcut {
+    font-size: 10.5px; font-weight: 700; color: var(--text-dim); background: var(--bg);
+    border: 1px solid var(--border); border-radius: 5px; padding: 1px 5px; flex: 0 0 auto;
+    letter-spacing: .01em; opacity: .75;
+  }
   .space-menu-item .space-tools { display: flex; align-items: center; gap: 3px; flex: 0 0 auto; }
   /* Nút sửa/xoá ẩn cho tới khi hover; nút ▲▼ luôn hiện để đổi thứ tự nhanh */
   .space-menu-item .space-tools > .icon-btn { opacity: 0; transition: opacity .12s; }
@@ -127,29 +127,38 @@
   #dashboard { flex: 1; display: flex; min-height: 0; padding: 14px; gap: 12px; }
   #main-row { display: flex; flex: 1; min-height: 0; min-width: 0; gap: 12px; }
 
+  /* Cột bọc khối Thông báo + widget Space/Settings — wrapper flex-column nhận flex-basis
+     (thay cho #block-reminders nhận trực tiếp như trước), để widget nằm NGAY DƯỚI khối
+     Thông báo, rộng đúng = width của cột, không còn position:fixed nổi tự do. Cột này
+     CỐ ĐỊNH vị trí cuối #main-row (không tham gia kéo-thả đổi thứ tự — xem setupReorder()). */
+  .reminders-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: 0; }
+
   .main-block {
     background: var(--panel-bg);
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-hairline);
     border-radius: 14px;
     min-width: 0; min-height: 0;
     display: flex; flex-direction: column;
     overflow: hidden;
     box-shadow: var(--shadow);
-    transition: flex .15s ease, outline-offset .15s ease, opacity .15s ease;
+    transition: transform .2s var(--ease-standard), box-shadow .2s var(--ease-standard), opacity .2s var(--ease-standard);
   }
-  #block-combined { display: flex; flex-direction: column; gap: 12px; padding: 0; background: transparent; border: none; box-shadow: none; transition: flex .15s ease; }
+  #block-combined { display: flex; flex-direction: column; gap: 12px; padding: 0; background: transparent; border: none; box-shadow: none; }
   .main-block.drag-over { outline: 2px dashed var(--accent); outline-offset: 4px; }
   .main-block.dragging { opacity: .45; }
   .main-block .block-head { cursor: grab; }
   .main-block .block-head:active { cursor: grabbing; }
+  /* Khối Thông báo cố định vị trí (xem .reminders-col/reorderableBlocks) -> không kéo-thả
+     được nữa, trả con trỏ về bình thường để không gợi ý sai là kéo được. */
+  #block-reminders .block-head { cursor: default; }
+  #block-reminders .block-head:active { cursor: default; }
 
   #combined-sub { flex: 1; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
-  #combined-bottom-row { display: flex; gap: 12px; flex: 1; min-height: 0; min-width: 0; transition: flex .15s ease; }
+  #combined-bottom-row { display: flex; gap: 12px; flex: 1; min-height: 0; min-width: 0; }
   .sub-block {
     display: flex; flex-direction: column; min-height: 0; min-width: 0;
     background: var(--panel-bg);
-    border: 1px solid var(--border); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow);
-    transition: flex .15s ease;
+    border: 1px solid var(--border-hairline); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow);
   }
 
   .block-head {
@@ -180,7 +189,7 @@
   .head-divider { width: 1px; height: 18px; background: var(--border); flex: 0 0 auto; }
   .head-eye-btn {
     color: var(--text-dim); background: none; padding: 5px; border-radius: 7px;
-    display: flex; align-items: center; justify-content: center; flex: 0 0 auto; transition: color .12s, background .12s;
+    display: flex; align-items: center; justify-content: center; flex: 0 0 auto; transition: color .15s var(--ease-standard), background .15s var(--ease-standard);
   }
   .head-eye-btn:hover { color: var(--accent); background: rgba(var(--accent-rgb), .1); }
   .head-eye-btn svg.icon { width: 14px; height: 14px; }
@@ -193,22 +202,52 @@
     color: var(--text-dim); font-size: 13.5px; padding: 16px;
   }
   .collapsed-placeholder svg.icon { width: 18px; height: 18px; opacity: .5; }
-  .collapsed .collapsed-placeholder { display: flex; }
+  .collapsed .collapsed-placeholder { display: flex; animation: fadeInPop .2s var(--ease-standard); }
+
+  /* ===== Empty state (3 khối chính: Việc cần làm / Ghi chú / Thông báo) =====
+     Thay placeholder text thuần bằng icon minh hoạ + hướng dẫn ngắn, dùng lại
+     ICON_PATHS có sẵn (không thêm icon library ngoài). */
+  .empty-state {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 10px; padding: 28px 16px; text-align: center; color: var(--text-dim);
+    animation: fadeInPop .22s var(--ease-standard);
+  }
+  .empty-state .empty-icon {
+    width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+    background: rgba(var(--accent-rgb),.08); color: var(--accent);
+  }
+  .empty-state .empty-icon svg.icon { width: 21px; height: 21px; opacity: .85; }
+  .empty-state .empty-title { font-size: 13.5px; font-weight: 700; color: var(--text); }
+  .empty-state .empty-hint { font-size: 12.5px; line-height: 1.5; max-width: 240px; }
+
+  @keyframes fadeInPop {
+    from { opacity: 0; transform: translateY(4px) scale(.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
 
   .filter-tabs { display: flex; gap: 3px; background: var(--bg); padding: 3px; border-radius: 8px; }
   .filter-tabs button { font-size: 12.5px; padding: 4px 9px; border-radius: 6px; background: transparent; color: var(--text-dim); font-weight: 600; }
   .filter-tabs button.active { background: rgba(var(--accent-rgb),.12); color: var(--accent); box-shadow: none; }
 
   /* ===== Việc cần làm ===== */
-  .task-row { display: flex; align-items: flex-start; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .task-row { display: flex; align-items: flex-start; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 14px; transition: opacity .15s var(--ease-standard), box-shadow .12s; }
   .task-row:last-child { border-bottom: none; }
+  /* Kéo-thả sắp xếp thủ công — cùng pattern .note-card: draggable chỉ bật khi mousedown
+     đúng vào .card-grip, disarm ở mouseup trên document (xem setupTaskDrag()). */
+  .task-row.dragging { opacity: .45; }
+  .task-row.drop-before { box-shadow: 0 -2px 0 -1px var(--accent); }
+  .task-row.drop-after { box-shadow: 0 2px 0 -1px var(--accent); }
+  .task-row .card-grip { margin-top: 1px; width: 17px; height: 22px; }
   .check { width: 17px; height: 17px; border-radius: 6px; border: 1.6px solid var(--border); flex: 0 0 auto; margin-top: 1px; display:flex; align-items:center; justify-content:center; cursor:pointer; background: var(--raised); transition: all .12s; }
   .check svg.icon { width: 11px; height: 11px; stroke-width: 3; opacity: 0; transition: opacity .1s; color: white; }
   .check.checked { background: var(--done); border-color: var(--done); }
   .check.checked svg.icon { opacity: 1; }
-  .task-row .row-main { flex: 1; }
+  .task-row .row-main { flex: 1; min-width: 0; }
   .task-row.done .row-title { text-decoration: line-through; color: var(--text-dim); }
-  .row-title { font-weight: 500; }
+  .row-title { font-weight: 500; display: flex; align-items: center; gap: 6px; }
+  /* Dấu hiệu nhỏ báo task có nội dung chi tiết (field content) đã lưu qua modal */
+  .row-title .has-content-dot { color: var(--text-dim); flex: 0 0 auto; opacity: .65; display: inline-flex; }
+  .row-title .has-content-dot svg.icon { width: 11px; height: 11px; }
   .row-meta { display: flex; gap: 6px; margin-top: 4px; }
   .meta-tag { font-size: 11.5px; padding: 2px 7px; border-radius: 6px; background: var(--raised); color: var(--text-dim); display:inline-flex; align-items:center; gap:4px; font-weight: 600; }
   .meta-tag svg.icon { width: 10px; height: 10px; }
@@ -233,7 +272,7 @@
   .habit-top.done .habit-title { color: var(--done); }
   .habit-left { display: flex; align-items: center; gap: 9px; cursor: pointer; flex: 1; min-width: 0; }
   .habit-right { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
-  .habit-row .row-tools { display: flex; gap: 4px; opacity: 0; transition: opacity .12s; }
+  .habit-row .row-tools { display: flex; gap: 4px; opacity: 0; transition: opacity .15s var(--ease-standard); }
   .habit-row:hover .row-tools { opacity: 1; }
   .week-track { display: flex; align-items: center; gap: 7px; }
   .week-dot {
@@ -241,8 +280,8 @@
     flex: 0 0 13px; cursor: default;
   }
   .week-dot.filled { background: var(--habit-color); border-color: var(--habit-color); }
-  .week-dot.today { box-shadow: 0 0 0 3px rgba(255,138,61,.25); }
-  .streak-pill { font-size: 12.5px; color: var(--habit-color); font-weight: 700; display:inline-flex; align-items:center; gap:5px; background: rgba(255,138,61,.12); padding: 4px 9px; border-radius: 20px; white-space: nowrap; flex: 0 0 auto; }
+  .week-dot.today { box-shadow: 0 0 0 3px rgba(232,135,61,.22); }
+  .streak-pill { font-size: 12.5px; color: var(--habit-color); font-weight: 700; display:inline-flex; align-items:center; gap:5px; background: rgba(232,135,61,.12); padding: 4px 9px; border-radius: 20px; white-space: nowrap; flex: 0 0 auto; }
   .streak-pill svg.icon { width: 12px; height: 12px; }
 
   /* ===== Thông báo feed ===== */
@@ -303,32 +342,50 @@
   .sort-switcher-btn svg.icon { width: 11px; height: 11px; color: var(--text-dim); }
   #sort-menu { left: auto; right: 0; min-width: 190px; }
 
+  /* ===== Nhóm nút ngang chọn 1 (segmented control) — dùng cho "Tự động đổi ảnh" và
+     "Tần suất đổi quote" trong Settings. Cùng tinh thần .theme-toggle/.filter-tabs:
+     không còn dropdown xổ xuống (gây vỡ layout), chọn trực tiếp 1 trong N nút ngang.
+     flex-wrap để tự xuống dòng ở màn hẹp thay vì đẩy vỡ layout ngang. */
+  .segmented-options { display: flex; flex-wrap: wrap; gap: 6px; }
+  .segmented-options button {
+    background: var(--raised); border: 1.5px solid var(--border); color: var(--text-dim);
+    border-radius: 8px; padding: 6px 11px; font-size: 12.5px; font-weight: 600;
+    transition: border-color .12s, color .12s, background .12s;
+  }
+  .segmented-options button:hover { border-color: var(--accent); color: var(--accent); }
+  .segmented-options button.active { border-color: var(--accent); color: var(--accent); background: rgba(var(--accent-rgb),.08); }
+
   /* ===== Ghi chú: nút chuyển chế độ hiển thị (grid / list) ===== */
   .note-view-toggle { display: flex; gap: 2px; background: var(--bg); padding: 3px; border-radius: 8px; flex: 0 0 auto; }
   .note-view-toggle button {
     background: transparent; color: var(--text-dim); border-radius: 6px;
     width: 28px; height: 26px; display: flex; align-items: center; justify-content: center;
-    transition: background .12s, color .12s;
+    transition: background .15s var(--ease-standard), color .15s var(--ease-standard);
   }
   .note-view-toggle button svg.icon { width: 14px; height: 14px; }
   .note-view-toggle button:hover { color: var(--text); }
   .note-view-toggle button.active { background: var(--raised); color: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
 
-  /* ===== Ghi chú card grid ===== */
+  /* ===== Ghi chú card grid =====
+     1 lớp duy nhất (về lại bản gốc): note-card có border-left màu riêng của note + nền
+     fill alpha thấp theo màu đó (hexToRgba(color, --note-alpha), set qua style inline lúc
+     render — xem noteCardHtml()). Giữ easing/hover transform đã cải tiến. */
   .notes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; align-content: start; width: 100%; }
   .note-card {
-    background: var(--note-card-bg); border: 1px solid var(--border); border-radius: 10px;
-    padding: 9px 11px 24px;
-    border-left: 3px solid var(--note-color);
-    font-size: 14px; position: relative; cursor: pointer;
-    box-shadow: 0 1px 2px rgba(20,20,43,.05);
+    background: var(--note-card-bg); border: 1px solid var(--border-hairline); border-left: 3px solid var(--note-color);
+    border-radius: 10px;
+    padding: 8px 10px 22px; position: relative;
+    font-size: 14px; cursor: pointer;
+    box-shadow: 0 1px 3px rgba(20,20,43,.04);
+    transition: transform .18s var(--ease-standard), box-shadow .18s var(--ease-standard);
   }
+  .note-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(20,20,43,.08); }
   .nc-head { display: flex; align-items: center; justify-content: flex-end; gap: 6px; min-height: 18px; margin-bottom: 3px; }
   .note-card .nc-title { font-weight: 700; margin: 0 0 3px; }
   .note-card .nc-content { color: var(--text-dim); white-space: pre-wrap; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 4; line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
   .nc-date { position: absolute; right: 11px; bottom: 7px; font-size: 10.5px; color: var(--text-dim); opacity: .7; font-weight: 500; }
 
-  .note-card .nc-tools { display:flex; align-items:center; gap:3px; opacity:0; transition:opacity .15s; flex: 0 0 auto; }
+  .note-card .nc-tools { display:flex; align-items:center; gap:3px; opacity:0; transition:opacity .15s var(--ease-standard); flex: 0 0 auto; }
   .note-card:hover .nc-tools { opacity:1; }
   .note-card.dragging { opacity: .4; }
   .card-grip { color: var(--text-dim); cursor: grab; flex: 0 0 auto; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
@@ -342,12 +399,43 @@
   .notes-list .note-card.drop-before { box-shadow: 0 -3px 0 -1px var(--accent); }
   .notes-list .note-card.drop-after { box-shadow: 0 3px 0 -1px var(--accent); }
 
-  /* ===== Modal (luôn nền đặc — dễ đọc, không kính mờ) ===== */
-  .overlay { position: fixed; inset: 0; background: rgba(20,20,30,.45); display: flex; align-items: center; justify-content: center; z-index: 80; backdrop-filter: blur(2px); }
-  .modal { background: var(--modal-bg); border: 1px solid var(--border); border-radius: 16px; width: 440px; max-width: 90vw; padding: 22px; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
-  .modal-settings { width: 760px; max-width: 92vw; }
+  /* ===== Modal (luôn nền đặc — dễ đọc, không kính mờ) =====
+     Animation mở modal: chỉ animate transform/opacity (không động width/height/top/left),
+     dùng easing thống nhất --ease-standard cho cảm giác "pop-in" nhất quán toàn hệ thống. */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(20,20,30,.45); display: flex; align-items: center; justify-content: center;
+    z-index: 80; backdrop-filter: blur(2px);
+    animation: overlayFadeIn .18s var(--ease-standard);
+  }
+  .modal {
+    background: var(--modal-bg); border: 1px solid var(--border-hairline); border-radius: 16px; width: 440px; max-width: 90vw;
+    padding: 22px; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.16);
+    animation: modalPopIn .22s var(--ease-standard);
+  }
+  @keyframes overlayFadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes modalPopIn { from { opacity: 0; transform: translateY(8px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  /* Modal Settings: kích thước CỐ ĐỊNH (không co giãn theo nội dung) — header + thanh tab +
+     nút Đóng luôn cố định, chỉ phần nội dung .settings-body bên trong được scroll riêng.
+     Ghi đè max-height/overflow-y/padding của .modal chung vì layout đổi sang flex column. */
+  .modal-settings {
+    width: 760px; max-width: 92vw; height: min(680px, 82vh); max-height: none;
+    display: flex; flex-direction: column; overflow: hidden; padding: 0;
+  }
+  .modal-settings h2 {
+    margin: 0; padding: 16px 22px 8px; flex: 0 0 auto;
+  }
+  .modal-settings .settings-tabs {
+    flex: 0 0 auto; margin: 0; padding: 0 22px 10px; border-bottom: 1px solid var(--border-hairline);
+  }
+  .modal-settings .settings-body {
+    flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 18px 22px;
+  }
+  .modal-settings .modal-actions {
+    flex: 0 0 auto; margin: 0; padding: 14px 22px; border-top: 1px solid var(--border-hairline);
+  }
   .modal-note { width: 620px; max-width: 92vw; }
   .modal-note #note-content { min-height: 320px; }
+  .modal-note #task-content { min-height: 140px; }
   .note-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
   .note-modal-head h2 { margin: 0; flex: 0 0 auto; }
   .note-modal-head .color-palette { gap: 6px; }
@@ -373,6 +461,25 @@
   .block-check-row input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; flex: 0 0 auto; }
 
   /* ===== Settings ===== */
+  /* Mỗi nhóm chủ đề (Giao diện / Ảnh nền / Bố cục / Dữ liệu) bọc trong 1 .settings-section,
+     phân tách bằng hairline mảnh + khoảng cách lớn hơn margin trong nhóm — không cần heading to. */
+  /* ===== Settings: thanh tab ngang (thay cho 4 section nối tiếp phải scroll) ===== */
+  .settings-tabs {
+    display: flex; gap: 4px; margin-bottom: 18px; padding-bottom: 0;
+    border-bottom: 1px solid var(--border-hairline); flex-wrap: wrap;
+  }
+  .settings-tab {
+    display: flex; align-items: center; gap: 7px; background: transparent; color: var(--text-dim);
+    font-size: 13.5px; font-weight: 600; padding: 9px 13px; border-radius: 8px 8px 0 0;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+    transition: color .15s var(--ease-standard), border-color .15s var(--ease-standard), background .15s var(--ease-standard);
+  }
+  .settings-tab svg.icon { width: 14px; height: 14px; }
+  .settings-tab:hover { color: var(--text); background: rgba(var(--accent-rgb),.06); }
+  .settings-tab.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(var(--accent-rgb),.08); }
+  .settings-section { padding-top: 0; border-top: none; display: none; }
+  .settings-section.active-tab-panel { display: block; animation: fadeInPop .18s var(--ease-standard); }
+  .settings-section + .settings-section { margin-top: 4px; }
   .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px 28px; align-items: start; }
   .settings-grid .span-2 { grid-column: 1 / -1; }
   .layout-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 28px; }
@@ -387,14 +494,16 @@
   .swatch.active { border-color: var(--text); }
   .swatch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-  /* Lưới preview ảnh nền Home — mỗi ô = 1 ảnh trong HOME_IMAGES, sửa link trực tiếp tại ô đó. */
-  .home-bg-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 4px; }
-  .home-bg-item { display: flex; flex-direction: column; gap: 6px; }
+  /* Lưới preview ảnh nền Home — mỗi ô = 1 ảnh trong HOME_IMAGES, sửa link hoặc upload trực tiếp
+     tại ô đó. Block này dùng span-2 trong settings-grid (~700px khả dụng) nên lưới 3 cột vẫn rộng
+     rãi; thumb dùng aspect-ratio 4/3 thay vì height cố định để ảnh không bị dẹt, dễ xem rõ nội dung. */
+  .home-bg-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 4px; }
+  .home-bg-item { display: flex; flex-direction: column; gap: 7px; }
   .home-bg-item .home-bg-thumb {
-    height: 64px; border-radius: 10px; border: 2px solid transparent;
+    aspect-ratio: 4 / 3; border-radius: 10px; border: 2px solid transparent;
     box-shadow: 0 0 0 1px var(--border) inset; background-size: cover; background-position: center;
     background-color: var(--raised); position: relative; overflow: hidden; cursor: pointer;
-    transition: border-color .12s, transform .12s;
+    transition: border-color .15s var(--ease-standard), transform .15s var(--ease-standard);
   }
   .home-bg-item .home-bg-thumb:hover { transform: scale(1.02); }
   .home-bg-item .home-bg-thumb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -403,34 +512,98 @@
     content: 'Link lỗi'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
     font-size: 11px; font-weight: 600; color: #fff; background: rgba(220,60,60,.55);
   }
-  .home-bg-item input {
+  .home-bg-item .home-bg-row { display: flex; align-items: center; gap: 6px; }
+  .home-bg-item .home-bg-row input {
     font-size: 11.5px; padding: 5px 7px; border-radius: 6px; border: 1px solid var(--border);
-    background: var(--raised); color: var(--text); width: 100%;
+    background: var(--raised); color: var(--text); width: 100%; min-width: 0;
   }
+  .home-bg-item .home-bg-row input:disabled { color: var(--text-dim); cursor: default; }
+  .home-bg-item .home-bg-upload-btn {
+    flex: 0 0 auto; width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--raised); color: var(--text-dim); display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: color .15s var(--ease-standard), border-color .15s var(--ease-standard);
+  }
+  .home-bg-item .home-bg-upload-btn svg.icon { width: 13px; height: 13px; }
+  .home-bg-item .home-bg-upload-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .home-bg-item .home-bg-upload-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .home-bg-item .home-bg-use-link-btn {
+    font-size: 10.5px; font-weight: 600; color: var(--accent); background: none; border: none;
+    cursor: pointer; padding: 0; text-align: left; width: 100%;
+  }
+  .home-bg-item .home-bg-use-link-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .hint { font-size: 12.5px; color: var(--text-dim); line-height: 1.5; margin: 0; }
   .export-import button { flex: 1; }
+
+  /* ===== Lưới slot Quote Home — 10 ô CỐ ĐỊNH (không CRUD thêm/xoá), mỗi ô sửa nội
+     dung trực tiếp qua textarea. Cùng tinh thần home-bg-grid (slot cố định + sửa tại
+     chỗ) nhưng hiển thị card text nhỏ thay cho thumbnail ảnh — không cần aspect-ratio
+     cố định vì độ dài câu khác nhau. 2 cột (không 3 như ảnh) vì nội dung text dài hơn,
+     cần đủ rộng để đọc/sửa dễ; @640px về 1 cột. */
+  .home-quote-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 4px; }
+  .home-quote-item {
+    display: flex; flex-direction: column; gap: 6px; padding: 10px 11px; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--raised); position: relative;
+    transition: border-color .15s var(--ease-standard);
+  }
+  .home-quote-item.active-slot { border-color: var(--accent); }
+  .home-quote-item .home-quote-index {
+    font-size: 10.5px; font-weight: 700; color: var(--text-dim); text-transform: uppercase;
+    letter-spacing: .03em; display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  }
+  .home-quote-item .home-quote-use-btn {
+    font-size: 10.5px; font-weight: 600; color: var(--accent); background: none; border: none;
+    cursor: pointer; padding: 2px 5px; border-radius: 5px; flex: 0 0 auto;
+  }
+  .home-quote-item .home-quote-use-btn:hover { background: rgba(var(--accent-rgb),.1); }
+  .home-quote-item .home-quote-use-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .home-quote-item textarea {
+    width: 100%; min-height: 56px; resize: vertical; font-family: inherit; font-size: 12.5px;
+    line-height: 1.5; color: var(--text); background: var(--panel-bg); border: 1px solid var(--border);
+    border-radius: 7px; padding: 6px 8px;
+  }
+  .home-quote-item textarea:focus { outline: none; border-color: var(--accent); }
 
   .size-row { display: flex; align-items: center; gap: 10px; margin-bottom: 11px; }
   .size-row label { flex: 0 0 150px; font-size: 13.5px; color: var(--text); font-weight: 500; }
   .layout-cols .size-row label { flex-basis: 140px; }
-  .size-row input[type=range] { flex: 1; accent-color: var(--accent); }
+  /* Custom track tô màu phần đã kéo bằng linear-gradient (set qua JS, đọc var(--accent)
+     trực tiếp trong gradient nên tự đổi theo accent mới, không cần JS chạy lại khi đổi màu).
+     Lý do không dùng accent-color thuần: track-fill theo accent-color không nhất quán giữa
+     các giá trị màu trên Chrome (vd cam ra track đen, hồng ra track xám) — tự vẽ track đảm bảo
+     luôn đúng màu accent đang chọn. */
+  .size-row input[type=range] {
+    flex: 1; -webkit-appearance: none; appearance: none; height: 5px; border-radius: 3px;
+    background: var(--raised); cursor: pointer;
+  }
+  .size-row input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 15px; height: 15px; border-radius: 50%;
+    background: var(--accent); border: 2px solid var(--panel-bg); box-shadow: 0 1px 3px rgba(0,0,0,.25); cursor: pointer;
+  }
+  .size-row input[type=range]::-moz-range-thumb {
+    width: 15px; height: 15px; border-radius: 50%; border: 2px solid var(--panel-bg);
+    background: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,.25); cursor: pointer;
+  }
+  .size-row input[type=range]::-moz-range-track { background: transparent; }
   .size-row .size-val { width: 38px; text-align: right; font-size: 13.5px; color: var(--text-dim); font-weight: 700; }
   .size-row .size-auto { flex: 1; font-size: 13px; color: var(--text-dim); }
 
   /* ===== Responsive: màn hình/cửa sổ hẹp ===== */
   @media (max-width: 980px) {
     #main-row { flex-direction: column; }
-    #block-combined, #block-notes, #block-reminders { flex: 1 1 0 !important; min-height: 260px; }
+    #block-combined, #block-notes, .reminders-col { flex: 1 1 0 !important; min-height: 260px; }
     #combined-sub { min-height: 0; }
   }
   @media (max-width: 640px) {
     #combined-bottom-row { flex-direction: column; }
     #sub-reminder, #sub-habits { flex: 1 1 0 !important; min-height: 160px; }
     .settings-grid, .layout-cols { grid-template-columns: 1fr; }
+    .home-quote-grid { grid-template-columns: 1fr; }
     .modal-settings { width: 94vw; }
     .modal-note { width: 94vw; }
     .modal-note #note-content { min-height: 220px; }
     .modal-note-view { width: 94vw; }
+    /* Phase 1 = desktop full-tab, không tối ưu mobile; footer toolbar #dashboard-corner
+       nằm trong .reminders-col nên tự co theo cột, không cần xử lý riêng ở màn hẹp. */
   }
 
   /* ========================================================================
@@ -506,7 +679,6 @@
   body[data-style-mode="b"] #dashboard { background: transparent; }
   body[data-style-mode="b"] .main-block,
   body[data-style-mode="b"] .sub-block { background: var(--panel-bg); backdrop-filter: none; }
-  body[data-style-mode="b"] .topbar { background: var(--panel-bg) !important; }
 
   /* --- Hướng C: glassmorphism đầy đủ — kính mờ trong suốt CAO (alpha thấp ~65%),
      viền sáng mỏng, backdrop-blur mạnh hơn A --- */
@@ -521,13 +693,6 @@
     background: rgba(20,18,40,.45); backdrop-filter: blur(22px) saturate(1.3);
     border: 1px solid rgba(255,255,255,.14);
     box-shadow: 0 8px 32px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.06);
-  }
-  body[data-style-mode="c"] .topbar {
-    background: rgba(255,255,255,.38) !important; backdrop-filter: blur(18px);
-    border-bottom-color: rgba(255,255,255,.4);
-  }
-  body[data-style-mode="c"][data-theme="dark"] .topbar {
-    background: rgba(20,18,40,.4) !important; border-bottom-color: rgba(255,255,255,.1);
   }
   body[data-style-mode="c"] .note-card { backdrop-filter: blur(10px); border-color: rgba(255,255,255,.5); }
   /* Vấn đề cố ý để LỘ trong demo: ở Hướng C, alpha thấp khiến màu riêng từng note-card
@@ -580,14 +745,18 @@
     background-color: #1e3c72;
     background-image: linear-gradient(135deg, #1e3c72 0%, #2a5298 45%, #6a82fb 100%);
   }
-  /* lớp ảnh thật fade-in đè lên gradient fallback của #app-bg */
-  #app-bg::after {
-    content: ''; position: absolute; inset: 0;
-    background-image: var(--app-bg-img, none);
+  /* CROSSFADE 2 LỚP PING-PONG: thay cho 1 lớp ::after duy nhất (gây "nhảy" tức thì khi
+     đổi ảnh vì opacity của CÙNG 1 lớp chỉ chuyển từ ảnh cũ sang ảnh mới không có giai
+     đoạn 2 ảnh cùng hiện). Giờ có 2 layer con cố định trong #app-bg, mỗi lần đổi ảnh
+     ta set ảnh MỚI vào layer đang ẨN rồi fade nó lên trên (opacity 0->1) trong khi layer
+     đang hiện vẫn còn đó bên dưới một nhịp ngắn -> crossfade mượt thật. */
+  #app-bg .app-bg-layer {
+    position: absolute; inset: 0;
     background-size: cover; background-position: center;
-    opacity: 0; transition: opacity .6s ease;
+    opacity: 0; transition: opacity .55s var(--ease-standard);
   }
-  #app-bg.loaded::after { opacity: 1; }
+  #app-bg .app-bg-layer.visible { opacity: 1; }
+  #app-bg .app-bg-layer.layer-top { z-index: 1; }
 
   /* Overlay riêng cho DASHBOARD (nhạt hơn overlay Home) — ổn định contrast nền
      sau card bất kể ảnh sáng/tối, nhưng vẫn để gap/viền lộ ảnh đẹp.
@@ -595,7 +764,7 @@
   #dashboard-bg-overlay {
     position: fixed; inset: 0; z-index: -1; pointer-events: none;
     background: linear-gradient(180deg, rgba(10,12,28,.34) 0%, rgba(10,12,28,.22) 50%, rgba(10,12,28,.40) 100%);
-    opacity: 0; transition: opacity .45s ease;
+    opacity: 0; transition: opacity .45s var(--ease-standard);
   }
   body.home-hidden #dashboard-bg-overlay { opacity: 1; }
   /* theme tối: overlay đậm hơn chút để card tối nổi rõ trên ảnh */
@@ -609,7 +778,7 @@
     align-items: center; justify-content: center;
     color: #fff;
     opacity: 1; visibility: visible;
-    transition: opacity .45s ease, visibility .45s ease;
+    transition: opacity .45s var(--ease-standard), visibility .45s var(--ease-standard);
     overflow: hidden;
     /* Trong suốt — ảnh nền giờ do #app-bg lo. Khi Home->Dashboard chỉ #home-screen
        (content + overlay riêng của Home) mờ đi, ẢNH ĐỨNG YÊN phía sau. */
@@ -618,10 +787,27 @@
   body.home-hidden #home-screen { opacity: 0; visibility: hidden; pointer-events: none; }
 
   /* overlay tối mờ RIÊNG của Home (đậm hơn overlay Dashboard vì chữ Home to/ít,
-     cần nền tối hơn cho cảm giác "cinematic"; tách biệt overlay Dashboard) */
+     cần nền tối hơn cho cảm giác "cinematic"; tách biệt overlay Dashboard).
+     Dải giữa tăng từ .14 -> .20 để đảm bảo contrast tối thiểu cho chữ trắng khi
+     ảnh nền sáng (vd ảnh trời/biển/đồng cỏ) — không cần detect độ sáng ảnh, chỉ
+     tăng sàn tối an toàn hơn. */
   #home-overlay {
     position: absolute; inset: 0; z-index: 1;
-    background: linear-gradient(180deg, rgba(0,0,0,.30) 0%, rgba(0,0,0,.14) 35%, rgba(0,0,0,.46) 100%);
+    background: linear-gradient(180deg, rgba(0,0,0,.30) 0%, rgba(0,0,0,.20) 35%, rgba(0,0,0,.46) 100%);
+  }
+  /* #home-content (đồng hồ/ngày/lời chào/quote) + .home-enter-wrap (nút tròn + caption)
+     cùng nhận hiệu ứng "depth" khi chuyển sang Dashboard: scale nhẹ về .97 + dịch xuống
+     8px, ĐỒNG THỜI với fade của #home-screen (cùng thời lượng/easing) -> cảm giác lùi
+     vào màn hình thay vì chỉ mờ phẳng. Khi quay lại Home (home-hidden gỡ) tự trở về
+     trạng thái gốc. (Giữ id #home-enter-btn cho riêng nút tròn để không phải sửa các
+     tham chiếu khác — chỉ đổi target transition sang .home-enter-wrap bao ngoài.) */
+  #home-content, .home-enter-wrap {
+    transition: opacity .45s var(--ease-standard), transform .45s var(--ease-standard);
+    transform: scale(1) translateY(0);
+  }
+  body.home-hidden #home-content,
+  body.home-hidden .home-enter-wrap {
+    transform: scale(.97) translateY(8px);
   }
   #home-content {
     position: relative; z-index: 2;
@@ -634,40 +820,84 @@
     line-height: 1; font-variant-numeric: tabular-nums;
   }
   #home-clock .sec { font-size: .42em; font-weight: 400; opacity: .8; margin-left: .1em; vertical-align: super; }
-  #home-date { font-size: clamp(15px, 2vw, 20px); font-weight: 500; opacity: .92; margin-top: 6px; }
-  #home-greeting { font-size: clamp(20px, 3vw, 30px); font-weight: 600; margin-top: 22px; }
+  #home-date { font-size: clamp(15px, 2vw, 20px); font-weight: 500; opacity: .92; margin-top: 4px; }
+  #home-greeting { font-size: clamp(20px, 3vw, 30px); font-weight: 600; margin-top: 14px; }
+  /* Revert: giữ lại font-style italic (bản có italic được đánh giá đẹp hơn) + vẫn giữ
+     letter-spacing rất nhẹ (không xung đột với italic, càng tăng chất "trích dẫn").
+     Crossfade riêng (opacity transition) để applyHomeQuote() có thể fade-out/fade-in
+     khi đổi câu. */
   #home-quote {
-    font-size: clamp(14px, 1.7vw, 18px); font-weight: 400; font-style: italic;
+    font-size: clamp(14px, 1.7vw, 18px); font-weight: 400; font-style: italic; letter-spacing: .01em;
     opacity: .9; max-width: 620px; margin-top: 14px; line-height: 1.55;
+    transition: opacity .2s var(--ease-standard);
   }
+  /* Tín hiệu phụ rất nhẹ "X việc cần làm hôm nay" — chuyển ra góc dưới-cùng bên phải
+     màn Home (tách khỏi luồng nội dung chính/quote), đồng bộ khoảng cách 18px với
+     #home-corner (đang ở góc trên-phải). Vẫn nhỏ/mờ + ẨN HẲN (display:none, không chỉ
+     opacity 0) khi không có task để tránh khoảng trống thừa/đọc nhầm "0 việc". */
+  #home-today-hint {
+    position: absolute; bottom: 18px; right: 18px; z-index: 3;
+    font-size: clamp(11px, 1.1vw, 12.5px); font-weight: 400; opacity: .58;
+    letter-spacing: .01em; text-align: right; max-width: 280px;
+  }
+  #home-today-hint:empty { display: none; }
 
-  /* nút "Vào Dashboard" — to, rõ, center-bottom, ít friction */
+  /* nút "Vào Dashboard" — KHÔNG còn khung/nền/viền/blur (đã bỏ hẳn kiểu FAB tròn kính mờ).
+     Giờ là "scroll-cue" tối giản: chỉ 1 icon mũi tên to hơn bình thường + caption nhỏ dưới,
+     không có hình khối nào quanh icon — đúng tinh thần "màn chờ điềm tĩnh, không gấp gáp".
+     Wrapper tăng margin-top rõ rệt so với bản cũ (46px -> 64px) để tạo ranh giới thị giác
+     giữa "phần thông tin" (đồng hồ/ngày/chào/quote) và "phần hành động" (nút). */
+  .home-enter-wrap {
+    position: relative; z-index: 2; margin-top: 64px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+  }
+  /* Button thật (giữ semantics/a11y) nhưng KHÔNG có khung/nền/viền/shadow/blur nào —
+     padding mở rộng vùng bấm tới ~44px (touch-target tối thiểu) mà không đổi kích thước
+     nhìn thấy của icon+caption bên trong. Icon bounce rất nhẹ, lặp vô hạn, chu kỳ chậm. */
   #home-enter-btn {
-    position: relative; z-index: 2; margin-top: 46px;
-    display: inline-flex; align-items: center; gap: 9px;
-    background: rgba(255,255,255,.16); color: #fff;
-    border: 1px solid rgba(255,255,255,.45); border-radius: 999px;
-    padding: 13px 26px; font-size: 15.5px; font-weight: 600;
-    backdrop-filter: blur(10px); cursor: pointer;
-    box-shadow: 0 6px 24px rgba(0,0,0,.22);
-    transition: background .15s, transform .15s, border-color .15s;
+    background: none; border: none; box-shadow: none; backdrop-filter: none;
+    padding: 10px 16px; margin: -10px -16px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    color: #fff; cursor: pointer;
+    transition: opacity .15s var(--ease-standard);
   }
-  #home-enter-btn:hover { background: rgba(255,255,255,.30); border-color: #fff; transform: translateY(-2px); }
-  #home-enter-btn:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
-  #home-enter-btn svg.icon { width: 17px; height: 17px; }
+  #home-enter-btn:hover { opacity: .82; }
+  #home-enter-btn:focus-visible { outline: 2px solid #fff; outline-offset: 4px; border-radius: 6px; }
+  #home-enter-btn svg.icon {
+    width: 26px; height: 26px; stroke-width: 1.7;
+    animation: homeEnterBounce 1.6s ease-in-out infinite;
+  }
+  @keyframes homeEnterBounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(4px); }
+  }
+  /* Caption — uppercase, letter-spacing rộng, nhỏ/mờ, không nền/viền */
+  .home-enter-caption {
+    font-size: 11.5px; font-weight: 600; opacity: .75;
+    text-transform: uppercase; letter-spacing: .08em;
+  }
 
-  /* nút đổi ảnh + chú thích demo — góc trên phải */
+  /* nút đổi ảnh + chú thích demo — góc trên phải.
+     ĐỒNG BỘ ngôn ngữ thiết kế với #home-enter-btn đã làm mềm ở trên (kính mờ viền trắng
+     nhẹ + gradient sheen) thay vì nền đen-mờ khác phong cách như bản cũ — 2 nút trên màn
+     Home giờ nhất quán. */
   #home-corner {
     position: absolute; top: 18px; right: 18px; z-index: 3;
     display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
   }
   .home-corner-btn {
     display: inline-flex; align-items: center; gap: 7px;
-    background: rgba(0,0,0,.32); color: #fff; border: 1px solid rgba(255,255,255,.28);
+    background: linear-gradient(165deg, rgba(255,255,255,.18) 0%, rgba(255,255,255,.08) 100%);
+    color: #fff; border: 1px solid rgba(255,255,255,.28);
     border-radius: 9px; padding: 7px 12px; font-size: 12.5px; font-weight: 600;
-    backdrop-filter: blur(8px); cursor: pointer; transition: background .15s;
+    backdrop-filter: blur(10px); cursor: pointer;
+    box-shadow: 0 4px 18px rgba(0,0,0,.14);
+    transition: background .15s var(--ease-standard), border-color .15s var(--ease-standard), box-shadow .15s var(--ease-standard);
   }
-  .home-corner-btn:hover { background: rgba(0,0,0,.5); }
+  .home-corner-btn:hover {
+    background: linear-gradient(165deg, rgba(255,255,255,.30) 0%, rgba(255,255,255,.16) 100%);
+    border-color: rgba(255,255,255,.5);
+  }
   .home-corner-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
   .home-corner-btn svg.icon { width: 14px; height: 14px; }
   #home-demo-note {
@@ -675,15 +905,6 @@
     border-radius: 8px; padding: 6px 11px; font-size: 11px; font-weight: 500; max-width: 260px;
     text-align: right; line-height: 1.45; backdrop-filter: blur(8px);
   }
-
-  /* nút quay về Home trên topbar dashboard */
-  #btn-home {
-    background: var(--raised); border: 1px solid var(--border); border-radius: 9px;
-    width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center;
-    color: var(--text-dim); transition: color .12s, border-color .12s;
-  }
-  #btn-home:hover { color: var(--accent); border-color: var(--accent); }
-  #btn-home svg.icon { width: 16px; height: 16px; }
 
   /* ============================================================
      DASHBOARD NỔI TRÊN ẢNH NỀN CHUNG
@@ -698,48 +919,97 @@
   }
   /* Ở Home, #home-screen che phủ bằng z-index NHƯNG khi nó fade ra (opacity:0;
      visibility:hidden) thì không còn che gì nữa — nếu #dashboard không tự ẩn,
-     5 khối Dashboard (đứng sau trong DOM, không có z-index riêng) sẽ lộ ra đè
-     lên Home đang fade. Phải ẩn hẳn #dashboard (+ topbar liên quan) khi CHƯA
-     có body.home-hidden, để nó không bao giờ hiện cùng lúc với Home. */
-  #dashboard, .topbar {
+     3 khối Dashboard (đứng sau trong DOM, không có z-index riêng) sẽ lộ ra đè
+     lên Home đang fade. Phải ẩn hẳn #dashboard khi CHƯA có body.home-hidden, để
+     nó không bao giờ hiện cùng lúc với Home. (#dashboard-corner tự xử lý ẩn/hiện
+     riêng theo body.home-hidden ở CSS phía trên.) */
+  #dashboard {
     opacity: 0; visibility: hidden; pointer-events: none;
     transition: opacity .45s ease, visibility .45s ease;
   }
-  body.home-hidden #dashboard,
-  body.home-hidden .topbar {
+  body.home-hidden #dashboard {
     opacity: 1; visibility: visible; pointer-events: auto;
   }
 
-  /* --- Kính mờ nhẹ (cố định): alpha cao 88-90% + blur nhẹ, vẫn đọc rõ --- */
+  /* --- Card nổi trên ảnh nền: "kính mờ NHẸ" — mức trung gian giữa bản gốc (blur 16px/
+     sat 1.18, khá nặng) và bản hairline-flat trước đó (blur 6px/sat 1.05, gần như phẳng).
+     Alpha panel ~92-94% giữ card đủ sáng/dễ đọc, blur 12px/saturate 1.12 vẫn rõ ràng là
+     hiệu ứng glass (không phẳng), nền card đã đổi sang tông gần trắng hơn ở --panel-bg. --- */
   .main-block, .sub-block {
-    background: color-mix(in srgb, var(--panel-bg) 90%, transparent);
-    backdrop-filter: blur(16px) saturate(1.18);
-    -webkit-backdrop-filter: blur(16px) saturate(1.18);
-    border-color: rgba(255,255,255,.30);
+    background: color-mix(in srgb, var(--panel-bg) 92%, transparent);
+    backdrop-filter: blur(12px) saturate(1.12);
+    -webkit-backdrop-filter: blur(12px) saturate(1.12);
+    border-color: var(--border-hairline);
   }
   [data-theme="dark"] .main-block,
   [data-theme="dark"] .sub-block {
-    background: color-mix(in srgb, var(--panel-bg) 88%, transparent);
-    border-color: rgba(255,255,255,.10);
+    background: color-mix(in srgb, var(--panel-bg) 90%, transparent);
+    border-color: var(--border-hairline);
   }
-  /* block-head dùng border ngăn cách nhạt hơn trên kính mờ để liền mạch */
-  .block-head, .notes-toolbar { border-bottom-color: rgba(128,128,160,.22); }
+  /* block-head dùng border ngăn cách nhạt hơn để liền mạch với card */
+  .block-head, .notes-toolbar { border-bottom-color: var(--border-hairline); }
 
-  /* Bóng đổ rõ hơn khi nổi trên ảnh — tạo cảm giác "đặt trên" ảnh */
+  /* Bóng đổ cực diffuse khi nổi trên ảnh — vẫn tách lớp rõ nhưng không nặng/đậm như trước */
   body.home-hidden .main-block,
   body.home-hidden .sub-block {
-    box-shadow: 0 4px 14px rgba(10,12,40,.22), 0 14px 40px rgba(10,12,40,.26);
+    box-shadow: 0 2px 10px rgba(10,12,40,.10), 0 10px 28px rgba(10,12,40,.12);
   }
 
   /* Thanh khảo sát nền A/B/C/D cũ + layer mesh đã ĐƯỢC GỠ khỏi demo (ý tưởng nền
      Dashboard giờ dùng chung ảnh Home) để tránh nhiễu/xung đột. */
   #style-mode-switcher, #style-mode-note, #style-mesh-layer { display: none !important; }
+
+  /* ============================================================
+     DASHBOARD — Footer toolbar (Space-switcher + Settings) nằm NGAY DƯỚI khối Thông
+     báo, trong cùng .reminders-col (đã bỏ hẳn position:fixed nổi tự do trước đây).
+     Width = 100% theo cột cha, không cần JS tính lại khi đổi width vì flexbox tự xử
+     lý (cùng nằm trong 1 column). Kính mờ hairline đồng bộ phong cách .main-block. */
+  #dashboard-corner {
+    flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    background: color-mix(in srgb, var(--panel-bg) 88%, transparent);
+    backdrop-filter: blur(14px) saturate(1.15);
+    -webkit-backdrop-filter: blur(14px) saturate(1.15);
+    border: 1px solid var(--border-hairline);
+    border-radius: 12px; padding: 7px 9px;
+    box-shadow: 0 4px 16px rgba(10,12,40,.10), 0 1px 4px rgba(10,12,40,.08);
+  }
+  /* Vẫn dãn nút Space-switcher full chiều rộng còn lại (flex:1) để widget lấp đầy đều,
+     nhưng đổi nội dung (dot+tên+chevron) sang CĂN GIỮA (justify-content:center) thay vì
+     dồn trái — dồn trái khiến phần "thừa" bên trong nút nằm hết ở bên phải, làm khoảng
+     hở Home↔Switcher (gap thật ngoài nút) và Switcher↔Settings (gap + phần thừa trong
+     nút) nhìn lệch nhau dù viền nút vẫn đối xứng. Căn giữa giúp mắt thấy cân đối hơn. */
+  #dashboard-corner .space-switcher { position: relative; flex: 1; min-width: 0; }
+  #dashboard-corner .space-switcher-btn {
+    width: 100%; max-width: none; justify-content: center;
+  }
+  #dashboard-corner .space-switcher-btn span#space-switcher-label {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  /* Menu mở LÊN trên trigger (bottom:100%) — widget vẫn nằm ở phần dưới của cột,
+     mở lên đảm bảo không cần thêm logic đo viewport, nhất quán với hành vi trước đó. */
+  #dashboard-corner .space-menu {
+    top: auto; bottom: calc(100% + 8px); left: 0; right: auto; min-width: 240px;
+  }
+  #dashboard-corner-home-btn,
+  #dashboard-corner-settings-btn {
+    background: var(--raised); border: 1px solid var(--border); border-radius: 9px;
+    width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center;
+    color: var(--text-dim); flex: 0 0 auto; transition: color .12s, border-color .12s;
+  }
+  #dashboard-corner-home-btn:hover,
+  #dashboard-corner-settings-btn:hover { color: var(--accent); border-color: var(--accent); }
+  #dashboard-corner-home-btn svg.icon,
+  #dashboard-corner-settings-btn svg.icon { width: 16px; height: 16px; }
 </style>
 </head>
 <body data-theme="light">
 
-  <!-- Lớp ẢNH NỀN dùng chung cho cả Home và Dashboard (đứng dưới mọi thứ) -->
-  <div id="app-bg" aria-hidden="true"></div>
+  <!-- Lớp ẢNH NỀN dùng chung cho cả Home và Dashboard (đứng dưới mọi thứ).
+       2 layer con ping-pong để crossfade mượt khi đổi ảnh (xem loadAndApplyBg). -->
+  <div id="app-bg" aria-hidden="true">
+    <div class="app-bg-layer" id="app-bg-layer-0"></div>
+    <div class="app-bg-layer" id="app-bg-layer-1"></div>
+  </div>
   <!-- Overlay riêng cho Dashboard (nhạt hơn Home) — ổn định contrast nền sau card -->
   <div id="dashboard-bg-overlay" aria-hidden="true"></div>
 
@@ -753,6 +1023,7 @@
 
     <div id="home-corner">
       <p id="home-demo-note">Màn Home thử nghiệm (Tabliss-style) — demo để cảm nhận. Bấm "Vào Dashboard" hoặc nhấn Enter.</p>
+
       <button class="home-corner-btn" id="home-shuffle-btn" onclick="shuffleHomeBg()" title="Đổi ảnh nền khác" aria-label="Đổi ảnh nền khác">
         <span id="home-shuffle-icon"></span><span>Đổi ảnh</span>
       </button>
@@ -765,9 +1036,17 @@
       <div id="home-quote"></div>
     </div>
 
-    <button id="home-enter-btn" onclick="goToDashboard()" aria-label="Vào Dashboard">
-      <span>Vào Dashboard</span><span id="home-enter-icon"></span>
-    </button>
+    <div class="home-enter-wrap">
+      <button id="home-enter-btn" onclick="goToDashboard()" aria-label="Vào Dashboard">
+        <span id="home-enter-icon"></span>
+        <span class="home-enter-caption" aria-hidden="true">Vào Dashboard</span>
+      </button>
+    </div>
+
+    <!-- Tín hiệu phụ rất nhẹ, đặt góc dưới-cùng bên phải (tách khỏi luồng nội dung
+         chính) — chỉ render text khi có việc cần làm hôm nay (xem renderHomeTodayHint),
+         ẨN HOÀN TOÀN (rỗng -> display:none qua CSS :empty) nếu count = 0 -->
+    <div id="home-today-hint" aria-live="off"></div>
   </div>
 
   <!-- ===== KHẢO SÁT PHONG CÁCH NỀN (demo riêng, không phải tính năng chính thức) =====
@@ -785,29 +1064,6 @@
     </div>
   </div>
   <div id="style-mode-note"></div>
-
-  <div class="topbar">
-    <div class="brand">
-      <div class="brand-mark" id="ic-brand"></div>
-      <div>
-        <h1>KN-Space</h1>
-        <div class="sub">Personal dashboard</div>
-      </div>
-      <div class="space-switcher">
-        <button class="space-switcher-btn" id="space-switcher-btn" onclick="toggleSpaceMenu()">
-          <span id="space-switcher-icon"></span>
-          <span id="space-switcher-label">Cá nhân</span>
-          <span id="space-switcher-chevron"></span>
-        </button>
-        <div class="space-menu" id="space-menu" style="display:none;"></div>
-      </div>
-    </div>
-    <div style="display:flex; gap:10px; align-items:center;">
-      <button id="btn-home" onclick="goToHome()" title="Quay về màn Home" aria-label="Quay về màn Home"></button>
-      <button class="btn-ghost" id="btn-hide-all" onclick="toggleCollapseAll()"></button>
-      <button class="btn-ghost" id="btn-settings" onclick="openSettings()"></button>
-    </div>
-  </div>
 
   <div id="dashboard">
     <div id="main-row">
@@ -889,16 +1145,37 @@
         <div class="collapsed-placeholder" id="placeholder-notes"></div>
       </div>
 
-      <!-- ===== Khối Thông báo ===== -->
-      <div id="block-reminders" class="main-block" data-block="reminders">
-        <div class="block-head">
-          <h2 id="ic-reminders-title"></h2>
-          <div class="head-actions">
-            <button class="head-eye-btn" id="collapse-reminders-btn" onclick="toggleCollapse('reminders')"></button>
+      <!-- ===== Cột Thông báo: khối Thông báo (CỐ ĐỊNH vị trí cuối, không kéo-thả đổi
+           thứ tự, không đổi width qua slider) + ngay dưới nó là footer toolbar
+           Space-switcher + Settings (đã bỏ position:fixed, giờ width = 100% theo cột). ===== -->
+      <div class="reminders-col" id="reminders-col">
+        <div id="block-reminders" class="main-block" data-block="reminders" style="flex:1; min-height:0;">
+          <div class="block-head">
+            <h2 id="ic-reminders-title"></h2>
+            <div class="head-actions">
+              <button class="head-eye-btn" id="collapse-reminders-btn" onclick="toggleCollapse('reminders')"></button>
+            </div>
           </div>
+          <div class="block-body" id="reminders-body"></div>
+          <div class="collapsed-placeholder" id="placeholder-reminders"></div>
         </div>
-        <div class="block-body" id="reminders-body"></div>
-        <div class="collapsed-placeholder" id="placeholder-reminders"></div>
+
+        <!-- Footer toolbar — nút "Về Home" (đứng riêng, tách biệt cụm Space+Settings) +
+             Space-switcher (tái dùng renderSpaceMenu()/switchSpace(), menu mở LÊN trên
+             trigger) + nút Settings. Phím tắt Esc vẫn là cách về Home chính song song
+             (giữ nguyên), nút này chỉ thêm 1 lối vào trực quan bằng chuột. -->
+        <div id="dashboard-corner" role="group" aria-label="Về Home, chuyển space &amp; cài đặt">
+          <button id="dashboard-corner-home-btn" onclick="goToHome()" title="Về Home" aria-label="Về Home"></button>
+          <div class="space-switcher">
+            <button class="space-switcher-btn" id="space-switcher-btn" onclick="toggleSpaceMenu()" title="Đổi space" aria-label="Đổi space hiện tại">
+              <span class="space-dot" id="space-switcher-dot" aria-hidden="true"></span>
+              <span id="space-switcher-label">Cá nhân</span>
+              <span id="space-switcher-chevron"></span>
+            </button>
+            <div class="space-menu" id="space-menu" style="display:none;"></div>
+          </div>
+          <button id="dashboard-corner-settings-btn" onclick="openSettings()" title="Cài đặt" aria-label="Cài đặt"></button>
+        </div>
       </div>
 
     </div>
@@ -937,10 +1214,11 @@
 
   <!-- ===== Modal: Việc cần làm (chỉ 1 lần — không còn chọn loại) ===== -->
   <div class="overlay" id="task-modal" style="display:none;">
-    <div class="modal">
+    <div class="modal modal-note">
       <h2 id="task-modal-title">Việc mới</h2>
       <input type="hidden" id="task-id" />
       <div class="field"><label>Tên việc</label><input type="text" id="task-title" placeholder="Vd: Họp với khách hàng" /></div>
+      <div class="field"><label>Nội dung (tuỳ chọn)</label><textarea id="task-content" placeholder="Ghi chú chi tiết, vd: nội dung cần chuẩn bị, link tài liệu..."></textarea></div>
       <div class="field-row">
         <div class="field"><label>Ngày (tuỳ chọn)</label><input type="date" id="task-date" /></div>
         <div class="field"><label>Giờ (tuỳ chọn)</label><input type="time" id="task-time" /></div>
@@ -1039,97 +1317,123 @@
 
   <!-- ===== Settings ===== -->
   <div class="overlay" id="settings-modal" style="display:none;">
-    <div class="modal modal-settings">
+    <div class="modal modal-settings" id="settings-modal-inner">
       <h2>Cài đặt</h2>
 
-      <div class="settings-grid">
-        <div class="setting-block">
-          <label id="lbl-theme"></label>
-          <div class="theme-toggle">
-            <button id="theme-light-btn" onclick="setTheme('light', this)"></button>
-            <button id="theme-dark-btn" onclick="setTheme('dark', this)"></button>
-          </div>
-        </div>
+      <div class="settings-tabs" id="settings-tabs" role="tablist" aria-label="Danh mục cài đặt">
+        <button class="settings-tab" data-tab="general" role="tab" onclick="switchSettingsTab('general')"></button>
+        <button class="settings-tab" data-tab="background" role="tab" onclick="switchSettingsTab('background')"></button>
+        <button class="settings-tab" data-tab="quote" role="tab" onclick="switchSettingsTab('quote')"></button>
+      </div>
 
-        <div class="setting-block">
-          <label id="lbl-color"></label>
-          <div class="color-palette">
-            <div class="swatch active" style="background:#5b6cff" onclick="setAccent('#5b6cff', this)" title="Màu xanh dương" aria-label="Chọn màu chủ đạo xanh dương" role="button" tabindex="0"></div>
-            <div class="swatch" style="background:#1fb874" onclick="setAccent('#1fb874', this)" title="Màu xanh lá" aria-label="Chọn màu chủ đạo xanh lá" role="button" tabindex="0"></div>
-            <div class="swatch" style="background:#8b5cf6" onclick="setAccent('#8b5cf6', this)" title="Màu tím" aria-label="Chọn màu chủ đạo tím" role="button" tabindex="0"></div>
-            <div class="swatch" style="background:#ff5d7a" onclick="setAccent('#ff5d7a', this)" title="Màu hồng" aria-label="Chọn màu chủ đạo hồng" role="button" tabindex="0"></div>
-            <div class="swatch" style="background:#ff8a3d" onclick="setAccent('#ff8a3d', this)" title="Màu cam" aria-label="Chọn màu chủ đạo cam" role="button" tabindex="0"></div>
-          </div>
-        </div>
-
-        <div class="setting-block">
-          <label id="lbl-data"></label>
-          <div class="export-import">
-            <button class="btn-ghost" id="btn-export" onclick="exportData()"></button>
-            <button class="btn-ghost" id="btn-import" onclick="document.getElementById('import-file-input').click()"></button>
-            <input type="file" id="import-file-input" accept="application/json" style="display:none;" onchange="importData(event)" />
-          </div>
-          <p class="hint" id="export-import-status" style="margin-top:8px;"></p>
-        </div>
-
-        <div class="setting-block span-2">
-          <label id="lbl-home-bg">Ảnh nền Home (link ảnh)</label>
-          <div class="home-bg-grid" id="home-bg-grid"></div>
-          <p class="hint" id="home-bg-url-status" style="margin-top:8px;">Click vào ảnh để dùng ngay; sửa link rồi nhấn Enter (hoặc click ra ngoài) để áp dụng cho ô đó.</p>
-          <div style="display:flex; align-items:center; gap:10px; margin-top:12px;">
-            <label for="auto-rotate-select" style="margin-bottom:0; font-weight:600; font-size:13px;">Tự động đổi ảnh</label>
-            <select id="auto-rotate-select" onchange="setAutoRotate(this.value)" style="padding:6px 10px; border-radius:7px; border:1px solid var(--border); background:var(--raised); color:var(--text); font-size:13px;">
-              <option value="0">Tắt</option>
-              <option value="15000">Mỗi 15 giây (demo)</option>
-              <option value="60000">Mỗi 1 phút</option>
-              <option value="900000">Mỗi 15 phút</option>
-              <option value="3600000">Mỗi 1 giờ</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="setting-block span-2">
-          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
-            <label id="lbl-layout" style="margin-bottom:0;"></label>
-            <button class="add-link" id="btn-reset-layout" onclick="resetLayout()" style="margin-bottom:0;"></button>
-          </div>
-          <div class="layout-cols">
-            <div>
-              <div class="size-row">
-                <label>Khối trái (Việc làm+Nhắc việc+Thói quen)</label>
-                <input type="range" min="20" max="60" id="size-combined" oninput="onSizeChange()" />
-                <span class="size-val" id="size-combined-val">42%</span>
-              </div>
-              <div class="size-row">
-                <label>Khối Ghi chú</label>
-                <input type="range" min="10" max="60" id="size-notes" oninput="onSizeChange()" />
-                <span class="size-val" id="size-notes-val">29%</span>
-              </div>
-              <div class="size-row">
-                <label>Khối Thông báo</label>
-                <span class="size-auto">Tự động = phần còn lại</span>
-                <span class="size-val" id="size-reminders-val">29%</span>
-              </div>
+      <div class="settings-body">
+      <div class="settings-section" data-tab-panel="general">
+        <div class="settings-grid">
+          <div class="setting-block">
+            <label id="lbl-theme"></label>
+            <div class="theme-toggle">
+              <button id="theme-light-btn" onclick="setTheme('light', this)"></button>
+              <button id="theme-dark-btn" onclick="setTheme('dark', this)"></button>
             </div>
-            <div>
-              <div class="size-row">
-                <label>↳ Việc cần làm (cao, so hàng dưới)</label>
-                <input type="range" min="15" max="70" id="size-tasks" oninput="onSizeChange()" />
-                <span class="size-val" id="size-tasks-val">45%</span>
+          </div>
+
+          <div class="setting-block">
+            <label id="lbl-color"></label>
+            <div class="color-palette">
+              <div class="swatch active" style="background:#5457d6" onclick="setAccent('#5457d6', this)" title="Màu xanh chàm (mặc định)" aria-label="Chọn màu chủ đạo xanh chàm" role="button" tabindex="0"></div>
+              <div class="swatch" style="background:#2fa86b" onclick="setAccent('#2fa86b', this)" title="Màu xanh lá" aria-label="Chọn màu chủ đạo xanh lá" role="button" tabindex="0"></div>
+              <div class="swatch" style="background:#8b7cf6" onclick="setAccent('#8b7cf6', this)" title="Màu tím" aria-label="Chọn màu chủ đạo tím" role="button" tabindex="0"></div>
+              <div class="swatch" style="background:#e2566f" onclick="setAccent('#e2566f', this)" title="Màu hồng" aria-label="Chọn màu chủ đạo hồng" role="button" tabindex="0"></div>
+              <div class="swatch" style="background:#e8873d" onclick="setAccent('#e8873d', this)" title="Màu cam" aria-label="Chọn màu chủ đạo cam" role="button" tabindex="0"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-grid" style="margin-top:4px; padding-top:18px; border-top:1px solid var(--border-hairline);">
+          <div class="setting-block span-2">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+              <label id="lbl-layout" style="margin-bottom:0;"></label>
+              <button class="add-link" id="btn-reset-layout" onclick="resetLayout()" style="margin-bottom:0;"></button>
+            </div>
+            <div class="layout-cols">
+              <div>
+                <div class="size-row">
+                  <label>Khối trái (Việc làm+Nhắc việc+Thói quen)</label>
+                  <input type="range" min="20" max="60" id="size-combined" oninput="onSizeChange()" />
+                  <span class="size-val" id="size-combined-val">42%</span>
+                </div>
+                <div class="size-row">
+                  <label>Khối Ghi chú</label>
+                  <input type="range" min="10" max="60" id="size-notes" oninput="onSizeChange()" />
+                  <span class="size-val" id="size-notes-val">29%</span>
+                </div>
+                <div class="size-row">
+                  <label>Khối Thông báo</label>
+                  <span class="size-auto">Tự động = phần còn lại</span>
+                  <span class="size-val" id="size-reminders-val">29%</span>
+                </div>
               </div>
-              <div class="size-row">
-                <label>↳ Nhắc việc (rộng, hàng dưới)</label>
-                <input type="range" min="15" max="85" id="size-reminder" oninput="onSizeChange()" />
-                <span class="size-val" id="size-reminder-val">50%</span>
-              </div>
-              <div class="size-row">
-                <label>↳ Thói quen (rộng, hàng dưới)</label>
-                <span class="size-auto">Tự động = phần còn lại</span>
-                <span class="size-val" id="size-habits-val">50%</span>
+              <div>
+                <div class="size-row">
+                  <label>↳ Việc cần làm (cao, so hàng dưới)</label>
+                  <input type="range" min="15" max="70" id="size-tasks" oninput="onSizeChange()" />
+                  <span class="size-val" id="size-tasks-val">45%</span>
+                </div>
+                <div class="size-row">
+                  <label>↳ Nhắc việc (rộng, hàng dưới)</label>
+                  <input type="range" min="15" max="85" id="size-reminder" oninput="onSizeChange()" />
+                  <span class="size-val" id="size-reminder-val">50%</span>
+                </div>
+                <div class="size-row">
+                  <label>↳ Thói quen (rộng, hàng dưới)</label>
+                  <span class="size-auto">Tự động = phần còn lại</span>
+                  <span class="size-val" id="size-habits-val">50%</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
+
+        <div class="settings-grid" style="margin-top:4px; padding-top:18px; border-top:1px solid var(--border-hairline);">
+          <div class="setting-block">
+            <label id="lbl-data"></label>
+            <div class="export-import">
+              <button class="btn-ghost" id="btn-export" onclick="exportData()"></button>
+              <button class="btn-ghost" id="btn-import" onclick="document.getElementById('import-file-input').click()"></button>
+              <input type="file" id="import-file-input" accept="application/json" style="display:none;" onchange="importData(event)" />
+            </div>
+            <p class="hint" id="export-import-status" style="margin-top:8px;"></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section" data-tab-panel="background">
+        <div class="settings-grid">
+          <div class="setting-block span-2">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap;">
+              <label style="margin-bottom:0; font-weight:600; font-size:13px;">Tự động đổi ảnh</label>
+              <div class="segmented-options" id="autorotate-options" role="group" aria-label="Chọn tần suất tự động đổi ảnh nền"></div>
+            </div>
+            <label id="lbl-home-bg">Ảnh nền Home (link ảnh hoặc upload)</label>
+            <div class="home-bg-grid" id="home-bg-grid"></div>
+            <p class="hint" id="home-bg-url-status" style="margin-top:8px;">Click vào ảnh để dùng ngay. Mỗi ô có thể dùng link ảnh (nhập rồi Enter/click ra ngoài) hoặc bấm nút upload để chọn ảnh từ máy.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section" data-tab-panel="quote">
+        <div class="settings-grid">
+          <div class="setting-block span-2">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap;">
+              <label style="margin-bottom:0; font-weight:600; font-size:13px;">Tần suất đổi quote</label>
+              <div class="segmented-options" id="quoterotate-options" role="group" aria-label="Chọn tần suất đổi câu quote"></div>
+            </div>
+            <label id="lbl-home-quote">Câu quote Home (10 ô cố định, sửa nội dung trực tiếp)</label>
+            <div class="home-quote-grid" id="home-quote-grid"></div>
+            <p class="hint" id="home-quote-status" style="margin-top:8px;">Sửa nội dung trực tiếp trong từng ô (Enter/click ra ngoài để lưu). Bấm "Dùng câu này" để hiển thị ngay trên màn Home.</p>
+          </div>
+        </div>
+      </div>
       </div>
 
       <div class="modal-actions"><button class="btn-primary" onclick="closeModal('settings-modal')">Đóng</button></div>
@@ -1174,6 +1478,7 @@ const ICON_PATHS = {
   shuffle: '<path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/>',
   chevronsDown: '<polyline points="6,8 12,14 18,8"/><polyline points="6,14 12,20 18,14"/>',
   home: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 001 1h12a1 1 0 001-1V10"/><path d="M9 21v-6h6v6"/>',
+  quote: '<path d="M4 8.5A3.5 3.5 0 017.5 5H8v3.5A3.5 3.5 0 014.5 12H4V8.5z"/><path d="M13 8.5A3.5 3.5 0 0116.5 5H17v3.5A3.5 3.5 0 0113.5 12H13V8.5z"/>',
 };
 function svgIcon(name, extraClass){
   const inner = ICON_PATHS[name] || '';
@@ -1206,9 +1511,9 @@ let spaces = [
     name: 'Cá nhân',
     enabledBlocks: { tasks: true, reminder: true, habits: true, notes: true, reminders: true },
     tasks: [
-      { id: 1, title: 'Đặt lịch khám răng định kỳ', date: todayStr, time: '09:00', done: false },
-      { id: 2, title: 'Đọc xong "Atomic Habits"', date: '', time: '', done: true },
-      { id: 3, title: 'Thay nhớt xe máy', date: '', time: '', done: false },
+      { id: 1, title: 'Đặt lịch khám răng định kỳ', date: todayStr, time: '09:00', done: false, order: 0, content: 'Gọi nha khoa Hoà Bình, hỏi lịch trống cuối tuần. Mang theo sổ bảo hiểm.' },
+      { id: 2, title: 'Đọc xong "Atomic Habits"', date: '', time: '', done: true, order: 1, content: '' },
+      { id: 3, title: 'Thay nhớt xe máy', date: '', time: '', done: false, order: 2, content: '' },
     ],
     reminderItems: [
       { id: 11, type: 'recurring', title: 'Uống vitamin sau bữa sáng', freqN: 1, freqUnit: 'day', time: '08:00' },
@@ -1237,9 +1542,9 @@ let spaces = [
     /* Seed demo: minh hoạ "Khối hiển thị" — space này TẮT khối Thói quen ngay khi mở demo */
     enabledBlocks: { tasks: true, reminder: true, habits: false, notes: true, reminders: true },
     tasks: [
-      { id: 41, title: 'Chuẩn bị slide họp team', date: todayStr, time: '14:00', done: false },
-      { id: 42, title: 'Review pull request', date: todayStr, time: '16:00', done: false },
-      { id: 43, title: 'Cập nhật tài liệu API', date: '', time: '', done: true },
+      { id: 41, title: 'Chuẩn bị slide họp team', date: todayStr, time: '14:00', done: false, order: 0, content: 'Mục tiêu: tóm tắt tiến độ sprint, nêu 2 rủi ro chính (deadline API, thiếu nhân sự QA).' },
+      { id: 42, title: 'Review pull request', date: todayStr, time: '16:00', done: false, order: 1, content: '' },
+      { id: 43, title: 'Cập nhật tài liệu API', date: '', time: '', done: true, order: 2, content: '' },
     ],
     reminderItems: [
       { id: 51, type: 'recurring', title: 'Daily standup', freqN: 1, freqUnit: 'day', time: '09:30' },
@@ -1269,15 +1574,17 @@ let habits = spaces[0].habits;
 
 /* Khối hiển thị — cấu hình RIÊNG cho từng space (5 cờ bật/tắt). Mặc định bật hết nếu
    space cũ (import từ trước) không có field này. */
+/* Khối Thông báo KHÔNG còn trong danh sách bật/tắt theo Space — nó luôn hiện vì cùng cột
+   với widget điều hướng cố định (Về Home/Space-switcher/Settings); tắt khối Thông báo sẽ
+   kéo theo mất luôn widget này (không có cách nào đổi Space/mở Settings ngoài Esc). */
 const BLOCK_DEFS = [
   { key: 'tasks', label: 'Việc cần làm' },
   { key: 'reminder', label: 'Nhắc việc' },
   { key: 'habits', label: 'Thói quen' },
   { key: 'notes', label: 'Ghi chú' },
-  { key: 'reminders', label: 'Thông báo' },
 ];
 function defaultEnabledBlocks(){ return { tasks: true, reminder: true, habits: true, notes: true, reminders: true }; }
-function getEnabledBlocks(space){ return space.enabledBlocks || defaultEnabledBlocks(); }
+function getEnabledBlocks(space){ return { ...defaultEnabledBlocks(), ...(space.enabledBlocks || {}), reminders: true }; }
 let enabledBlocks = getEnabledBlocks(spaces[0]);
 
 let noteCards = spaces[0].noteCards;
@@ -1295,6 +1602,12 @@ function toggleNoteContentHidden(id){
 /* Mỗi card có màu riêng để phân biệt trực quan (không còn đồng nhất 1 màu tím như trước) —
    tự gán xoay vòng theo palette khi tạo mới, người dùng có thể đổi lại trong modal sửa */
 const NOTE_PALETTE = ['#8b5cf6', '#0ea5e9', '#22c55e', '#f97316', '#ec4899', '#64748b'];
+/* Dot màu cho từng Space trong dropdown switcher — tái dùng đúng palette của Ghi chú
+   (NOTE_PALETTE) để không phải định nghĩa thêm bộ màu riêng, vẫn đủ phân biệt rõ.
+   Gán theo INDEX trong mảng spaces (không theo id) — nếu kéo đổi thứ tự (moveSpace),
+   màu sẽ đổi theo vị trí mới; đây là trade-off chấp nhận được vì mục đích chỉ là
+   "phân biệt nhanh bằng mắt trong dropdown đang mở", không cần ổn định tuyệt đối. */
+function spaceDotColor(idx){ return NOTE_PALETTE[idx % NOTE_PALETTE.length]; }
 function hexToRgba(hex, alpha){
   const v = hex.replace('#', '');
   const r = parseInt(v.substring(0,2), 16), g = parseInt(v.substring(2,4), 16), b = parseInt(v.substring(4,6), 16);
@@ -1312,16 +1625,24 @@ function freqText(r){
 }
 function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
+/* Empty state có icon (dùng lại ICON_PATHS có sẵn) + tiêu đề + hướng dẫn ngắn —
+   thay cho placeholder text thuần trước đây, áp dụng cho 3 khối chính. */
+function emptyStateHtml(iconName, title, hint){
+  return `<div class="empty-state">
+    <span class="empty-icon">${svgIcon(iconName)}</span>
+    <span class="empty-title">${escapeHtml(title)}</span>
+    <span class="empty-hint">${escapeHtml(hint)}</span>
+  </div>`;
+}
+
 /* ========================================================================
    Render phần header/label tĩnh bằng icon (chạy 1 lần khi load)
    ======================================================================== */
 function renderStaticIcons(){
-  document.getElementById('ic-brand').innerHTML = svgIcon('notebook');
-  document.getElementById('btn-settings').innerHTML = svgIcon('settings') + ' Cài đặt';
-  document.getElementById('btn-home').innerHTML = svgIcon('home');
-  document.getElementById('home-enter-icon').innerHTML = svgIcon('arrowRight');
+  document.getElementById('dashboard-corner-home-btn').innerHTML = svgIcon('home');
+  document.getElementById('dashboard-corner-settings-btn').innerHTML = svgIcon('settings');
+  document.getElementById('home-enter-icon').innerHTML = svgIcon('chevronsDown');
   document.getElementById('home-shuffle-icon').innerHTML = svgIcon('shuffle');
-  document.getElementById('space-switcher-icon').innerHTML = svgIcon('layers');
   document.getElementById('space-switcher-chevron').innerHTML = svgIcon('chevronDown');
   document.getElementById('sort-switcher-chevron').innerHTML = svgIcon('chevronDown');
 
@@ -1333,10 +1654,12 @@ function renderStaticIcons(){
 
   const grip = `<span class="grip-handle" aria-hidden="true">${svgIcon('grip')}</span>`;
   document.getElementById('ic-tasks-title').innerHTML = `${grip}<span class="block-icon" style="background:rgba(var(--accent-rgb),.12); color:var(--accent)">${svgIcon('checkSquare')}</span><span class="title-text">Việc cần làm</span>`;
-  document.getElementById('ic-reminder-title').innerHTML = `${grip}<span class="block-icon" style="background:rgba(20,184,166,.12); color:var(--recurring-color)">${svgIcon('bell')}</span><span class="title-text">Nhắc việc</span>`;
-  document.getElementById('ic-habits-title').innerHTML = `${grip}<span class="block-icon" style="background:rgba(255,138,61,.14); color:var(--habit-color)">${svgIcon('flame')}</span><span class="title-text">Thói quen</span>`;
-  document.getElementById('ic-notes-title').innerHTML = `${grip}<span class="block-icon" style="background:rgba(139,92,246,.12); color:var(--note-color)">${svgIcon('notebook')}</span><span class="title-text">Ghi chú</span>`;
-  document.getElementById('ic-reminders-title').innerHTML = `${grip}<span class="block-icon" style="background:rgba(255,93,122,.12); color:var(--reminder-color)">${svgIcon('bell')}</span><span class="title-text">Thông báo</span>`;
+  document.getElementById('ic-reminder-title').innerHTML = `${grip}<span class="block-icon" style="background:rgba(15,158,142,.12); color:var(--recurring-color)">${svgIcon('bell')}</span><span class="title-text">Nhắc việc</span>`;
+  document.getElementById('ic-habits-title').innerHTML = `${grip}<span class="block-icon" style="background:rgba(232,135,61,.14); color:var(--habit-color)">${svgIcon('flame')}</span><span class="title-text">Thói quen</span>`;
+  document.getElementById('ic-notes-title').innerHTML = `${grip}<span class="block-icon" style="background:rgba(139,124,246,.12); color:var(--note-color)">${svgIcon('notebook')}</span><span class="title-text">Ghi chú</span>`;
+  /* Khối Thông báo KHÔNG kéo-thả đổi thứ tự được nữa (xem .reminders-col/reorderableBlocks)
+     -> bỏ icon grip ở header để khỏi gợi ý sai là kéo được, không có ${grip} ở đây. */
+  document.getElementById('ic-reminders-title').innerHTML = `<span class="block-icon" style="background:rgba(226,86,111,.12); color:var(--reminder-color)">${svgIcon('bell')}</span><span class="title-text">Thông báo</span>`;
 
   ['tasks','reminder','habits','notes','reminders'].forEach(key => {
     const btn = document.getElementById(`collapse-${key}-btn`);
@@ -1359,6 +1682,10 @@ function renderStaticIcons(){
   document.getElementById('note-view-list-btn').setAttribute('aria-label', 'Chế độ danh sách');
   document.getElementById('note-view-list-btn').innerHTML = svgIcon('rows');
   updateNoteViewToggle();
+
+  document.querySelector('.settings-tab[data-tab="general"]').innerHTML = svgIcon('settings') + ' Chung';
+  document.querySelector('.settings-tab[data-tab="background"]').innerHTML = svgIcon('layout') + ' Ảnh nền';
+  document.querySelector('.settings-tab[data-tab="quote"]').innerHTML = svgIcon('quote') + ' Quote';
 
   document.getElementById('lbl-theme').innerHTML = svgIcon('sun') + ' Giao diện';
   document.getElementById('theme-light-btn').innerHTML = svgIcon('sun') + ' Sáng';
@@ -1397,18 +1724,31 @@ function renderAll(){
   renderReminders();
 }
 
+/* Sắp xếp HIỂN THỊ (không đổi field order lưu trữ): khi filter="all", luôn ưu tiên
+   việc CHƯA xong lên trên (theo order), việc ĐÃ xong xuống dưới (theo order riêng
+   trong nhóm đã xong) — bỏ tick "đã xong" thì việc tự về đúng vị trí cũ trong nhóm
+   chưa xong vì order gốc không đổi. Khi filter là "pending"/"done" thì danh sách đã
+   đồng nhất 1 nhóm, chỉ cần sort theo order bình thường (không cần tách nhóm). */
+function getVisibleTasks(){
+  if (taskFilter === 'pending') return tasks.filter(t => !t.done).sort((a, b) => a.order - b.order);
+  if (taskFilter === 'done') return tasks.filter(t => t.done).sort((a, b) => a.order - b.order);
+  const pending = tasks.filter(t => !t.done).sort((a, b) => a.order - b.order);
+  const done = tasks.filter(t => t.done).sort((a, b) => a.order - b.order);
+  return [...pending, ...done];
+}
+
 function renderTasks(){
   const body = document.getElementById('tasks-body');
-  let list = tasks;
-  if (taskFilter === 'pending') list = tasks.filter(t => !t.done);
-  if (taskFilter === 'done') list = tasks.filter(t => t.done);
+  const list = getVisibleTasks();
 
   body.innerHTML = list.map(t => {
     const meta = t.date ? `<span class="meta-tag">${t.date.slice(5)} ${t.time||''}</span>` : '';
-    return `<div class="task-row ${t.done?'done':''}">
+    const hasContent = (t.content || '').trim().length > 0;
+    return `<div class="task-row ${t.done?'done':''}" data-id="${t.id}">
+      <span class="card-grip" title="Kéo để đổi thứ tự" aria-label="Kéo để đổi thứ tự việc" role="button" tabindex="0">${svgIcon('grip')}</span>
       <span class="check ${t.done?'checked':''}" onclick="toggleTask(${t.id})" role="checkbox" aria-checked="${t.done}" tabindex="0" title="${t.done?'Đánh dấu chưa xong':'Đánh dấu đã xong'}">${svgIcon('check')}</span>
       <div class="row-main">
-        <div class="row-title">${escapeHtml(t.title)}</div>
+        <div class="row-title">${escapeHtml(t.title)}${hasContent ? `<span class="has-content-dot" title="Có ghi chú nội dung chi tiết" aria-label="Có ghi chú nội dung chi tiết">${svgIcon('notebook')}</span>` : ''}</div>
         ${meta ? `<div class="row-meta">${meta}</div>` : ''}
       </div>
       <div class="row-tools">
@@ -1416,7 +1756,62 @@ function renderTasks(){
         <button class="icon-btn" onclick="deleteTask(${t.id})" title="Xoá việc" aria-label="Xoá việc">${svgIcon('trash')}</button>
       </div>
     </div>`;
-  }).join('') || '<p style="font-size:13.5px;color:var(--text-dim)">Không có việc nào.</p>';
+  }).join('') || emptyStateHtml('checkSquare', 'Chưa có việc cần làm', 'Bấm "+ Thêm" ở góc trên để tạo việc đầu tiên.');
+
+  setupTaskDrag();
+}
+
+/* Kéo-thả sắp xếp thủ công cho Task — cùng pattern setupNoteDrag(): draggable chỉ bật
+   khi mousedown đúng vào .card-grip, disarm ở mouseup trên document. */
+function setupTaskDrag(){
+  let draggedId = null;
+  const rows = document.querySelectorAll('#tasks-body .task-row');
+  const clearDropHints = () => rows.forEach(r => r.classList.remove('drop-before', 'drop-after'));
+  rows.forEach(row => {
+    row.draggable = false;
+    const grip = row.querySelector('.card-grip');
+    if (grip) grip.addEventListener('mousedown', () => { row.draggable = true; });
+    row.addEventListener('dragstart', (e) => {
+      draggedId = Number(row.dataset.id);
+      row.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    row.addEventListener('dragend', () => { row.draggable = false; row.classList.remove('dragging'); clearDropHints(); });
+    row.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (draggedId !== null && Number(row.dataset.id) !== draggedId) {
+        clearDropHints();
+        const rect = row.getBoundingClientRect();
+        row.classList.add(e.clientY < rect.top + rect.height / 2 ? 'drop-before' : 'drop-after');
+      }
+    });
+    row.addEventListener('dragleave', () => row.classList.remove('drop-before', 'drop-after'));
+    row.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const targetId = Number(row.dataset.id);
+      const insertAfter = row.classList.contains('drop-after');
+      clearDropHints();
+      if (draggedId === null || draggedId === targetId) return;
+      reorderTasks(draggedId, targetId, insertAfter);
+    });
+  });
+  document.addEventListener('mouseup', () => {
+    rows.forEach(row => { if (!row.classList.contains('dragging')) row.draggable = false; });
+  });
+}
+
+/* Reindex lại field `order` của TOÀN BỘ task theo thứ tự hiển thị mới sau khi kéo-thả.
+   draggedId được chèn ngay trước/sau targetId trong danh sách hiển thị hiện tại
+   (getVisibleTasks), sau đó gán lại order = vị trí trong mảng kết quả (0,1,2,...). */
+function reorderTasks(draggedId, targetId, insertAfter){
+  const visible = getVisibleTasks();
+  const fromIdx = visible.findIndex(t => t.id === draggedId);
+  const [moved] = visible.splice(fromIdx, 1);
+  let toIdx = visible.findIndex(t => t.id === targetId);
+  if (insertAfter) toIdx += 1;
+  visible.splice(toIdx, 0, moved);
+  visible.forEach((t, i) => { t.order = i; });
+  renderAll();
 }
 
 /* Nhắc việc — chỉ hiển thị thông tin, không có checkbox/done (1 lần hoặc lặp lại) */
@@ -1436,7 +1831,7 @@ function renderReminderItems(){
         <button class="icon-btn" onclick="deleteReminder(${r.id})" title="Xoá nhắc việc" aria-label="Xoá nhắc việc">${svgIcon('trash')}</button>
       </div>
     </div>`;
-  }).join('') || '<p style="font-size:13.5px;color:var(--text-dim)">Chưa có nhắc việc nào.</p>';
+  }).join('') || emptyStateHtml('bell', 'Chưa có nhắc việc', 'Tạo nhắc việc 1 lần hoặc lặp lại để không bỏ sót việc quan trọng.');
 }
 
 const DAY_LABELS = ['T2','T3','T4','T5','T6','T7','CN'];
@@ -1479,7 +1874,7 @@ function renderHabits(){
         ${week.map((d, i) => `<span class="week-dot ${d?'filled':''} ${i===todayIdx?'today':''}" title="${DAY_LABELS[i]}${i===todayIdx?' (hôm nay)':''}: ${d?'đã hoàn thành':'chưa hoàn thành'}"></span>`).join('')}
       </div>
     </div>`;
-  }).join('') || '<p style="font-size:13.5px;color:var(--text-dim)">Chưa có thói quen nào.</p>';
+  }).join('') || emptyStateHtml('flame', 'Chưa có thói quen', 'Thêm thói quen muốn duy trì để theo dõi streak hàng ngày.');
 }
 
 function getVisibleNoteCards(){
@@ -1498,11 +1893,13 @@ function maskContent(text){
 }
 function noteCardHtml(c){
   const color = c.color || NOTE_PALETTE[0];
-  const noteAlpha = parseFloat(getComputedStyle(document.body).getPropertyValue('--note-alpha')) || 0.1;
-  const bgStyle = `background:${hexToRgba(color, noteAlpha)};`;
+  /* 1 lớp duy nhất (về lại bản gốc): border-left màu riêng của note + nền fill alpha thấp
+     bằng chính màu đó (--note-alpha: 0.07 light / 0.16 dark) để mỗi note phân biệt rõ ràng
+     bằng màu, không chỉ qua 1 viền mỏng. */
   const isHidden = hiddenContentIds.has(c.id);
   const content = `<p class="nc-content">${escapeHtml(isHidden ? maskContent(c.content) : c.content)}</p>`;
-  return `<div class="note-card" data-id="${c.id}" style="border-left-color:${color}; ${bgStyle}" onclick="openNoteView(${c.id})">
+  const bg = hexToRgba(color, 'var(--note-alpha)');
+  return `<div class="note-card" data-id="${c.id}" onclick="openNoteView(${c.id})" style="border-left-color:${color}; background:${bg};">
       <div class="nc-head">
         <div class="nc-tools" onclick="event.stopPropagation()">
           ${noteSortBy === 'order' ? `<span class="card-grip" title="Kéo để đổi thứ tự" aria-label="Kéo để đổi thứ tự card">${svgIcon('grip')}</span>` : ''}
@@ -1521,8 +1918,9 @@ function renderNotes(){
   const body = document.getElementById('notes-body');
   const list = getVisibleNoteCards();
   if (list.length === 0){
-    const emptyMsg = noteCards.length === 0 ? 'Chưa có card nào.' : 'Không tìm thấy note phù hợp.';
-    body.innerHTML = `<p style="font-size:13.5px;color:var(--text-dim)">${emptyMsg}</p>`;
+    body.innerHTML = noteCards.length === 0
+      ? emptyStateHtml('notebook', 'Chưa có note nào', 'Bấm "+ Thêm note" để ghi lại ý tưởng, mật khẩu hay danh sách cần nhớ.')
+      : emptyStateHtml('eyeOff', 'Không tìm thấy note phù hợp', 'Thử đổi từ khoá tìm kiếm hoặc xoá bộ lọc hiện tại.');
     return;
   }
 
@@ -1678,7 +2076,7 @@ function renderReminders(){
       </div>
       ${idx === newestIdx ? `<span class="new-badge">Mới</span>` : ''}
       ${r.source ? `<button class="r-toggle" onclick="toggleReminderSource('${r.source.type}', ${r.source.id})">${r.done ? svgIcon('check') + ' Đã xong' : 'Xong'}</button>` : ''}
-    </div>`).join('') || '<p style="font-size:13.5px;color:var(--text-dim)">Không có thông báo nào.</p>';
+    </div>`).join('') || emptyStateHtml('bell', 'Chưa có thông báo nào', 'Thông báo sẽ tự tổng hợp từ Việc cần làm, Nhắc việc và Thói quen trong ngày.');
 }
 
 function toggleReminderSource(type, id){
@@ -1699,6 +2097,7 @@ function openTaskCreate(){
   document.getElementById('task-modal-title').textContent = 'Việc mới';
   document.getElementById('task-id').value = '';
   document.getElementById('task-title').value = '';
+  document.getElementById('task-content').value = '';
   document.getElementById('task-date').value = '';
   document.getElementById('task-time').value = '';
   document.getElementById('task-modal').style.display = 'flex';
@@ -1708,6 +2107,7 @@ function editTask(id){
   document.getElementById('task-modal-title').textContent = 'Sửa việc';
   document.getElementById('task-id').value = t.id;
   document.getElementById('task-title').value = t.title;
+  document.getElementById('task-content').value = t.content || '';
   document.getElementById('task-date').value = t.date || '';
   document.getElementById('task-time').value = t.time || '';
   document.getElementById('task-modal').style.display = 'flex';
@@ -1718,9 +2118,13 @@ function saveTask(){
     title: document.getElementById('task-title').value.trim() || 'Việc chưa đặt tên',
     date: document.getElementById('task-date').value,
     time: document.getElementById('task-time').value,
+    content: document.getElementById('task-content').value,
   };
   if (id) Object.assign(tasks.find(x => x.id === Number(id)), payload);
-  else tasks.push({ id: nextId++, done: false, ...payload });
+  else {
+    const maxOrder = tasks.reduce((max, t) => Math.max(max, t.order || 0), -1);
+    tasks.push({ id: nextId++, done: false, order: maxOrder + 1, ...payload });
+  }
   closeModal('task-modal');
   renderAll();
 }
@@ -1926,7 +2330,27 @@ function showConfirm(message, onConfirm){
   okBtn.onclick = () => { closeModal('confirm-modal'); onConfirm(); };
   document.getElementById('confirm-modal').style.display = 'flex';
 }
-function openSettings(){ document.getElementById('settings-modal').style.display = 'flex'; }
+/* Settings: 3 tab — "Chung" (Giao diện + Bố cục + Dữ liệu, 3 nhóm nhẹ phân tách bằng hairline
+   nội bộ), "Ảnh nền" (lưới 6 ảnh + upload + auto-rotate) và "Quote" (lưới 10 ô quote cố định
+   + tần suất đổi quote) — mỗi tab nặng tách riêng để modal không phải cuộn dài.
+   switchSettingsTab() đổi tab theo data-tab/data-tab-panel (generic, không hardcode số lượng)
+   + reset scroll modal về đầu; openSettings() luôn mở lại ở tab "Chung" mỗi lần bấm nút Cài đặt. */
+function switchSettingsTab(tab){
+  document.querySelectorAll('.settings-tab').forEach(btn => {
+    const active = btn.dataset.tab === tab;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-selected', active);
+  });
+  document.querySelectorAll('.settings-section[data-tab-panel]').forEach(panel => {
+    panel.classList.toggle('active-tab-panel', panel.dataset.tabPanel === tab);
+  });
+  const modalEl = document.getElementById('settings-modal-inner');
+  if (modalEl) modalEl.scrollTop = 0;
+}
+function openSettings(){
+  document.getElementById('settings-modal').style.display = 'flex';
+  switchSettingsTab('general');
+}
 
 /* ========================================================================
    F13 — Export / Import dữ liệu JSON (toàn bộ space + settings hiển thị)
@@ -2064,7 +2488,9 @@ let sizeTasks = DEFAULT_SIZES.tasks, sizeReminder = DEFAULT_SIZES.reminder;
 function applySizes(){
   document.getElementById('block-combined').style.flex = sizeCombined;
   document.getElementById('block-notes').style.flex = sizeNotes;
-  document.getElementById('block-reminders').style.flex = Math.max(10, 100 - sizeCombined - sizeNotes);
+  // Khối Thông báo CỐ ĐỊNH width = phần còn lại; flex được gán cho .reminders-col
+  // (wrapper chứa block-reminders + footer toolbar), không phải #block-reminders trực tiếp.
+  document.getElementById('reminders-col').style.flex = Math.max(10, 100 - sizeCombined - sizeNotes);
   document.getElementById('sub-tasks').style.flex = sizeTasks;
   document.getElementById('combined-bottom-row').style.flex = Math.max(10, 100 - sizeTasks);
   document.getElementById('sub-reminder').style.flex = sizeReminder;
@@ -2079,6 +2505,17 @@ function applySizes(){
 
   // Slider Settings đổi % thô — áp lại ngay layout "tự dồn" theo khối đang bật/tắt của space
   if (typeof enabledBlocks !== 'undefined') applyEnabledBlocksLayout();
+
+  ['size-combined', 'size-notes', 'size-tasks', 'size-reminder'].forEach(updateRangeFill);
+}
+/* Tô gradient "đã kéo tới đâu" cho slider — đọc var(--accent) trực tiếp trong chuỗi gradient
+   nên khi đổi màu chủ đạo, track tự đổi theo ngay, không cần gọi lại hàm này. */
+function updateRangeFill(id){
+  const el = document.getElementById(id);
+  if (!el) return;
+  const min = Number(el.min) || 0, max = Number(el.max) || 100, val = Number(el.value);
+  const pct = ((val - min) / (max - min)) * 100;
+  el.style.background = `linear-gradient(to right, var(--accent) ${pct}%, var(--raised) ${pct}%)`;
 }
 function onSizeChange(){
   sizeCombined = Number(document.getElementById('size-combined').value);
@@ -2111,21 +2548,31 @@ function setupReorder(){
   const row = document.getElementById('main-row');
   let draggedBlock = null;
 
+  /* Khối Thông báo (#block-reminders, giờ bọc trong .reminders-col) CỐ ĐỊNH vị trí cuối
+     #main-row — KHÔNG tham gia kéo-thả đổi thứ tự (chốt thiết kế: width/vị trí khối này
+     cố định để footer toolbar Space/Settings luôn bám đúng dưới nó). Chỉ 2 khối Combined
+     và Notes là con trực tiếp của #main-row vẫn đổi được thứ tự với nhau như cũ — lấy
+     đúng 2 khối đó qua :scope > .main-block (loại .reminders-col khỏi querySelectorAll). */
+  const reorderableBlocks = () => Array.from(row.querySelectorAll(':scope > .main-block'));
+
   /* draggable chỉ bật khi bấm-giữ đúng vào phần header (.block-head) — tránh việc
      kéo-chọn text trong nội dung khối bị nhận lầm thành kéo-thả đổi vị trí khối,
-     điều này cũng giúp bôi đen/copy nội dung card hoạt động bình thường trở lại */
-  row.querySelectorAll('.main-block').forEach(block => { block.draggable = false; });
-  document.querySelectorAll('.block-head').forEach(head => {
-    head.addEventListener('mousedown', () => {
-      const mainBlock = head.closest('.main-block');
-      if (mainBlock) mainBlock.draggable = true;
-    });
+     điều này cũng giúp bôi đen/copy nội dung card hoạt động bình thường trở lại.
+     Chỉ gắn listener mousedown cho .block-head của 2 khối CÒN đổi thứ tự được — khối
+     Thông báo không nhận draggable=true dù bấm vào header của nó. */
+  reorderableBlocks().forEach(block => { block.draggable = false; });
+  reorderableBlocks().forEach(block => {
+    /* KHÔNG dùng ":scope > .block-head" ở đây — #block-combined không có .block-head
+       trực tiếp (nó nằm sâu hơn trong #sub-tasks/.../.block-head), nên phải querySelector
+       thường (dò xuống mọi cấp) để tìm đúng header đầu tiên làm điểm bấm-giữ kéo cả khối. */
+    const head = block.querySelector('.block-head');
+    if (head) head.addEventListener('mousedown', () => { block.draggable = true; });
   });
   document.addEventListener('mouseup', () => {
-    row.querySelectorAll('.main-block').forEach(b => b.draggable = false);
+    reorderableBlocks().forEach(b => b.draggable = false);
   });
 
-  row.querySelectorAll('.main-block').forEach(block => {
+  reorderableBlocks().forEach(block => {
     /* Chỉ phản ứng khi chính khối này (e.target === block) là nguồn phát sự kiện kéo —
        tránh nhận lầm sự kiện kéo bong bóng lên từ card con bên trong (vd. kéo card Ghi chú)
        khiến cả khối bị coi như đang "kéo đổi vị trí" và mờ đi (.dragging) sai chỗ */
@@ -2178,18 +2625,6 @@ function applyCollapse(key, collapsed){
 }
 function toggleCollapse(key){
   applyCollapse(key, !collapsedBlocks[key]);
-  updateHideAllBtn();
-}
-/* Nút "Ẩn tất cả" trên header — nếu đang có khối hiện thì ẩn hết, nếu đã ẩn hết thì hiện lại hết */
-function toggleCollapseAll(){
-  const allCollapsed = Object.keys(BLOCK_EL).every(key => collapsedBlocks[key]);
-  const target = !allCollapsed;
-  Object.keys(BLOCK_EL).forEach(key => applyCollapse(key, target));
-  updateHideAllBtn();
-}
-function updateHideAllBtn(){
-  const allCollapsed = Object.keys(BLOCK_EL).every(key => collapsedBlocks[key]);
-  document.getElementById('btn-hide-all').innerHTML = svgIcon(allCollapsed ? 'eyeOff' : 'eye') + (allCollapsed ? ' Hiện tất cả' : ' Ẩn tất cả');
 }
 
 /* ========================================================================
@@ -2237,22 +2672,24 @@ function applyEnabledBlocksLayout(){
     bottomRow.style.flex = '1';
   }
 
-  // ----- 3 khối chính: ẩn khối tổng hợp/notes/reminders nếu rỗng, giãn đều phần còn lại -----
+  // ----- 3 khối chính: ẩn khối tổng hợp/notes/reminders (cả cột) nếu rỗng, giãn đều
+  // phần còn lại. Khối Thông báo ẩn/hiện theo CẢ .reminders-col (gồm footer toolbar đi
+  // cùng nó), flex cũng gán cho .reminders-col thay vì #block-reminders trực tiếp. -----
   document.getElementById('block-combined').style.display = combinedOn ? '' : 'none';
   document.getElementById('block-notes').style.display = notesOn ? '' : 'none';
-  document.getElementById('block-reminders').style.display = remindersOn ? '' : 'none';
+  document.getElementById('reminders-col').style.display = remindersOn ? '' : 'none';
 
   const visibleMainCount = [combinedOn, notesOn, remindersOn].filter(Boolean).length;
   if (visibleMainCount > 0 && visibleMainCount < 3) {
     // có khối chính bị ẩn — giãn đều các khối còn lại lấp khoảng trống, bỏ % cố định
     if (combinedOn) document.getElementById('block-combined').style.flex = '1';
     if (notesOn) document.getElementById('block-notes').style.flex = '1';
-    if (remindersOn) document.getElementById('block-reminders').style.flex = '1';
+    if (remindersOn) document.getElementById('reminders-col').style.flex = '1';
   } else if (visibleMainCount === 3) {
     // đủ cả 3 — dùng lại % từ Settings (đã set bởi applySizes())
     document.getElementById('block-combined').style.flex = sizeCombined;
     document.getElementById('block-notes').style.flex = sizeNotes;
-    document.getElementById('block-reminders').style.flex = Math.max(10, 100 - sizeCombined - sizeNotes);
+    document.getElementById('reminders-col').style.flex = Math.max(10, 100 - sizeCombined - sizeNotes);
   }
 }
 
@@ -2272,18 +2709,43 @@ function setupOverlayClickClose(){
 function toggleSpaceMenu(){
   const menu = document.getElementById('space-menu');
   const opening = menu.style.display === 'none';
-  if (opening) renderSpaceMenu();
+  // sync trước khi render để preview "X việc hôm nay · Y note" của space ĐANG MỞ phản
+  // ánh đúng dữ liệu mới nhất (biến tasks/noteCards sửa trực tiếp, chỉ ghi lại vào
+  // spaces[] qua syncCurrentSpace() ở các điểm render khác — đảm bảo không đọc dữ liệu cũ)
+  if (opening) { syncCurrentSpace(); renderSpaceMenu(); }
   menu.style.display = opening ? 'block' : 'none';
 }
+/* Phím tắt chuyển nhanh Space: Alt+1..9 (Windows/Linux) hoặc Cmd(⌘)+1..9 (Mac), theo
+   index hiển thị trong danh sách (chỉ 9 space đầu có gợi ý — đủ dùng thực tế, tránh
+   phải hỗ trợ 0/phím kép cho space thứ 10+). Detect platform qua navigator.userAgent
+   (ưu tiên) / navigator.platform (fallback) — không dùng userAgentData vì chưa hỗ trợ
+   mọi browser, chỉ cần biết Mac hay không để hiển thị ĐÚNG modifier, không quyết định
+   việc phím tắt có hoạt động hay không (xem global keydown listener bên dưới: lắng
+   nghe cả altKey/metaKey rồi tự ưu tiên theo OS). */
+function isMacPlatform(){
+  const ua = navigator.userAgent || '';
+  const plat = navigator.platform || '';
+  return /Mac|iPhone|iPad|iPod/.test(plat) || /Macintosh/.test(ua);
+}
+function spaceShortcutLabel(idx){
+  if (idx >= 9) return '';
+  return isMacPlatform() ? `⌘${idx + 1}` : `Alt+${idx + 1}`;
+}
 function renderSpaceMenu(){
-  const menu = document.getElementById('space-menu');
-  menu.innerHTML = spaces.map((s, idx) => {
+  const html = spaces.map((s, idx) => {
     const isFirst = idx === 0;
     const isLast = idx === spaces.length - 1;
+    const taskCount = (s.tasks || []).filter(t => t.date === todayStr && !t.done).length;
+    const noteCount = (s.noteCards || []).length;
+    const shortcut = spaceShortcutLabel(idx);
     return `
     <div class="space-menu-item ${s.id === currentSpaceId ? 'active' : ''}" onclick="switchSpace(${s.id})">
-      ${svgIcon('layers')}
-      <span class="space-name">${escapeHtml(s.name)}</span>
+      <span class="space-dot" style="background:${spaceDotColor(idx)}" aria-hidden="true"></span>
+      <span class="space-main">
+        <span class="space-name">${escapeHtml(s.name)}</span>
+        <span class="space-meta">${taskCount} việc hôm nay · ${noteCount} note</span>
+      </span>
+      ${shortcut ? `<span class="space-shortcut" aria-hidden="true">${shortcut}</span>` : ''}
       <span class="space-tools">
         <span class="space-move">
           <button class="icon-btn icon-btn-mini" onclick="event.stopPropagation(); moveSpace(${s.id}, -1)" title="Di chuyển lên" aria-label="Di chuyển lên" ${isFirst ? 'disabled' : ''}>${svgIcon('chevronUp')}</button>
@@ -2296,6 +2758,8 @@ function renderSpaceMenu(){
   }).join('') + `
     <div class="space-menu-divider"></div>
     <div class="space-menu-add" onclick="openSpaceCreate()">${svgIcon('plus')}<span>Thêm space mới</span></div>`;
+  const menu = document.getElementById('space-menu');
+  if (menu) menu.innerHTML = html;
 }
 /* Hoán đổi space với space liền kề (dir = -1 lên / +1 xuống). Re-render menu nhưng GIỮ
    menu đang mở; space đang active vẫn active vì so sánh theo id, không theo vị trí. */
@@ -2308,11 +2772,17 @@ function moveSpace(id, dir){
   renderSpaceMenu();
 }
 function updateSpaceSwitcherLabel(){
-  const space = spaces.find(s => s.id === currentSpaceId);
+  const idx = spaces.findIndex(s => s.id === currentSpaceId);
+  const space = spaces[idx];
   document.getElementById('space-switcher-label').textContent = space ? space.name : '';
+  const dot = document.getElementById('space-switcher-dot');
+  if (dot) dot.style.background = idx >= 0 ? spaceDotColor(idx) : 'transparent';
 }
 function switchSpace(id){
-  if (id === currentSpaceId) { document.getElementById('space-menu').style.display = 'none'; return; }
+  if (id === currentSpaceId) {
+    document.getElementById('space-menu').style.display = 'none';
+    return;
+  }
   syncCurrentSpace();
   currentSpaceId = id;
   const space = spaces.find(s => s.id === id);
@@ -2371,7 +2841,9 @@ function openSpaceRename(id){
 function saveSpace(){
   const id = document.getElementById('space-id').value;
   const name = document.getElementById('space-name').value.trim() || 'Space chưa đặt tên';
-  const blocks = readSpaceBlocksChecks();
+  // 'reminders' không còn checkbox riêng (luôn bật) — readSpaceBlocksChecks() không trả
+  // về key này nữa, phải tự thêm lại để space.enabledBlocks luôn có đủ field, không thiếu.
+  const blocks = { ...readSpaceBlocksChecks(), reminders: true };
   const errorEl = document.getElementById('space-blocks-error');
   if (!Object.values(blocks).some(Boolean)) {
     errorEl.style.display = 'block';
@@ -2402,12 +2874,31 @@ function deleteSpace(id){
 }
 document.addEventListener('mousedown', (e) => {
   const switcher = document.querySelector('.space-switcher');
-  const menu = document.getElementById('space-menu');
-  if (menu.style.display !== 'none' && !switcher.contains(e.target)) menu.style.display = 'none';
+  const menu = switcher ? switcher.querySelector('.space-menu') : null;
+  if (menu && menu.style.display !== 'none' && !switcher.contains(e.target)) menu.style.display = 'none';
 
   const sortSwitcher = document.querySelector('.sort-switcher');
   const sortMenu = document.getElementById('sort-menu');
   if (sortMenu.style.display !== 'none' && !sortSwitcher.contains(e.target)) sortMenu.style.display = 'none';
+});
+
+/* ----- Phím tắt chuyển nhanh Space: Alt+1..9 (Win/Linux) hoặc Cmd+1..9 (Mac) -----
+   Lắng nghe CẢ e.altKey và e.metaKey rồi ưu tiên đúng theo OS (isMacPlatform()) để
+   tránh xung đột với phím tắt OS khác (vd Cmd+số trên Win không có nghĩa gì nên không
+   bắt nhầm; Alt+số trên Mac thường đổi thành ký tự đặc biệt ở 1 số layout nên cũng
+   không bắt). Chỉ hoạt động khi KHÔNG đang gõ trong input/textarea/select và KHÔNG có
+   modal nào đang mở (tái dùng isTypingTarget/isAnyModalOpen đã có ở khối Home). */
+document.addEventListener('keydown', (e) => {
+  const wantMac = isMacPlatform();
+  const modifierOk = wantMac ? e.metaKey : e.altKey;
+  if (!modifierOk) return;
+  if (!/^[1-9]$/.test(e.key)) return;
+  if (isTypingTarget(e.target)) return;
+  if (isAnyModalOpen()) return;
+  const idx = Number(e.key) - 1;
+  if (idx >= spaces.length) return;
+  e.preventDefault();
+  switchSpace(spaces[idx].id);
 });
 
 /* ========================================================================
@@ -2467,7 +2958,9 @@ const HOME_GRADIENTS = [
   'linear-gradient(135deg,#42275a 0%,#734b6d 100%)',
   'linear-gradient(135deg,#134e5e 0%,#71b280 100%)',
 ];
-/* Vài câu quote ngắn đóng gói cứng — random theo NGÀY (cùng ngày luôn ra 1 câu), không gọi API. */
+/* 10 SLOT QUOTE CỐ ĐỊNH — không CRUD thêm/xoá, chỉ sửa nội dung từng ô trong Settings
+   (tab "Quote", giống pattern HOME_IMAGES/home-bg-grid). Mặc định đổi theo NGÀY (dayIndex),
+   tần suất có thể đổi qua quoteRotateMode (xem khối "QUOTE — Settings tab" phía dưới). */
 const HOME_QUOTES = [
   'Một bước nhỏ mỗi ngày tạo nên hành trình lớn.',
   'Tập trung vào việc quan trọng, bỏ qua việc khẩn cấp giả.',
@@ -2476,6 +2969,9 @@ const HOME_QUOTES = [
   'Hôm nay là trang giấy trắng — hãy viết điều tử tế lên đó.',
   'Việc khó nhất thường là việc đáng làm nhất.',
   'Đơn giản hoá. Rồi làm cho xong.',
+  'Làm xong tốt hơn làm hoàn hảo — bắt đầu trước, chỉnh sau.',
+  'Nghỉ ngơi đúng lúc cũng là một phần của năng suất.',
+  'Đừng so sánh ngày hôm nay với hôm qua của người khác — so với chính bạn hôm qua.',
 ];
 const HOME_NAME = ''; // để trống cũng được; có thể đặt 1 tên mẫu, vd 'Hùng'
 
@@ -2505,22 +3001,34 @@ function updateHomeClock(){
 }
 
 /* Ảnh nền giờ áp lên #app-bg (lớp dùng CHUNG cho Home + Dashboard). Đổi ảnh chỉ
-   fade lại #app-bg::after — KHÔNG reload/nhảy khi chuyển màn vì cùng 1 layer. */
+   crossfade 2 layer con bên trong #app-bg — KHÔNG reload/nhảy khi chuyển màn vì
+   cùng 1 #app-bg, và không "nhảy" tức thì khi đổi ảnh vì luôn có 1 nhịp cả 2 layer
+   cùng hiện (ping-pong: layer ẩn nhận ảnh mới rồi fade lên trên layer đang hiện). */
+let appBgActiveLayer = 0; // 0 hoặc 1 — layer hiện đang "visible" (trên cùng)
 
-/* Hàm tải+áp dụng chung. gradientFallback luôn hiện ngay (không để màn trắng vỡ lúc ảnh tải/lỗi). */
+/* Hàm tải+áp dụng chung. gradientFallback luôn hiện ngay trên layer SẮP hiện (không để
+   màn trắng vỡ lúc ảnh tải/lỗi). onResult(ok) báo ảnh thật load được hay phải dùng gradient. */
 function loadAndApplyBg(url, gradientFallback, onResult){
-  const appBg = document.getElementById('app-bg');
-  appBg.classList.remove('loaded');
-  appBg.style.backgroundImage = gradientFallback;
+  const nextLayerIdx = appBgActiveLayer === 0 ? 1 : 0;
+  const curLayer = document.getElementById(`app-bg-layer-${appBgActiveLayer}`);
+  const nextLayer = document.getElementById(`app-bg-layer-${nextLayerIdx}`);
+  // layer sắp hiện luôn nhận gradient fallback trước (phòng ảnh lỗi/đang tải)
+  nextLayer.style.backgroundImage = gradientFallback;
+  nextLayer.classList.add('layer-top'); // đảm bảo layer mới luôn ở TRÊN khi fade-in
+  curLayer.classList.remove('layer-top');
   const img = new Image();
   img.onload = () => {
-    appBg.style.setProperty('--app-bg-img', `url("${url}")`);
-    appBg.classList.add('loaded');
+    nextLayer.style.backgroundImage = `url("${url}")`;
+    nextLayer.classList.add('visible');
+    curLayer.classList.remove('visible');
+    appBgActiveLayer = nextLayerIdx;
     onResult && onResult(true);
   };
   img.onerror = () => {
-    appBg.style.setProperty('--app-bg-img', 'none');
-    appBg.classList.remove('loaded');
+    // ảnh lỗi: vẫn crossfade sang layer mới nhưng giữ gradient fallback đã set ở trên
+    nextLayer.classList.add('visible');
+    curLayer.classList.remove('visible');
+    appBgActiveLayer = nextLayerIdx;
     onResult && onResult(false);
   };
   img.src = url;
@@ -2536,7 +3044,7 @@ function shuffleHomeBg(){ applyHomeBg(homeBgIndex + 1); }
 /* ----- Tự động đổi ảnh sau mỗi N ms (demo dùng setInterval; extension thật có thể
    dùng chrome.alarms để không phụ thuộc tab đang mở). 0 = tắt. ----- */
 let autoRotateTimer = null;
-let autoRotateMs = 0;
+let autoRotateMs = 900000;
 function setAutoRotate(ms){
   autoRotateMs = Number(ms) || 0;
   if (autoRotateTimer) { clearInterval(autoRotateTimer); autoRotateTimer = null; }
@@ -2545,20 +3053,61 @@ function setAutoRotate(ms){
   }
 }
 
-/* ----- Lưới preview ảnh nền trong Settings: mỗi ô = 1 link trong HOME_IMAGES,
-   sửa trực tiếp tại ô đó (không cần đổi code) ----- */
+/* ----- Nhóm nút ngang "Tự động đổi ảnh" (Settings) — thay cho dropdown cũ (xổ dọc,
+   phá layout). Render trực tiếp N nút theo AUTOROTATE_OPTIONS, click 1 nút gọi đúng
+   setAutoRotate() như cũ. Label rút ngắn cho gọn vì hiển thị cùng lúc cả 5 nút. ----- */
+const AUTOROTATE_OPTIONS = [
+  { value: '0', label: 'Tắt' },
+  { value: '15000', label: '15 giây (demo)' },
+  { value: '60000', label: '1 phút' },
+  { value: '900000', label: '15 phút' },
+  { value: '3600000', label: '1 giờ' },
+];
+function renderAutoRotateOptions(){
+  const wrap = document.getElementById('autorotate-options');
+  const current = String(autoRotateMs);
+  wrap.innerHTML = AUTOROTATE_OPTIONS.map(o => `
+    <button type="button" class="${o.value === current ? 'active' : ''}" onclick="selectAutoRotate('${o.value}')" aria-pressed="${o.value === current}">${o.label}</button>`).join('');
+}
+function selectAutoRotate(value){
+  setAutoRotate(value);
+  renderAutoRotateOptions();
+}
+
+/* ----- Lưới preview ảnh nền trong Settings: mỗi ô = 1 link/ảnh upload trong HOME_IMAGES,
+   sửa trực tiếp tại ô đó (không cần đổi code). Mỗi ô có thể ở 1 trong 2 trạng thái:
+   - "link": input URL có thể gõ, HOME_IMAGES[i] là URL bình thường.
+   - "upload": ảnh đã chọn từ máy (data-URL base64, đọc qua FileReader) — input bị disable
+     để tránh gõ đè nhầm, kèm nút nhỏ "Dùng link" để xoá ảnh upload và quay lại nhập link.
+   homeBgUploadedSlots theo dõi ô nào đang ở trạng thái "upload" (chỉ là cờ hiển thị UI, demo
+   in-memory — không persist qua reload, không tối ưu kích thước base64). ----- */
+const homeBgUploadedSlots = new Set();
+function isDataUrl(s){ return typeof s === 'string' && s.startsWith('data:'); }
 function renderHomeBgGrid(){
   const grid = document.getElementById('home-bg-grid');
-  grid.innerHTML = HOME_IMAGES.map((url, i) => `
+  grid.innerHTML = HOME_IMAGES.map((url, i) => {
+    const uploaded = homeBgUploadedSlots.has(i) || isDataUrl(url);
+    return `
     <div class="home-bg-item">
       <div class="home-bg-thumb" id="home-bg-thumb-${i}" style="background-image:url('${url}')"
         onclick="applyHomeBg(${i})" title="Dùng ảnh này ngay" role="button" tabindex="0"
         onkeydown="if(event.key==='Enter') applyHomeBg(${i})"></div>
-      <input type="url" value="${url}" id="home-bg-input-${i}"
-        onchange="updateHomeBgSlot(${i}, this.value)"
-        onkeydown="if(event.key==='Enter') this.blur()" />
-    </div>
-  `).join('');
+      <div class="home-bg-row">
+        <input type="${uploaded ? 'text' : 'url'}" id="home-bg-input-${i}"
+          value="${uploaded ? '' : url}" ${uploaded ? 'disabled' : ''}
+          placeholder="${uploaded ? 'Đang dùng ảnh đã upload' : 'Dán link ảnh…'}"
+          aria-label="Link ảnh nền ô ${i + 1}"
+          onchange="updateHomeBgSlot(${i}, this.value)"
+          onkeydown="if(event.key==='Enter') this.blur()" />
+        <button type="button" class="home-bg-upload-btn" id="home-bg-upload-btn-${i}"
+          title="Upload ảnh từ máy" aria-label="Upload ảnh từ máy cho ô ${i + 1}"
+          onclick="document.getElementById('home-bg-file-${i}').click()">${svgIcon('upload')}</button>
+        <input type="file" accept="image/*" id="home-bg-file-${i}" style="display:none;"
+          onchange="uploadHomeBgSlot(${i}, this)" />
+      </div>
+      ${uploaded ? `<button type="button" class="home-bg-use-link-btn" onclick="useLinkForHomeBgSlot(${i})">Dùng link khác thay vào đây</button>` : ''}
+    </div>`;
+  }).join('');
   highlightActiveHomeBgSlot();
 }
 function highlightActiveHomeBgSlot(){
@@ -2574,6 +3123,7 @@ function updateHomeBgSlot(index, newUrl){
   const img = new Image();
   img.onload = () => {
     HOME_IMAGES[index] = url;
+    homeBgUploadedSlots.delete(index); // nhập link mới -> rời khỏi trạng thái upload
     thumb.style.backgroundImage = `url('${url}')`;
     thumb.classList.remove('broken');
     if (index === homeBgIndex) applyHomeBg(homeBgIndex); // đang hiện đúng ô này -> áp ngay
@@ -2581,12 +3131,140 @@ function updateHomeBgSlot(index, newUrl){
   img.onerror = () => { thumb.classList.add('broken'); };
   img.src = url;
 }
+/* Upload ảnh từ máy: đọc file qua FileReader -> data-URL base64, lưu trực tiếp vào
+   HOME_IMAGES[index] giống như khi nhập URL (demo vanilla in-memory, không cần chrome.storage
+   thật — đó là việc của dev sau). Re-render cả ô để input chuyển sang trạng thái disable. */
+function uploadHomeBgSlot(index, inputEl){
+  const file = inputEl.files && inputEl.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const dataUrl = reader.result;
+    HOME_IMAGES[index] = dataUrl;
+    homeBgUploadedSlots.add(index);
+    renderHomeBgGrid();
+    if (index === homeBgIndex) applyHomeBg(homeBgIndex); // đang hiện đúng ô này -> áp ngay
+  };
+  reader.readAsDataURL(file);
+  inputEl.value = ''; // cho phép chọn lại cùng file lần sau nếu cần
+}
+/* Bỏ ảnh upload, quay lại nhập link cho ô này — KHÔNG xoá ảnh nền hiện tại của ô (giữ
+   nguyên cho tới khi người dùng gõ link mới), chỉ bật lại input để gõ đè. */
+function useLinkForHomeBgSlot(index){
+  homeBgUploadedSlots.delete(index);
+  renderHomeBgGrid();
+  const input = document.getElementById(`home-bg-input-${index}`);
+  if (input) input.focus();
+}
+
+/* ========================================================================
+   QUOTE Home — 10 slot CỐ ĐỊNH (HOME_QUOTES), sửa nội dung trực tiếp tại ô
+   (không phải CRUD thêm/xoá tự do). Biến/hàm tách riêng khỏi ảnh nền
+   (quoteRotateMode/quoteIndex/...) dù dùng đúng pattern dropdown tuỳ biến.
+   ======================================================================== */
+let quoteIndex = 0;
+/* Crossfade khi đổi quote: fade-out ngắn (150ms) -> đổi textContent lúc đã mờ hẳn ->
+   fade-in (200ms). Tránh "giật" chữ đổi tức thì như textContent set trực tiếp trước đây. */
+function applyHomeQuote(index){
+  quoteIndex = (index + HOME_QUOTES.length) % HOME_QUOTES.length;
+  const el = document.getElementById('home-quote');
+  el.style.transition = 'opacity .15s var(--ease-standard)';
+  el.style.opacity = '0';
+  setTimeout(() => {
+    el.textContent = HOME_QUOTES[quoteIndex];
+    el.style.transition = 'opacity .2s var(--ease-standard)';
+    el.style.opacity = '.9';
+  }, 150);
+  highlightActiveHomeQuoteSlot();
+}
+
+/* Tần suất đổi quote — 4 lựa chọn:
+   - 'daily' (mặc định): đổi theo NGÀY, dùng đúng công thức dayIndex() hiện có.
+   - 'onopen': đổi mỗi lần quay lại màn Home (gọi applyHomeQuote ở goToHome()).
+   - 'every15m' / 'every1h': đổi theo interval cố định (giống setAutoRotate ảnh nền
+     nhưng timer/biến TÁCH RIÊNG, không dùng chung autoRotateTimer/autoRotateMs). */
+const QUOTEROTATE_OPTIONS = [
+  { value: 'daily', label: 'Mỗi ngày' },
+  { value: 'onopen', label: 'Mỗi lần mở Home' },
+  { value: 'every15m', label: '15 phút' },
+  { value: 'every1h', label: '1 giờ' },
+];
+let quoteRotateMode = 'daily';
+let quoteRotateTimer = null;
+function setQuoteRotateMode(mode){
+  quoteRotateMode = mode;
+  if (quoteRotateTimer) { clearInterval(quoteRotateTimer); quoteRotateTimer = null; }
+  if (mode === 'daily') {
+    applyHomeQuote(dayIndex(HOME_QUOTES.length));
+  } else if (mode === 'every15m') {
+    quoteRotateTimer = setInterval(() => applyHomeQuote(quoteIndex + 1), 900000);
+  } else if (mode === 'every1h') {
+    quoteRotateTimer = setInterval(() => applyHomeQuote(quoteIndex + 1), 3600000);
+  }
+  // 'onopen': không cần timer — đổi quote được gọi trực tiếp trong goToHome().
+}
+function renderQuoteRotateOptions(){
+  const wrap = document.getElementById('quoterotate-options');
+  wrap.innerHTML = QUOTEROTATE_OPTIONS.map(o => `
+    <button type="button" class="${o.value === quoteRotateMode ? 'active' : ''}" onclick="selectQuoteRotate('${o.value}')" aria-pressed="${o.value === quoteRotateMode}">${o.label}</button>`).join('');
+}
+function selectQuoteRotate(value){
+  setQuoteRotateMode(value);
+  renderQuoteRotateOptions();
+}
+
+/* Lưới 10 ô Settings — sửa nội dung trực tiếp tại từng ô (textarea), không thêm/xoá ô.
+   Ô đang hiển thị trên Home được viền nổi (active-slot), giống active-slot ảnh nền. */
+function renderHomeQuoteGrid(){
+  const grid = document.getElementById('home-quote-grid');
+  grid.innerHTML = HOME_QUOTES.map((text, i) => `
+    <div class="home-quote-item ${i === quoteIndex ? 'active-slot' : ''}" id="home-quote-item-${i}">
+      <div class="home-quote-index">
+        <span>Ô ${i + 1}</span>
+        <button type="button" class="home-quote-use-btn" onclick="applyHomeQuote(${i})">Dùng câu này</button>
+      </div>
+      <textarea id="home-quote-input-${i}" aria-label="Nội dung câu quote ô ${i + 1}"
+        onchange="updateHomeQuoteSlot(${i}, this.value)">${escapeHtml(text)}</textarea>
+    </div>`).join('');
+}
+function highlightActiveHomeQuoteSlot(){
+  HOME_QUOTES.forEach((_, i) => {
+    const item = document.getElementById(`home-quote-item-${i}`);
+    if (item) item.classList.toggle('active-slot', i === quoteIndex);
+  });
+}
+function updateHomeQuoteSlot(index, newText){
+  const text = newText.trim();
+  HOME_QUOTES[index] = text || HOME_QUOTES[index];
+  if (!text) { document.getElementById(`home-quote-input-${index}`).value = HOME_QUOTES[index]; }
+  if (index === quoteIndex) {
+    document.getElementById('home-quote').textContent = HOME_QUOTES[quoteIndex];
+  }
+}
+
+/* Tín hiệu phụ rất nhẹ dưới quote: "X việc cần làm hôm nay" — đếm task của SPACE HIỆN
+   TẠI có date === todayStr và !done (đọc trực tiếp mảng `tasks` đang sync với space active,
+   không phải dashboard rút gọn, chỉ là con số). ẨN HOÀN TOÀN khi count = 0 bằng cách set
+   textContent rỗng -> CSS #home-today-hint:empty { display:none } tự ẩn, không hiện "0 việc". */
+function renderHomeTodayHint(){
+  const el = document.getElementById('home-today-hint');
+  if (!el) return;
+  const count = tasks.filter(t => t.date === todayStr && !t.done).length;
+  el.textContent = count > 0 ? `${count} việc cần làm hôm nay` : '';
+}
 
 function initHomeContent(){
-  document.getElementById('home-quote').textContent = HOME_QUOTES[dayIndex(HOME_QUOTES.length)];
+  applyHomeQuote(dayIndex(HOME_QUOTES.length));
   applyHomeBg(dayIndex(HOME_IMAGES.length));
   updateHomeClock();
   renderHomeBgGrid();
+  renderHomeQuoteGrid();
+  renderAutoRotateOptions();
+  renderQuoteRotateOptions();
+  renderHomeTodayHint();
+  // Khởi động timer tự động đổi ảnh theo giá trị mặc định (Mỗi 15 phút) ngay khi trang load.
+  setAutoRotate(autoRotateMs);
+  // Quote: mặc định 'daily' không cần khởi timer (applyHomeQuote đã set ở trên).
 }
 
 /* ----- Chuyển màn Home <-> Dashboard (transition fade qua class .home-hidden) ----- */
@@ -2594,19 +3272,41 @@ function isHomeVisible(){ return !document.body.classList.contains('home-hidden'
 function isAnyModalOpen(){
   return [...document.querySelectorAll('.overlay')].some(o => o.style.display !== 'none' && o.style.display !== '');
 }
+/* Focus theo transitionend (thay setTimeout cứng ~80ms): lắng nghe đúng sự kiện kết thúc
+   transition của phần tử đang fade/transform (#home-screen) để set focus đúng lúc animation
+   xong, không bị lệch khi thời lượng transition tăng (.45s scale+translate ở bước "depth").
+   once:true tự gỡ listener sau khi chạy 1 lần; có setTimeout fallback (= đúng thời lượng CSS)
+   để phòng trường hợp hiếm transitionend không bắn (vd phần tử bị display:none giữa chừng). */
+function focusAfterTransition(el, targetId, fallbackMs){
+  if (!el) { const t = document.getElementById(targetId); if (t) t.focus(); return; }
+  let done = false;
+  const finish = () => {
+    if (done) return;
+    done = true;
+    const t = document.getElementById(targetId);
+    if (t) t.focus();
+  };
+  el.addEventListener('transitionend', finish, { once: true });
+  setTimeout(finish, fallbackMs);
+}
 function goToDashboard(){
   if (!isHomeVisible()) return;
   document.body.classList.add('home-hidden');
   lastScreen = 'dashboard';
-  // focus hợp lý: đưa focus về nút quay-Home để bàn phím tiếp tục dùng được
-  setTimeout(() => { const b = document.getElementById('btn-home'); if (b) b.focus(); }, 80);
+  // focus hợp lý: đưa focus về nút Settings ở widget góc (nút "Về Home" riêng vẫn có
+  // trong widget, nhưng Esc là cách chính để về Home bằng bàn phím) để bàn phím tiếp
+  // tục dùng được, đúng lúc #home-screen fade/scale xong (450ms) thay vì setTimeout
+  // cứng tách biệt với CSS.
+  focusAfterTransition(document.getElementById('home-screen'), 'dashboard-corner-settings-btn', 480);
 }
 function goToHome(){
   if (isHomeVisible()) return;
   document.body.classList.remove('home-hidden');
   lastScreen = 'home';
   updateHomeClock();
-  setTimeout(() => { const b = document.getElementById('home-enter-btn'); if (b) b.focus(); }, 80);
+  if (quoteRotateMode === 'onopen') applyHomeQuote(quoteIndex + 1);
+  renderHomeTodayHint();
+  focusAfterTransition(document.getElementById('home-screen'), 'home-enter-btn', 480);
 }
 
 /* ----- Phím tắt: Enter/Space vào dashboard, Esc về Home -----
@@ -2634,7 +3334,6 @@ setupReorder();
 setupOverlayClickClose();
 updateSpaceSwitcherLabel();
 renderAll();
-updateHideAllBtn();
 applyTheme('light');
 
 /* khởi tạo Home + đồng hồ chạy real-time */

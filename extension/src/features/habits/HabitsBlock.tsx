@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Flame, Pencil, Plus, Trash2, Check } from 'lucide-react';
 import { BlockShell } from '../../components/BlockShell';
+import { EmptyState } from '../../components/EmptyState';
 import { useAppState, useCurrentSpace } from '../../state/AppStateContext';
 import { useConfirm } from '../../components/ConfirmContext';
 import { HabitFormModal } from './HabitFormModal';
@@ -48,7 +49,11 @@ export function HabitsBlock({ style }: HabitsBlockProps) {
     >
       <div className="block-body">
         {space.habits.length === 0 ? (
-          <p style={{ fontSize: 13.5, color: 'var(--text-dim)' }}>Chưa có thói quen nào.</p>
+          <EmptyState
+            icon={Flame}
+            title="Chưa có thói quen"
+            hint="Thêm thói quen muốn duy trì để theo dõi streak hàng ngày."
+          />
         ) : (
           space.habits.map((habit) => {
             const streak = computeStreak(habit);

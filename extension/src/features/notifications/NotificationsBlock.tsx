@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Bell, Check } from 'lucide-react';
 import { BlockShell } from '../../components/BlockShell';
+import { EmptyState } from '../../components/EmptyState';
 import { useAppState, useCurrentSpace } from '../../state/AppStateContext';
 import { computeNotifications } from './computeNotifications';
 
@@ -67,7 +68,11 @@ export function NotificationsBlock({
     >
       <div className="block-body">
         {rows.length === 0 ? (
-          <p style={{ fontSize: 13.5, color: 'var(--text-dim)' }}>Không có thông báo nào.</p>
+          <EmptyState
+            icon={Bell}
+            title="Chưa có thông báo nào"
+            hint="Thông báo sẽ tự tổng hợp từ Việc cần làm, Nhắc việc và Thói quen trong ngày."
+          />
         ) : (
           rows.map((row, idx) => (
             <div

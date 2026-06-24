@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { BookOpen, ChevronDown, Grid2x2, Plus, Rows2 } from 'lucide-react';
+import { BookOpen, ChevronDown, EyeOff, Grid2x2, Plus, Rows2 } from 'lucide-react';
 import { BlockShell } from '../../components/BlockShell';
+import { EmptyState } from '../../components/EmptyState';
 import { useAppState, useCurrentSpace } from '../../state/AppStateContext';
 import { useConfirm } from '../../components/ConfirmContext';
 import { NoteCard } from './NoteCard';
@@ -197,9 +198,19 @@ export function NotesBlock({
       </div>
       <div className="block-body">
         {list.length === 0 ? (
-          <p style={{ fontSize: 13.5, color: 'var(--text-dim)' }}>
-            {space.notes.length === 0 ? 'Chưa có card nào.' : 'Không tìm thấy note phù hợp.'}
-          </p>
+          space.notes.length === 0 ? (
+            <EmptyState
+              icon={BookOpen}
+              title="Chưa có note nào"
+              hint='Bấm "+ Thêm note" để ghi lại ý tưởng, mật khẩu hay danh sách cần nhớ.'
+            />
+          ) : (
+            <EmptyState
+              icon={EyeOff}
+              title="Không tìm thấy note phù hợp"
+              hint="Thử đổi từ khoá tìm kiếm hoặc xoá bộ lọc hiện tại."
+            />
+          )
         ) : noteView === 'list' ? (
           <div className="notes-list">
             {list.map((note) => (

@@ -36,6 +36,8 @@ không có backend, không tài khoản riêng, không quảng cáo, không theo
 
 - **`storage`:**
   "Used to save the user's tasks, reminders, habits, notes and display settings locally via chrome.storage, so data persists across sessions and syncs across the user's own signed-in devices."
+- **Host permission (`https://images.unsplash.com/*`):**
+  "Used only to load the optional background image the user selects from Unsplash for their dashboard background in Settings. No data is sent to this host besides the standard image request; the extension does not read, modify or inject content into any web page."
 - **Ghi đè trang Tab mới (chrome_url_overrides.newtab):**
   "Replaces the New Tab page with the KN-Space dashboard, which is the core single purpose of this extension — a personal productivity dashboard shown on every new tab."
 - **Single purpose description:**

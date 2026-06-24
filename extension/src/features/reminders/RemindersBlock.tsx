@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Bell, Pencil, Pin, Plus, Repeat, Trash2 } from 'lucide-react';
 import { BlockShell } from '../../components/BlockShell';
+import { EmptyState } from '../../components/EmptyState';
 import { useAppState, useCurrentSpace } from '../../state/AppStateContext';
 import { useConfirm } from '../../components/ConfirmContext';
 import { ReminderFormModal } from './ReminderFormModal';
@@ -51,7 +52,11 @@ export function RemindersBlock({ style }: RemindersBlockProps) {
     >
       <div className="block-body">
         {space.reminders.length === 0 ? (
-          <p style={{ fontSize: 13.5, color: 'var(--text-dim)' }}>Chưa có nhắc việc nào.</p>
+          <EmptyState
+            icon={Bell}
+            title="Chưa có nhắc việc"
+            hint="Tạo nhắc việc 1 lần hoặc lặp lại để không bỏ sót việc quan trọng."
+          />
         ) : (
           space.reminders.map((r) => (
             <div key={r.id} className="reminder-item-row">

@@ -1,15 +1,16 @@
-import type { Settings, Space } from '../types';
+import type { HomeBgSlot, Settings, Space } from '../types';
 import { DEFAULT_HOME_IMAGES, dayIndex } from '../features/home/homeContent';
 
 export function defaultSettings(): Settings {
   return {
     theme: 'light',
-    accent: '#5b6cff',
+    accent: '#5457d6',
     homeBackground: {
-      images: [...DEFAULT_HOME_IMAGES],
+      images: DEFAULT_HOME_IMAGES.map((url): HomeBgSlot => ({ type: 'url', value: url })),
       // Chỉ số ngày tính từ epoch — đồng bộ cách chọn với quote, đổi mỗi ngày tự nhiên.
       index: dayIndex(DEFAULT_HOME_IMAGES.length),
-      autoRotateMs: 0,
+      // Mặc định "Mỗi 15 phút" theo yêu cầu — trước đây mặc định "Tắt" (0).
+      autoRotateMs: 900_000,
     },
     layoutSizes: { combined: 45, notes: 35, tasks: 45, reminder: 50 },
     mainBlockOrder: ['combined', 'notes', 'reminders'],

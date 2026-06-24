@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CheckSquare, Pencil, Plus, Trash2, Check } from 'lucide-react';
 import { BlockShell } from '../../components/BlockShell';
+import { EmptyState } from '../../components/EmptyState';
 import { useAppState, useCurrentSpace } from '../../state/AppStateContext';
 import { useConfirm } from '../../components/ConfirmContext';
 import { TaskFormModal } from './TaskFormModal';
@@ -69,7 +70,11 @@ export function TasksBlock({ style }: TasksBlockProps) {
     >
       <div className="block-body">
         {list.length === 0 ? (
-          <p style={{ fontSize: 13.5, color: 'var(--text-dim)' }}>Không có việc nào.</p>
+          <EmptyState
+            icon={CheckSquare}
+            title="Chưa có việc cần làm"
+            hint='Bấm "+ Thêm" ở góc trên để tạo việc đầu tiên.'
+          />
         ) : (
           list.map((task) => {
             const meta = task.date ? `${task.date.slice(5)} ${task.time || ''}`.trim() : '';

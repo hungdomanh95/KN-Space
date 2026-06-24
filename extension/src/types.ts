@@ -79,9 +79,16 @@ export type Screen = 'home' | 'dashboard';
 /** Khoảng tự động đổi ảnh nền Home/Dashboard, ms. 0 = tắt. */
 export type HomeBgAutoRotateMs = 0 | 60_000 | 900_000 | 3_600_000;
 
-/** Ảnh nền dùng chung Home + Dashboard: 6 link tĩnh, chỉ số đang chọn, khoảng tự đổi. */
+/**
+ * 1 slot ảnh nền: `url` = link hotlink tĩnh (sync được), `upload` = ảnh người dùng
+ * chọn từ máy, lưu base64 data-URL (KHÔNG sync giữa các máy — chỉ tồn tại cục bộ,
+ * xem mục 10 requirements + chromeStorage.ts).
+ */
+export type HomeBgSlot = { type: 'url'; value: string } | { type: 'upload'; value: string };
+
+/** Ảnh nền dùng chung Home + Dashboard: 6 slot, chỉ số đang chọn, khoảng tự đổi. */
 export interface HomeBackground {
-  images: string[]; // luôn 6 link cố định, sửa được qua Settings
+  images: HomeBgSlot[]; // luôn 6 slot cố định, sửa được qua Settings (link hoặc upload)
   index: number; // chỉ số ảnh đang dùng trong `images`
   autoRotateMs: HomeBgAutoRotateMs;
 }

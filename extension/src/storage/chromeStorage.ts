@@ -1,15 +1,25 @@
-import type { AppState, Settings, Space, UiState } from '../types';
+import type { AppState, HomeBackground, Settings, Space, UiState } from '../types';
 import { createSeedSpaces, defaultSettings } from '../state/seed';
 
 // ============================================================================
 // Chiến lược key
 // - 1 key nhỏ "kn-space:space-index" LUÔN ở sync — lưu thứ tự Space + map
 //   storageLocations (sync/local) từng space, dùng để tự phục hồi khi load.
-// - 1 key "kn-space:settings" — settings dùng chung mọi Space.
+// - 1 key "kn-space:settings" — settings dùng chung mọi Space, TRỪ `homeBackground`
+//   (tách riêng key, xem dưới) — theme/accent/layout vẫn được sync bình thường dù
+//   người dùng có ảnh nền upload nặng.
+// - 1 key "kn-space:home-bg" — RIÊNG cho `homeBackground`, LUÔN ghi vào `local`
+//   (không thử sync) vì ảnh `upload` là base64 có thể vượt xa quota ~8KB/item của
+//   sync; nếu gộp chung vào "kn-space:settings" thì 1 ảnh nặng sẽ kéo toàn bộ
+//   settings (theme/accent/layout...) rớt sang local theo cơ chế fallback, làm các
+//   phần lẽ ra sync tốt bị mất đồng bộ oan. Đánh đổi: 6 link `url` mặc định (nhẹ,
+//   vốn sync được) cũng theo `homeBackground` về local luôn — chấp nhận được vì
+//   đây là 1 khối dữ liệu nhỏ, ưu tiên giữ phần còn lại của Settings sync ổn định.
 // - 1 key "kn-space:space:<id>" cho MỖI Space — tách riêng để né giới hạn ~8KB/item.
 // ============================================================================
 
 const SETTINGS_KEY = 'kn-space:settings';
+const HOME_BG_KEY = 'kn-space:home-bg';
 const SPACE_INDEX_KEY = 'kn-space:space-index';
 const spaceKey = (id: string) => `kn-space:space:${id}`;
 
@@ -168,9 +178,22 @@ export async function loadAppState(): Promise<LoadResult | null> {
     return null;
   }
 
-  const settingsResult = await readKeySelfHeal<Settings>(SETTINGS_KEY, undefined);
-  const settings = settingsResult.value ? normalizeSettings(settingsResult.value) : defaultSettings();
+  // `settings` (sync trước) — phần "Chung" (theme/accent/layout/...), KHÔNG gồm homeBackground.
+  const settingsResult = await readKeySelfHeal<Omit<Settings, 'homeBackground'>>(SETTINGS_KEY, undefined);
+  // `homeBackground` LUÔN đọc từ `local` trước (đây là khu vực ghi chính thức của nó) — vẫn tự
+  // kiểm tra `sync` qua readKeySelfHeal để migrate đúng dữ liệu cũ (trước khi tách key riêng,
+  // homeBackground từng nằm trong SETTINGS_KEY ở sync).
+  const homeBgResult = await readKeySelfHeal<HomeBackground>(HOME_BG_KEY, 'local');
+
+  const fallback = defaultSettings();
+  const settingsRaw = settingsResult.value ?? fallback;
+  // Dữ liệu cũ (trước khi tách key) có thể vẫn có homeBackground lồng trong SETTINGS_KEY —
+  // dùng làm fallback khi chưa từng ghi HOME_BG_KEY riêng (lần đầu sau khi cập nhật extension).
+  const legacyHomeBg = (settingsResult.value as Settings | undefined)?.homeBackground;
+  const settings = normalizeSettings(settingsRaw as Settings, homeBgResult.value ?? legacyHomeBg);
   if (settingsResult.area === 'local') fallbackActive = true;
+  // Không tính ảnh nền ở `local` là "fallback do vượt quota" — đây là khu vực CHÍNH THỨC/cố ý
+  // của riêng homeBackground (ảnh upload), không phải hệ quả của lỗi quota cần cảnh báo banner.
 
   const currentSpaceId = spaces.some((s) => s.id === index.currentSpaceId)
     ? index.currentSpaceId
@@ -201,23 +224,42 @@ function normalizeSpace(space: Space): Space {
 
 const VALID_AUTO_ROTATE_MS = new Set([0, 60_000, 900_000, 3_600_000]);
 
-function normalizeHomeBackground(raw: Settings['homeBackground'] | undefined, fallback: Settings['homeBackground']): Settings['homeBackground'] {
+/** Chuẩn hoá 1 slot — migrate đúng từ schema cũ (string[] trước khi có {type,value}). */
+function normalizeHomeBgSlot(raw: unknown, fallback: HomeBackground['images'][number]): HomeBackground['images'][number] {
+  if (typeof raw === 'string') {
+    // Schema cũ: slot là string URL thuần.
+    return raw.trim() ? { type: 'url', value: raw } : fallback;
+  }
+  if (raw && typeof raw === 'object' && 'type' in raw && 'value' in raw) {
+    const slot = raw as { type: unknown; value: unknown };
+    if ((slot.type === 'url' || slot.type === 'upload') && typeof slot.value === 'string' && slot.value.trim()) {
+      return { type: slot.type, value: slot.value };
+    }
+  }
+  return fallback;
+}
+
+export function normalizeHomeBackground(raw: HomeBackground | undefined, fallback: HomeBackground): HomeBackground {
   const images = Array.isArray(raw?.images) && raw.images.length === fallback.images.length
-    ? raw.images.map((url, i) => (typeof url === 'string' && url.trim() ? url : fallback.images[i]))
+    ? raw.images.map((slot, i) => normalizeHomeBgSlot(slot, fallback.images[i]))
     : fallback.images;
   const index = typeof raw?.index === 'number' && raw.index >= 0 && raw.index < images.length ? raw.index : fallback.index;
   const autoRotateMs = VALID_AUTO_ROTATE_MS.has(raw?.autoRotateMs as number)
-    ? (raw!.autoRotateMs as Settings['homeBackground']['autoRotateMs'])
+    ? (raw!.autoRotateMs as HomeBackground['autoRotateMs'])
     : fallback.autoRotateMs;
   return { images, index, autoRotateMs };
 }
 
-export function normalizeSettings(settings: Settings): Settings {
+/**
+ * `homeBgRaw` được truyền RIÊNG (đọc từ HOME_BG_KEY, hoặc legacy nếu chưa migrate) —
+ * `settings.homeBackground` không còn được lưu/đọc cùng SETTINGS_KEY.
+ */
+export function normalizeSettings(settings: Settings, homeBgRaw?: HomeBackground): Settings {
   const fallback = defaultSettings();
   return {
     theme: settings.theme ?? fallback.theme,
     accent: settings.accent ?? fallback.accent,
-    homeBackground: normalizeHomeBackground(settings.homeBackground, fallback.homeBackground),
+    homeBackground: normalizeHomeBackground(homeBgRaw ?? settings.homeBackground, fallback.homeBackground),
     layoutSizes: { ...fallback.layoutSizes, ...settings.layoutSizes },
     mainBlockOrder: Array.isArray(settings.mainBlockOrder) && settings.mainBlockOrder.length === 3
       ? settings.mainBlockOrder
@@ -243,12 +285,19 @@ export interface SaveSnapshot {
   settings: Settings;
 }
 
-/** Ghi settings + từng space qua writeKeyWithFallback, rồi ghi space-index sau cùng. */
+/** Ghi settings (trừ homeBackground) + homeBackground riêng (luôn local) + từng space, rồi ghi space-index sau cùng. */
 export async function flushSave(snapshot: SaveSnapshot): Promise<{ fellBack: boolean }> {
   let fellBack = false;
 
-  const settingsWrite = await writeKeyWithFallback(SETTINGS_KEY, snapshot.settings);
+  const { homeBackground, ...settingsWithoutHomeBg } = snapshot.settings;
+  const settingsWrite = await writeKeyWithFallback(SETTINGS_KEY, settingsWithoutHomeBg);
   if (settingsWrite.fellBack) fellBack = true;
+
+  // homeBackground LUÔN ghi local trực tiếp (không qua writeKeyWithFallback/không thử sync) —
+  // ảnh upload base64 vượt xa quota sync, thử sync trước chỉ tốn 1 lượt ghi lỗi vô ích.
+  // Không tính vào `fellBack`/banner cảnh báo vì đây là hành vi CỐ Ý, không phải lỗi quota.
+  await writeToArea('local', HOME_BG_KEY, homeBackground);
+  await removeFromArea('sync', HOME_BG_KEY);
 
   const locations: SpaceIndexEntry[] = [];
   for (const space of snapshot.spaces) {
