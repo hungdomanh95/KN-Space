@@ -36,6 +36,8 @@ không có backend, không tài khoản riêng, không quảng cáo, không theo
 
 - **`storage`:**
   "Used to save the user's tasks, reminders, habits, notes and display settings locally via chrome.storage, so data persists across sessions and syncs across the user's own signed-in devices."
+- **`unlimitedStorage`:**
+  "The user can optionally upload a custom background image for the dashboard in Settings. These images are resized/compressed client-side and stored as base64 in chrome.storage.local so the dashboard background persists across sessions. chrome.storage.local's default quota (~10MB) can be exceeded once a few background images are uploaded, so unlimitedStorage is requested to allow this local-only storage to grow as needed. No data leaves the user's device because of this permission."
 - **Host permission (`https://images.unsplash.com/*`):**
   "Used only to load the optional background image the user selects from Unsplash for their dashboard background in Settings. No data is sent to this host besides the standard image request; the extension does not read, modify or inject content into any web page."
 - **Ghi đè trang Tab mới (chrome_url_overrides.newtab):**
