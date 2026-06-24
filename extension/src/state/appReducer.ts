@@ -1,5 +1,6 @@
-import type { AppState, ExportPayload, NoteSortBy, Screen, Space, TaskFilter } from '../types';
+import type { AppState, ExportPayload, NoteSortBy, Screen, Settings, Space, TaskFilter } from '../types';
 import { buildUiInitialState, normalizeSettings } from '../storage/chromeStorage';
+import { dayIndex, epochDay } from '../features/home/homeContent';
 import type { HabitAction } from './reducers/habits';
 import { habitsReducer } from './reducers/habits';
 import type { NoteAction } from './reducers/notes';
@@ -36,6 +37,7 @@ const SPACE_DOMAIN_ACTION_TYPES = new Set([
   'TASK_UPDATE',
   'TASK_DELETE',
   'TASK_TOGGLE_DONE',
+  'TASK_REORDER',
   'REMINDER_CREATE',
   'REMINDER_UPDATE',
   'REMINDER_DELETE',
@@ -63,7 +65,10 @@ const SETTINGS_ACTION_TYPES = new Set([
   'SETTINGS_RESET_LAYOUT',
   'SETTINGS_SET_MAIN_BLOCK_ORDER',
   'BLOCK_TOGGLE_COLLAPSED',
-  'BLOCK_TOGGLE_COLLAPSE_ALL',
+  'SETTINGS_SET_HOME_QUOTE_TEXT',
+  'SETTINGS_SET_HOME_QUOTE_INDEX',
+  'SETTINGS_SET_QUOTE_ROTATE_MODE',
+  'SETTINGS_HOME_QUOTE_ROTATE_NEXT',
   'NOTE_SET_VIEW',
 ]);
 
@@ -74,6 +79,27 @@ const SPACES_ACTION_TYPES = new Set([
   'SPACE_DELETE',
   'SPACE_MOVE',
 ]);
+
+/**
+ * Snap ảnh nền + quote (nếu rotateMode 'daily') theo `dayIndex` đúng 1 LẦN mỗi ngày — vào lần
+ * HYDRATE đầu tiên của ngày đó (mục 4.6/7 requirements: "ảnh đang dùng được chọn theo chỉ số
+ * ngày... khi mở app LẦN ĐẦU trong ngày"). Các lần mở app khác trong cùng ngày giữ nguyên index
+ * hiện tại (có thể đã đổi do auto-rotate/chọn tay), không snap lại — khác hành vi mockup vanilla
+ * (luôn snap mỗi lần reload trang) vì extension thật PERSIST state giữa các lần mở tab.
+ */
+function syncDailyContentIfNewDay(settings: Settings): Settings {
+  const today = epochDay();
+  if (settings.lastOpenedEpochDay === today) return settings;
+  return {
+    ...settings,
+    homeBackground: { ...settings.homeBackground, index: dayIndex(settings.homeBackground.images.length) },
+    homeQuotes:
+      settings.homeQuotes.rotateMode === 'daily'
+        ? { ...settings.homeQuotes, index: dayIndex(settings.homeQuotes.texts.length) }
+        : settings.homeQuotes,
+    lastOpenedEpochDay: today,
+  };
+}
 
 /**
  * Reset UI ephemeral: dùng chung cho SPACE_SWITCH và IMPORT_DATA.
@@ -91,6 +117,7 @@ function applySpaceDomainAction(spaces: Space[], currentSpaceId: string, action:
       case 'TASK_UPDATE':
       case 'TASK_DELETE':
       case 'TASK_TOGGLE_DONE':
+      case 'TASK_REORDER':
         return tasksReducer(space, action);
       case 'REMINDER_CREATE':
       case 'REMINDER_UPDATE':
@@ -123,9 +150,12 @@ function normalizeImportedSpace(raw: Partial<Space> & { id?: string }): Space {
       reminder: raw.enabledBlocks?.reminder ?? true,
       habits: raw.enabledBlocks?.habits ?? true,
       notes: raw.enabledBlocks?.notes ?? true,
-      reminders: raw.enabledBlocks?.reminders ?? true,
+      // Khối Thông báo không có cấu hình tắt theo Space — luôn `true`, bất kể data import.
+      reminders: true,
     },
-    tasks: Array.isArray(raw.tasks) ? raw.tasks : [],
+    tasks: Array.isArray(raw.tasks)
+      ? raw.tasks.map((t, idx) => ({ ...t, content: t.content ?? '', order: t.order ?? idx }))
+      : [],
     reminders: Array.isArray(raw.reminders) ? raw.reminders : [],
     habits: Array.isArray(raw.habits) ? raw.habits : [],
     notes: Array.isArray(raw.notes) ? raw.notes.map((n) => ({ ...n, expanded: n.expanded ?? false })) : [],
@@ -134,14 +164,16 @@ function normalizeImportedSpace(raw: Partial<Space> & { id?: string }): Space {
 
 export function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
-    case 'HYDRATE':
+    case 'HYDRATE': {
+      const settings = syncDailyContentIfNewDay(action.payload.settings);
       return {
         spaces: action.payload.spaces,
         currentSpaceId: action.payload.currentSpaceId,
-        settings: action.payload.settings,
-        ui: buildUiInitialState(action.payload.settings.lastScreen),
+        settings,
+        ui: buildUiInitialState(settings.lastScreen),
         storageFallbackActive: action.payload.storageFallbackActive,
       };
+    }
 
     case 'SCREEN_NAVIGATE':
       if (state.ui.currentScreen === action.payload.screen) return state;

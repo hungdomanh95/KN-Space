@@ -1,17 +1,29 @@
 import React, { useRef, useState } from 'react';
-import { Database, Download, Image as ImageIcon, LayoutGrid, Moon, Repeat, Settings as SettingsIcon, Sun, Upload } from 'lucide-react';
+import {
+  Database,
+  Download,
+  Image as ImageIcon,
+  LayoutGrid,
+  MessageSquareQuote,
+  Moon,
+  Repeat,
+  Settings as SettingsIcon,
+  Sun,
+  Upload,
+} from 'lucide-react';
 import { Modal } from '../../components/Modal';
 import { useAppState } from '../../state/AppStateContext';
 import { useConfirm } from '../../components/ConfirmContext';
 import { buildExportPayload, downloadExportFile, parseImportFile } from './exportImport';
 import { HomeBackgroundSettings } from './HomeBackgroundSettings';
+import { HomeQuoteSettings } from './HomeQuoteSettings';
 import type { ThemeMode } from '../../types';
 
 interface SettingsModalProps {
   onClose: () => void;
 }
 
-type SettingsTab = 'general' | 'background';
+type SettingsTab = 'general' | 'background' | 'quote';
 
 const ACCENT_OPTIONS: { color: string; label: string }[] = [
   { color: '#5457d6', label: 'Màu xanh dương' },
@@ -106,8 +118,18 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
         >
           <ImageIcon className="icon" size={14} /> Ảnh nền
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'quote'}
+          className={`settings-tab ${activeTab === 'quote' ? 'active' : ''}`}
+          onClick={() => setActiveTab('quote')}
+        >
+          <MessageSquareQuote className="icon" size={14} /> Quote
+        </button>
       </div>
 
+      <div className="settings-body">
       {activeTab === 'general' && (
         <div className="settings-grid">
           <div className="setting-block">
@@ -245,6 +267,13 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
           <HomeBackgroundSettings />
         </div>
       )}
+
+      {activeTab === 'quote' && (
+        <div className="settings-grid">
+          <HomeQuoteSettings />
+        </div>
+      )}
+      </div>
 
       <div className="modal-actions">
         <button className="btn-primary" onClick={onClose}>

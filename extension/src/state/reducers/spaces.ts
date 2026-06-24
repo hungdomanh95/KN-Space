@@ -7,6 +7,15 @@ export type SpacesAction =
   | { type: 'SPACE_DELETE'; payload: { id: string } }
   | { type: 'SPACE_MOVE'; payload: { id: string; direction: -1 | 1 } };
 
+/**
+ * Khối Thông báo (`reminders`) không nằm trong cấu hình bật/tắt theo Space — luôn `true`
+ * bất kể payload truyền gì (xem mục 4.1/5.5/8 requirements). Ép ở đây để mọi điểm gọi
+ * (modal "Sửa Space" đã không còn cho chọn field này) không thể vô tình tắt nó.
+ */
+function forceRemindersEnabled(blocks: EnabledBlocks): EnabledBlocks {
+  return { ...blocks, reminders: true };
+}
+
 export function defaultEnabledBlocks(): EnabledBlocks {
   return { tasks: true, reminder: true, habits: true, notes: true, reminders: true };
 }
@@ -29,7 +38,7 @@ export function spacesReducer(spaces: Space[], action: SpacesAction): Space[] {
   switch (action.type) {
     case 'SPACE_CREATE': {
       const maxOrder = spaces.reduce((max, s) => Math.max(max, s.order), -1);
-      const newSpace = emptySpace(action.payload.name, maxOrder + 1, action.payload.enabledBlocks);
+      const newSpace = emptySpace(action.payload.name, maxOrder + 1, forceRemindersEnabled(action.payload.enabledBlocks));
       return [...spaces, newSpace];
     }
     case 'SPACE_RENAME':
@@ -38,7 +47,7 @@ export function spacesReducer(spaces: Space[], action: SpacesAction): Space[] {
       );
     case 'SPACE_SET_ENABLED_BLOCKS':
       return spaces.map((s) =>
-        s.id === action.payload.id ? { ...s, enabledBlocks: action.payload.enabledBlocks } : s,
+        s.id === action.payload.id ? { ...s, enabledBlocks: forceRemindersEnabled(action.payload.enabledBlocks) } : s,
       );
     case 'SPACE_DELETE': {
       if (spaces.length <= 1) return spaces; // Không cho xoá nếu chỉ còn 1 Space.

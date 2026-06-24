@@ -37,6 +37,13 @@ interface BlockShellProps {
   onDragOver?: (e: React.DragEvent<HTMLDivElement>) => void;
   onDragLeave?: () => void;
   onDrop?: (e: React.DragEvent<HTMLDivElement>) => void;
+  /**
+   * Icon grip ở header — mặc định `true` (đúng mockup: mọi khối/sub-khối đều có icon này dù
+   * chỉ 2 khối chính thực sự kéo-thả được). Khối Thông báo CỐ ĐỊNH vị trí, không kéo-thả được
+   * ở bất kỳ cấp nào -> truyền `false` để bỏ icon, tránh gợi ý sai là kéo được (xem mockup
+   * renderStaticIcons(): không có `${grip}` cho `ic-reminders-title`).
+   */
+  showGripHandle?: boolean;
 }
 
 export function BlockShell({
@@ -62,6 +69,7 @@ export function BlockShell({
   onDragOver,
   onDragLeave,
   onDrop,
+  showGripHandle = true,
 }: BlockShellProps) {
   return (
     <div
@@ -79,9 +87,11 @@ export function BlockShell({
     >
       <div className="block-head" ref={headRef} onMouseDown={onHeadMouseDown}>
         <h2>
-          <span className="grip-handle" aria-hidden="true">
-            <GripVertical className="icon" size={13} />
-          </span>
+          {showGripHandle && (
+            <span className="grip-handle" aria-hidden="true">
+              <GripVertical className="icon" size={13} />
+            </span>
+          )}
           <IconChip icon={icon} background={iconBg} color={iconColor} />
           <span className="title-text">{title}</span>
         </h2>

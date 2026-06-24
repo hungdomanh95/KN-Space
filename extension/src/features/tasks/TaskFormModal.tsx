@@ -11,20 +11,21 @@ interface TaskFormModalProps {
 export function TaskFormModal({ task, onClose }: TaskFormModalProps) {
   const { dispatch } = useAppState();
   const [title, setTitle] = useState(task?.title ?? '');
+  const [content, setContent] = useState(task?.content ?? '');
   const [date, setDate] = useState(task?.date ?? '');
   const [time, setTime] = useState(task?.time ?? '');
 
   function handleSave() {
     if (task) {
-      dispatch({ type: 'TASK_UPDATE', payload: { id: task.id, title, date, time } });
+      dispatch({ type: 'TASK_UPDATE', payload: { id: task.id, title, content, date, time } });
     } else {
-      dispatch({ type: 'TASK_CREATE', payload: { title, date, time } });
+      dispatch({ type: 'TASK_CREATE', payload: { title, content, date, time } });
     }
     onClose();
   }
 
   return (
-    <Modal onClose={onClose}>
+    <Modal onClose={onClose} className="modal-note">
       <h2>{task ? 'Sửa việc' : 'Việc mới'}</h2>
       <div className="field">
         <label>Tên việc</label>
@@ -34,6 +35,15 @@ export function TaskFormModal({ task, onClose }: TaskFormModalProps) {
           placeholder="Vd: Họp với khách hàng"
           onChange={(e) => setTitle(e.target.value)}
           autoFocus
+        />
+      </div>
+      <div className="field">
+        <label>Nội dung (tuỳ chọn)</label>
+        <textarea
+          className="note-content-field"
+          value={content}
+          placeholder="Vd: nội dung cần chuẩn bị, link tài liệu..."
+          onChange={(e) => setContent(e.target.value)}
         />
       </div>
       <div className="field-row">

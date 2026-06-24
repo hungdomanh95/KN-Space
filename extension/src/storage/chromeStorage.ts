@@ -1,4 +1,4 @@
-import type { AppState, HomeBackground, Settings, Space, UiState } from '../types';
+import type { AppState, HomeBackground, HomeQuotes, QuoteRotateMode, Settings, Space, UiState } from '../types';
 import { createSeedSpaces, defaultSettings } from '../state/seed';
 
 // ============================================================================
@@ -213,9 +213,12 @@ function normalizeSpace(space: Space): Space {
       reminder: space.enabledBlocks?.reminder ?? true,
       habits: space.enabledBlocks?.habits ?? true,
       notes: space.enabledBlocks?.notes ?? true,
-      reminders: space.enabledBlocks?.reminders ?? true,
+      // Khối Thông báo không có cấu hình tắt theo Space — luôn `true`, không đọc từ data cũ.
+      reminders: true,
     },
-    tasks: Array.isArray(space.tasks) ? space.tasks : [],
+    tasks: Array.isArray(space.tasks)
+      ? space.tasks.map((t, idx) => ({ ...t, content: t.content ?? '', order: t.order ?? idx }))
+      : [],
     reminders: Array.isArray(space.reminders) ? space.reminders : [],
     habits: Array.isArray(space.habits) ? space.habits : [],
     notes: Array.isArray(space.notes) ? space.notes.map((n) => ({ ...n, expanded: n.expanded ?? false })) : [],
@@ -250,6 +253,20 @@ export function normalizeHomeBackground(raw: HomeBackground | undefined, fallbac
   return { images, index, autoRotateMs };
 }
 
+const VALID_QUOTE_ROTATE_MODES = new Set<QuoteRotateMode>(['daily', 'onopen', 'every15m', 'every1h']);
+
+/** Chuẩn hoá `homeQuotes` — migrate dữ liệu cũ chưa có field này (extension trước khi có tab "Quote"). */
+function normalizeHomeQuotes(raw: HomeQuotes | undefined, fallback: HomeQuotes): HomeQuotes {
+  const texts = Array.isArray(raw?.texts) && raw.texts.length === fallback.texts.length
+    ? raw.texts.map((t, i) => (typeof t === 'string' && t.trim() ? t : fallback.texts[i]))
+    : fallback.texts;
+  const index = typeof raw?.index === 'number' && raw.index >= 0 && raw.index < texts.length ? raw.index : fallback.index;
+  const rotateMode = VALID_QUOTE_ROTATE_MODES.has(raw?.rotateMode as QuoteRotateMode)
+    ? (raw!.rotateMode as QuoteRotateMode)
+    : fallback.rotateMode;
+  return { texts, index, rotateMode };
+}
+
 /**
  * `homeBgRaw` được truyền RIÊNG (đọc từ HOME_BG_KEY, hoặc legacy nếu chưa migrate) —
  * `settings.homeBackground` không còn được lưu/đọc cùng SETTINGS_KEY.
@@ -260,6 +277,7 @@ export function normalizeSettings(settings: Settings, homeBgRaw?: HomeBackground
     theme: settings.theme ?? fallback.theme,
     accent: settings.accent ?? fallback.accent,
     homeBackground: normalizeHomeBackground(homeBgRaw ?? settings.homeBackground, fallback.homeBackground),
+    homeQuotes: normalizeHomeQuotes(settings.homeQuotes, fallback.homeQuotes),
     layoutSizes: { ...fallback.layoutSizes, ...settings.layoutSizes },
     mainBlockOrder: Array.isArray(settings.mainBlockOrder) && settings.mainBlockOrder.length === 3
       ? settings.mainBlockOrder
@@ -267,6 +285,9 @@ export function normalizeSettings(settings: Settings, homeBgRaw?: HomeBackground
     collapsedBlocks: { ...fallback.collapsedBlocks, ...settings.collapsedBlocks },
     noteView: settings.noteView ?? fallback.noteView,
     lastScreen: settings.lastScreen === 'dashboard' ? 'dashboard' : 'home',
+    // Dữ liệu cũ (trước khi có field này) không có `lastOpenedEpochDay` -> -1 để HYDRATE coi
+    // là "ngày mới", tự snap lại ảnh nền/quote theo dayIndex đúng 1 lần khi nâng cấp lên.
+    lastOpenedEpochDay: typeof settings.lastOpenedEpochDay === 'number' ? settings.lastOpenedEpochDay : -1,
   };
 }
 

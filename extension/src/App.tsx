@@ -2,10 +2,10 @@ import { useEffect } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { AppStateProvider, useAppState } from './state/AppStateContext';
 import { ConfirmProvider } from './components/ConfirmContext';
-import { TopBar } from './components/TopBar';
 import { AppLayout } from './layout/AppLayout';
 import { AppBackground } from './components/AppBackground';
 import { HomeScreen } from './features/home/HomeScreen';
+import { isMacPlatform } from './features/spaces/spaceShortcuts';
 
 /** true nếu đang có modal `.overlay` mở trên trang — dùng để không "nuốt" phím Enter/Space/Esc. */
 function isAnyModalOpen(): boolean {
@@ -40,8 +40,16 @@ function Shell() {
     }
   }, [settings.accent]);
 
-  // Phím tắt ngầm: Enter/Space ở Home -> Dashboard; Esc ở Dashboard -> Home.
-  // Không hoạt động khi đang gõ trong input/textarea/select hoặc có modal mở.
+  function goHome() {
+    // 'onopen': đổi quote mỗi lần quay lại Home (port từ goToHome() trong mockup).
+    if (settings.homeQuotes.rotateMode === 'onopen') {
+      dispatch({ type: 'SETTINGS_HOME_QUOTE_ROTATE_NEXT' });
+    }
+    dispatch({ type: 'SCREEN_NAVIGATE', payload: { screen: 'home' } });
+  }
+
+  // Phím tắt ngầm: Enter/Space ở Home -> Dashboard (đổi quote nếu rotateMode === 'onopen');
+  // Esc ở Dashboard -> Home. Không hoạt động khi đang gõ trong input/textarea/select hoặc có modal mở.
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (isTypingTarget(e.target)) return;
@@ -53,12 +61,33 @@ function Shell() {
         }
       } else if (e.key === 'Escape') {
         e.preventDefault();
-        dispatch({ type: 'SCREEN_NAVIGATE', payload: { screen: 'home' } });
+        goHome();
       }
     }
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentScreen, dispatch]);
+
+  // Phím tắt đổi nhanh Space: Alt+1..9 (Win/Linux) hoặc Cmd+1..9 (Mac) — chỉ hoạt động khi
+  // không đang gõ input/textarea/select và không có modal mở (mục 4.1/6 requirements).
+  useEffect(() => {
+    function handleSpaceShortcut(e: KeyboardEvent) {
+      const wantMac = isMacPlatform();
+      const modifierOk = wantMac ? e.metaKey : e.altKey;
+      if (!modifierOk) return;
+      if (!/^[1-9]$/.test(e.key)) return;
+      if (isTypingTarget(e.target)) return;
+      if (isAnyModalOpen()) return;
+      const idx = Number(e.key) - 1;
+      const orderedSpaces = [...state.spaces].sort((a, b) => a.order - b.order);
+      if (idx >= orderedSpaces.length) return;
+      e.preventDefault();
+      dispatch({ type: 'SPACE_SWITCH', payload: { id: orderedSpaces[idx].id } });
+    }
+    document.addEventListener('keydown', handleSpaceShortcut);
+    return () => document.removeEventListener('keydown', handleSpaceShortcut);
+  }, [state.spaces, dispatch]);
 
   // Tự động đổi ảnh nền theo khoảng thời gian đã chọn (0 = tắt). Đọc index/total mới
   // nhất qua dispatch thunk-style (callback nhận state hiện tại từ closure ngoài effect
@@ -72,6 +101,23 @@ function Shell() {
     }, ms);
     return () => clearInterval(timer);
   }, [settings.homeBackground.autoRotateMs, dispatch]);
+
+  // Tự động đổi quote Home theo `rotateMode` — chỉ 'every15m'/'every1h' cần interval cố định
+  // (không phụ thuộc reload trang); 'daily' đã cố định theo dayIndex lúc seed, 'onopen' đổi
+  // ngay khi điều hướng vào Home (xem dưới).
+  useEffect(() => {
+    const mode = settings.homeQuotes.rotateMode;
+    const ms = mode === 'every15m' ? 900_000 : mode === 'every1h' ? 3_600_000 : 0;
+    if (!ms) return;
+    const timer = setInterval(() => {
+      dispatch({ type: 'SETTINGS_HOME_QUOTE_ROTATE_NEXT' });
+    }, ms);
+    return () => clearInterval(timer);
+  }, [settings.homeQuotes.rotateMode, dispatch]);
+
+  function enterDashboard() {
+    dispatch({ type: 'SCREEN_NAVIGATE', payload: { screen: 'dashboard' } });
+  }
 
   if (isLoading) {
     return (
@@ -87,7 +133,7 @@ function Shell() {
     <>
       <AppBackground imageUrl={imageUrl} imageIndex={settings.homeBackground.index} />
       <div className={`home-layer ${currentScreen === 'dashboard' ? 'screen-hidden' : ''}`}>
-        <HomeScreen onEnterDashboard={() => dispatch({ type: 'SCREEN_NAVIGATE', payload: { screen: 'dashboard' } })} />
+        <HomeScreen onEnterDashboard={enterDashboard} />
       </div>
       <div className={`dashboard-layer ${currentScreen === 'home' ? 'screen-hidden' : ''}`}>
         {storageFallbackActive && (
@@ -100,8 +146,7 @@ function Shell() {
             </span>
           </div>
         )}
-        <TopBar onGoHome={() => dispatch({ type: 'SCREEN_NAVIGATE', payload: { screen: 'home' } })} />
-        <AppLayout />
+        <AppLayout onGoHome={goHome} />
       </div>
     </>
   );

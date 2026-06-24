@@ -1,5 +1,5 @@
 import type { HomeBgSlot, Settings, Space } from '../types';
-import { DEFAULT_HOME_IMAGES, dayIndex } from '../features/home/homeContent';
+import { DEFAULT_HOME_IMAGES, HOME_QUOTES, dayIndex, epochDay } from '../features/home/homeContent';
 
 export function defaultSettings(): Settings {
   return {
@@ -12,11 +12,21 @@ export function defaultSettings(): Settings {
       // Mặc định "Mỗi 15 phút" theo yêu cầu — trước đây mặc định "Tắt" (0).
       autoRotateMs: 900_000,
     },
-    layoutSizes: { combined: 45, notes: 35, tasks: 45, reminder: 50 },
+    homeQuotes: {
+      texts: [...HOME_QUOTES],
+      // Cùng cách chọn với ảnh nền mặc định "Mỗi ngày" — chỉ số ngày tính từ epoch modulo 10.
+      index: dayIndex(HOME_QUOTES.length),
+      rotateMode: 'daily',
+    },
+    // combined 45% + notes 40% -> khối Thông báo (auto = phần còn lại) mặc định 15%.
+    layoutSizes: { combined: 45, notes: 40, tasks: 45, reminder: 50 },
     mainBlockOrder: ['combined', 'notes', 'reminders'],
     collapsedBlocks: { tasks: false, reminder: false, habits: false, notes: false, reminders: false },
     noteView: 'grid',
     lastScreen: 'home',
+    // Đã snap theo dayIndex ngay trên — đánh dấu hôm nay đã "sync" để HYDRATE đầu tiên
+    // (ngay sau seed, cùng lượt) không snap lại lần nữa một cách dư thừa.
+    lastOpenedEpochDay: epochDay(),
   };
 }
 

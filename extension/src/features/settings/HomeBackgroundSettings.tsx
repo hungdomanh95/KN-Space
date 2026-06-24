@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, Link2, Upload } from 'lucide-react';
+import { Link2, Upload } from 'lucide-react';
 import { useAppState } from '../../state/AppStateContext';
 import type { HomeBgAutoRotateMs } from '../../types';
 
@@ -57,21 +57,11 @@ export function HomeBackgroundSettings() {
   // Giá trị input đang sửa từng ô (cho phép gõ tự do trước khi blur/Enter mới validate).
   const [drafts, setDrafts] = useState<string[]>(homeBackground.images.map((slot) => (slot.type === 'url' ? slot.value : '')));
   const [uploadError, setUploadError] = useState('');
-  const [autoRotateOpen, setAutoRotateOpen] = useState(false);
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
-  const autoRotateWrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setDrafts(homeBackground.images.map((slot) => (slot.type === 'url' ? slot.value : '')));
   }, [homeBackground.images]);
-
-  useEffect(() => {
-    function onMouseDown(e: MouseEvent) {
-      if (autoRotateWrapRef.current && !autoRotateWrapRef.current.contains(e.target as Node)) setAutoRotateOpen(false);
-    }
-    document.addEventListener('mousedown', onMouseDown);
-    return () => document.removeEventListener('mousedown', onMouseDown);
-  }, []);
 
   function setBroken(index: number, broken: boolean) {
     setBrokenSlots((prev) => {
@@ -116,7 +106,26 @@ export function HomeBackgroundSettings() {
 
   return (
     <div className="setting-block span-2">
-      <label>Ảnh nền Home</label>
+      {/* Tần suất tự động đổi ảnh đặt ở ĐẦU tab, cùng style segmented-options với "Tần suất đổi
+          quote" (tab Quote) — đúng vị trí + kiểu control trong mockup (#autorotate-options /
+          #quoterotate-options dùng chung renderAutoRotateOptions-style), không phải dropdown. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+        <label style={{ marginBottom: 0, fontWeight: 600, fontSize: 13 }}>Tự động đổi ảnh</label>
+        <div className="segmented-options" role="group" aria-label="Chọn tần suất tự động đổi ảnh nền">
+          {AUTO_ROTATE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              className={opt.value === homeBackground.autoRotateMs ? 'active' : ''}
+              aria-pressed={opt.value === homeBackground.autoRotateMs}
+              onClick={() => dispatch({ type: 'SETTINGS_SET_HOME_BG_AUTO_ROTATE', payload: { ms: opt.value } })}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <label>Ảnh nền Home (link ảnh hoặc upload)</label>
       <div className="home-bg-grid">
         {homeBackground.images.map((slot, i) => {
           const isUpload = slot.type === 'upload';
@@ -188,32 +197,6 @@ export function HomeBackgroundSettings() {
           {uploadError}
         </p>
       )}
-
-      <div className="size-row" style={{ marginTop: 14 }}>
-        <label>Tự động đổi ảnh</label>
-        <div className="sort-switcher" ref={autoRotateWrapRef}>
-          <button type="button" className="sort-switcher-btn" onClick={() => setAutoRotateOpen((v) => !v)}>
-            <span>{AUTO_ROTATE_OPTIONS.find((o) => o.value === homeBackground.autoRotateMs)?.label}</span>
-            <ChevronDown className="icon" size={11} />
-          </button>
-          {autoRotateOpen && (
-            <div className="space-menu" id="autorotate-menu">
-              {AUTO_ROTATE_OPTIONS.map((opt) => (
-                <div
-                  key={opt.value}
-                  className={`space-menu-item ${opt.value === homeBackground.autoRotateMs ? 'active' : ''}`}
-                  onClick={() => {
-                    dispatch({ type: 'SETTINGS_SET_HOME_BG_AUTO_ROTATE', payload: { ms: opt.value } });
-                    setAutoRotateOpen(false);
-                  }}
-                >
-                  <span className="space-name">{opt.label}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   );
 }

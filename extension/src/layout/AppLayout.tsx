@@ -5,26 +5,37 @@ import { RemindersBlock } from '../features/reminders/RemindersBlock';
 import { HabitsBlock } from '../features/habits/HabitsBlock';
 import { NotesBlock } from '../features/notes/NotesBlock';
 import { NotificationsBlock } from '../features/notifications/NotificationsBlock';
+import { DashboardCorner } from '../components/DashboardCorner';
 import { computeBlockFlexValues } from './computeBlockFlexValues';
 import type { MainBlockKey } from '../types';
 
+interface AppLayoutProps {
+  onGoHome: () => void;
+}
+
+/** 2 khối được phép kéo-thả đổi thứ tự — khối Thông báo cố định cuối, không tham gia. */
+type ReorderableBlockKey = Exclude<MainBlockKey, 'reminders'>;
+
 /**
- * Drag-reorder 3 khối chính (combined/notes/reminders) bằng HTML5 DnD gốc.
- * Mỗi khối chính có 1 ref riêng; "arm" draggable=true khi mousedown đúng vào
- * block-head, "disarm" lúc mouseup ở document — làm imperatively qua ref,
- * KHÔNG qua state (tránh race batched/async). Khi xử lý dragstart/dragend ở cấp
- * khối cha, guard `e.target !== block` để chặn event nổi bọt từ card con (vd. note).
+ * Drag-reorder CHỈ 2 khối: combined/notes (HTML5 DnD gốc). Khối Thông báo (`reminders`)
+ * cố định vị trí cuối #main-row, nằm trong .reminders-col cùng DashboardCorner (widget
+ * điều hướng Về Home/Space-switcher/Settings) — không tham gia kéo-thả đổi thứ tự, không
+ * có slider width riêng (xem computeBlockFlexValues/requirements mục 4/4.1).
+ *
+ * Mỗi khối chính có 1 ref riêng; "arm" draggable=true khi mousedown đúng vào block-head,
+ * "disarm" lúc mouseup ở document — làm imperatively qua ref, KHÔNG qua state (tránh race
+ * batched/async). Khi xử lý dragstart/dragend ở cấp khối cha, guard `e.target !== block`
+ * để chặn event nổi bọt từ card con (vd. note).
  */
-export function AppLayout() {
+export function AppLayout({ onGoHome }: AppLayoutProps) {
   const { state, dispatch } = useAppState();
   const space = useCurrentSpace();
-  const blockRefs = useRef<Record<MainBlockKey, HTMLDivElement | null>>({
+  const blockRefs = useRef<Record<ReorderableBlockKey, HTMLDivElement | null>>({
     combined: null,
     notes: null,
-    reminders: null,
   });
-  const [draggedKey, setDraggedKey] = useState<MainBlockKey | null>(null);
-  const [dragOverKey, setDragOverKey] = useState<MainBlockKey | null>(null);
+  const [draggedKey, setDraggedKey] = useState<ReorderableBlockKey | null>(null);
+  const [dragOverKey, setDragOverKey] = useState<ReorderableBlockKey | null>(null);
 
   useEffect(() => {
     function disarmAll() {
@@ -36,20 +47,20 @@ export function AppLayout() {
     return () => document.removeEventListener('mouseup', disarmAll);
   }, []);
 
-  function armBlock(key: MainBlockKey, e: React.MouseEvent) {
+  function armBlock(key: ReorderableBlockKey, e: React.MouseEvent) {
     const target = e.target as HTMLElement;
     if (!target.closest('.block-head')) return;
     const el = blockRefs.current[key];
     if (el) el.draggable = true;
   }
 
-  function handleDragStart(key: MainBlockKey, e: React.DragEvent<HTMLDivElement>) {
+  function handleDragStart(key: ReorderableBlockKey, e: React.DragEvent<HTMLDivElement>) {
     if (e.target !== blockRefs.current[key]) return;
     setDraggedKey(key);
     e.dataTransfer.effectAllowed = 'move';
   }
 
-  function handleDragEnd(key: MainBlockKey, e: React.DragEvent<HTMLDivElement>) {
+  function handleDragEnd(key: ReorderableBlockKey, e: React.DragEvent<HTMLDivElement>) {
     if (e.target !== blockRefs.current[key]) return;
     const el = blockRefs.current[key];
     if (el) el.draggable = false;
@@ -57,17 +68,17 @@ export function AppLayout() {
     setDragOverKey(null);
   }
 
-  function handleDragOver(key: MainBlockKey, e: React.DragEvent<HTMLDivElement>) {
+  function handleDragOver(key: ReorderableBlockKey, e: React.DragEvent<HTMLDivElement>) {
     if (!draggedKey) return;
     e.preventDefault();
     setDragOverKey(key);
   }
 
-  function handleDragLeave(key: MainBlockKey) {
+  function handleDragLeave(key: ReorderableBlockKey) {
     setDragOverKey((prev) => (prev === key ? null : prev));
   }
 
-  function handleDrop(key: MainBlockKey, e: React.DragEvent<HTMLDivElement>) {
+  function handleDrop(key: ReorderableBlockKey, e: React.DragEvent<HTMLDivElement>) {
     if (!draggedKey) return;
     e.preventDefault();
     setDragOverKey(null);
@@ -83,11 +94,11 @@ export function AppLayout() {
 
   const flex = computeBlockFlexValues(space.enabledBlocks, state.settings.layoutSizes);
 
-  const blockModifierClass = (key: MainBlockKey) =>
+  const blockModifierClass = (key: ReorderableBlockKey) =>
     `${draggedKey === key ? 'dragging' : ''} ${dragOverKey === key && draggedKey !== key ? 'drag-over' : ''}`.trim();
-  const blockClass = (key: MainBlockKey) => `main-block ${blockModifierClass(key)}`.trim();
+  const blockClass = (key: ReorderableBlockKey) => `main-block ${blockModifierClass(key)}`.trim();
 
-  function dragHandlers(key: MainBlockKey) {
+  function dragHandlers(key: ReorderableBlockKey) {
     return {
       onMouseDownCapture: (e: React.MouseEvent<HTMLDivElement>) => armBlock(key, e),
       onDragStart: (e: React.DragEvent<HTMLDivElement>) => handleDragStart(key, e),
@@ -98,7 +109,7 @@ export function AppLayout() {
     };
   }
 
-  const blockNodes: Record<MainBlockKey, React.ReactNode> = {
+  const blockNodes: Record<ReorderableBlockKey, React.ReactNode> = {
     combined: flex.combinedDisplay ? (
       <div
         key="combined"
@@ -134,23 +145,26 @@ export function AppLayout() {
         {...dragHandlers('notes')}
       />
     ) : null,
-    reminders: flex.remindersDisplay ? (
-      <NotificationsBlock
-        key="reminders"
-        rootRef={(el) => {
-          blockRefs.current.reminders = el;
-        }}
-        className={blockModifierClass('reminders')}
-        style={{ flex: flex.reminders }}
-        draggable={false}
-        {...dragHandlers('reminders')}
-      />
-    ) : null,
   };
+
+  const reorderableOrder = state.settings.mainBlockOrder.filter(
+    (key): key is ReorderableBlockKey => key !== 'reminders',
+  );
 
   return (
     <div id="dashboard">
-      <div id="main-row">{state.settings.mainBlockOrder.map((key) => blockNodes[key])}</div>
+      <div id="main-row">
+        {reorderableOrder.map((key) => blockNodes[key])}
+        {/* Cột Thông báo CỐ ĐỊNH cuối #main-row, không tham gia kéo-thả đổi thứ tự, width
+            luôn = phần còn lại (không slider riêng) — widget điều hướng nằm ngay dưới nó,
+            cùng cột nên width khớp đúng (xem requirements mục 4/4.1). */}
+        {flex.remindersDisplay && (
+          <div className="reminders-col" style={{ flex: flex.reminders }}>
+            <NotificationsBlock style={{ flex: 1, minHeight: 0 }} />
+            <DashboardCorner onGoHome={onGoHome} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

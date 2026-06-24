@@ -5,9 +5,11 @@
 export interface Task {
   id: string;
   title: string;
+  content: string; // nội dung chi tiết tuỳ chọn (textarea), '' nếu không đặt
   date: string; // yyyy-mm-dd, '' nếu không đặt
   time: string; // HH:mm, '' nếu không đặt
   done: boolean;
+  order: number; // thứ tự sắp xếp thủ công (kéo-thả qua icon grip)
 }
 
 export type ReminderFreqUnit = 'hour' | 'day' | 'month';
@@ -114,10 +116,21 @@ export type TaskFilter = 'all' | 'pending' | 'done';
 export type NoteSortBy = 'order' | 'title' | 'recent';
 export type NoteView = 'grid' | 'list';
 
+/** Tần suất đổi quote Home: 'daily' = theo dayIndex (mặc định), các giá trị khác đổi theo sự kiện/interval. */
+export type QuoteRotateMode = 'daily' | 'onopen' | 'every15m' | 'every1h';
+
+/** Quote Home: 10 slot cố định (không CRUD thêm/xoá), chỉ sửa nội dung qua Settings tab "Quote". */
+export interface HomeQuotes {
+  texts: string[]; // luôn đúng 10 phần tử
+  index: number; // chỉ số quote đang hiển thị trên Home
+  rotateMode: QuoteRotateMode;
+}
+
 export interface Settings {
   theme: ThemeMode;
   accent: string;
   homeBackground: HomeBackground;
+  homeQuotes: HomeQuotes;
   layoutSizes: LayoutSizes;
   mainBlockOrder: MainBlockKey[];
   collapsedBlocks: CollapsedBlocks;
@@ -127,6 +140,13 @@ export interface Settings {
    * luôn mở lại đúng màn cuối (yêu cầu cố định, không phải setting cho chọn).
    */
   lastScreen: Screen;
+  /**
+   * `epochDay()` (xem homeContent.ts) lúc app HYDRATE lần gần nhất — dùng để phát hiện
+   * "lần đầu mở app trong ngày" (mục 4.6/7 requirements: ảnh nền + quote "Mỗi ngày" chỉ
+   * snap lại theo dayIndex 1 LẦN mỗi ngày, không phải mỗi lần mở tab trong cùng 1 ngày).
+   * -1 = chưa từng hydrate (luôn coi là "ngày mới" ở lần đầu).
+   */
+  lastOpenedEpochDay: number;
 }
 
 /** UI state ephemeral — KHÔNG persist xuống storage. */

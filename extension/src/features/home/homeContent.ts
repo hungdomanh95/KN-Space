@@ -25,7 +25,12 @@ export const HOME_GRADIENTS: string[] = [
   'linear-gradient(135deg,#134e5e 0%,#71b280 100%)',
 ];
 
-/** ~7 câu quote ngắn đóng gói cứng — chọn theo chỉ số ngày tính từ epoch. */
+/**
+ * 10 slot quote cố định đóng gói cứng (không CRUD thêm/xoá tự do) — đây là nội dung MẶC ĐỊNH,
+ * dùng để seed `settings.homeQuotes.texts`. Sửa nội dung qua Settings tab "Quote" (chỉ sửa
+ * `settings.homeQuotes.texts`, không sửa mảng này lúc runtime). Copy nguyên văn từ HOME_QUOTES
+ * trong docs/mockup/index.html để khớp đúng nội dung mockup.
+ */
 export const HOME_QUOTES: string[] = [
   'Một bước nhỏ mỗi ngày tạo nên hành trình lớn.',
   'Tập trung vào việc quan trọng, bỏ qua việc khẩn cấp giả.',
@@ -34,14 +39,22 @@ export const HOME_QUOTES: string[] = [
   'Hôm nay là trang giấy trắng — hãy viết điều tử tế lên đó.',
   'Việc khó nhất thường là việc đáng làm nhất.',
   'Đơn giản hoá. Rồi làm cho xong.',
+  'Làm xong tốt hơn làm hoàn hảo — bắt đầu trước, chỉnh sau.',
+  'Nghỉ ngơi đúng lúc cũng là một phần của năng suất.',
+  'Đừng so sánh ngày hôm nay với hôm qua của người khác — so với chính bạn hôm qua.',
 ];
 
 /** Tên người dùng ghép vào lời chào — để trống theo yêu cầu (không có setting đổi tên ở Phase 1). */
 export const HOME_NAME = '';
 
+/** Số ngày tính từ epoch (mốc ổn định để so sánh "có phải lần mở đầu tiên trong ngày" — xem appReducer HYDRATE). */
+export function epochDay(): number {
+  return Math.floor(Date.now() / 86_400_000);
+}
+
 /** Số ngày tính từ epoch modulo `len` — cùng ngày luôn ra cùng chỉ số. */
 export function dayIndex(len: number): number {
-  return Math.floor(Date.now() / 86_400_000) % len;
+  return epochDay() % len;
 }
 
 export function gradientForImageIndex(index: number): string {
@@ -74,6 +87,7 @@ export function formatGreeting(now: Date, name = HOME_NAME): string {
   return name ? `${part}, ${name}` : part;
 }
 
-export function todayQuote(): string {
-  return HOME_QUOTES[dayIndex(HOME_QUOTES.length)];
+/** Lấy câu quote hiện tại từ `settings.homeQuotes` — index đã được seed/cập nhật theo rotateMode. */
+export function todayQuote(homeQuotes: { texts: string[]; index: number }): string {
+  return homeQuotes.texts[homeQuotes.index] ?? '';
 }

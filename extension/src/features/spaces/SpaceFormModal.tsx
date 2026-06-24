@@ -4,12 +4,13 @@ import { useAppState } from '../../state/AppStateContext';
 import { defaultEnabledBlocks } from '../../state/reducers/spaces';
 import type { EnabledBlocks, Space } from '../../types';
 
+// Khối Thông báo KHÔNG nằm trong danh sách chọn bật/tắt — luôn hiện ở mọi Space
+// (xem requirements mục 4.1/5.5/6/8, forceRemindersEnabled() ở reducers/spaces.ts).
 const BLOCK_DEFS: { key: keyof EnabledBlocks; label: string }[] = [
   { key: 'tasks', label: 'Việc cần làm' },
   { key: 'reminder', label: 'Nhắc việc' },
   { key: 'habits', label: 'Thói quen' },
   { key: 'notes', label: 'Ghi chú' },
-  { key: 'reminders', label: 'Thông báo' },
 ];
 
 interface SpaceFormModalProps {
@@ -28,7 +29,10 @@ export function SpaceFormModal({ space, onClose }: SpaceFormModalProps) {
   }
 
   function handleSave() {
-    if (!Object.values(blocks).some(Boolean)) {
+    // Chỉ kiểm tra 4 khối có thể tắt (BLOCK_DEFS) — `reminders` luôn `true` trong `blocks`
+    // (ép ở reducer) nên không được tính vào điều kiện "phải bật ít nhất 1 khối", nếu không
+    // validation sẽ luôn pass dù user tắt hết 4 khối còn lại.
+    if (!BLOCK_DEFS.some((b) => blocks[b.key])) {
       setShowError(true);
       return;
     }

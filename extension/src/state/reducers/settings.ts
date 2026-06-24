@@ -1,5 +1,15 @@
-import type { CollapsedBlocks, HomeBgAutoRotateMs, MainBlockKey, NoteView, Screen, Settings, ThemeMode } from '../../types';
+import type {
+  CollapsedBlocks,
+  HomeBgAutoRotateMs,
+  MainBlockKey,
+  NoteView,
+  QuoteRotateMode,
+  Screen,
+  Settings,
+  ThemeMode,
+} from '../../types';
 import { defaultSettings } from '../seed';
+import { dayIndex } from '../../features/home/homeContent';
 
 export type SettingsAction =
   | { type: 'SETTINGS_SET_THEME'; payload: { theme: ThemeMode } }
@@ -10,12 +20,15 @@ export type SettingsAction =
   | { type: 'SETTINGS_HOME_BG_USE_LINK_MODE'; payload: { index: number } }
   | { type: 'SETTINGS_SET_HOME_BG_AUTO_ROTATE'; payload: { ms: HomeBgAutoRotateMs } }
   | { type: 'SETTINGS_HOME_BG_ROTATE_NEXT' }
+  | { type: 'SETTINGS_SET_HOME_QUOTE_TEXT'; payload: { index: number; text: string } }
+  | { type: 'SETTINGS_SET_HOME_QUOTE_INDEX'; payload: { index: number } }
+  | { type: 'SETTINGS_SET_QUOTE_ROTATE_MODE'; payload: { mode: QuoteRotateMode } }
+  | { type: 'SETTINGS_HOME_QUOTE_ROTATE_NEXT' }
   | { type: 'SETTINGS_SET_LAST_SCREEN'; payload: { screen: Screen } }
   | { type: 'SETTINGS_SET_LAYOUT_SIZES'; payload: Partial<Settings['layoutSizes']> }
   | { type: 'SETTINGS_RESET_LAYOUT' }
   | { type: 'SETTINGS_SET_MAIN_BLOCK_ORDER'; payload: { order: MainBlockKey[] } }
   | { type: 'BLOCK_TOGGLE_COLLAPSED'; payload: { key: keyof CollapsedBlocks } }
-  | { type: 'BLOCK_TOGGLE_COLLAPSE_ALL' }
   | { type: 'NOTE_SET_VIEW'; payload: { view: NoteView } };
 
 export function settingsReducer(settings: Settings, action: SettingsAction): Settings {
@@ -50,6 +63,31 @@ export function settingsReducer(settings: Settings, action: SettingsAction): Set
       const total = settings.homeBackground.images.length;
       return { ...settings, homeBackground: { ...settings.homeBackground, index: (settings.homeBackground.index + 1) % total } };
     }
+    case 'SETTINGS_SET_HOME_QUOTE_TEXT': {
+      const texts = [...settings.homeQuotes.texts];
+      const trimmed = action.payload.text.trim();
+      texts[action.payload.index] = trimmed || texts[action.payload.index];
+      return { ...settings, homeQuotes: { ...settings.homeQuotes, texts } };
+    }
+    case 'SETTINGS_SET_HOME_QUOTE_INDEX': {
+      const total = settings.homeQuotes.texts.length;
+      const index = ((action.payload.index % total) + total) % total;
+      return { ...settings, homeQuotes: { ...settings.homeQuotes, index } };
+    }
+    case 'SETTINGS_SET_QUOTE_ROTATE_MODE': {
+      // Đổi sang 'daily': snap NGAY về đúng quote-của-hôm-nay (port setQuoteRotateMode('daily')
+      // trong mockup gọi applyHomeQuote(dayIndex(...)) ngay khi chọn) — không đợi tới lượt
+      // HYDRATE/mở tab kế tiếp mới đồng bộ.
+      const index =
+        action.payload.mode === 'daily'
+          ? dayIndex(settings.homeQuotes.texts.length)
+          : settings.homeQuotes.index;
+      return { ...settings, homeQuotes: { ...settings.homeQuotes, rotateMode: action.payload.mode, index } };
+    }
+    case 'SETTINGS_HOME_QUOTE_ROTATE_NEXT': {
+      const total = settings.homeQuotes.texts.length;
+      return { ...settings, homeQuotes: { ...settings.homeQuotes, index: (settings.homeQuotes.index + 1) % total } };
+    }
     case 'SETTINGS_SET_LAST_SCREEN':
       return { ...settings, lastScreen: action.payload.screen };
     case 'SETTINGS_SET_LAYOUT_SIZES':
@@ -66,16 +104,6 @@ export function settingsReducer(settings: Settings, action: SettingsAction): Set
           [action.payload.key]: !settings.collapsedBlocks[action.payload.key],
         },
       };
-    case 'BLOCK_TOGGLE_COLLAPSE_ALL': {
-      const allCollapsed = Object.values(settings.collapsedBlocks).every(Boolean);
-      const target = !allCollapsed;
-      const keys: (keyof CollapsedBlocks)[] = ['tasks', 'reminder', 'habits', 'notes', 'reminders'];
-      const collapsedBlocks = keys.reduce(
-        (acc, key) => ({ ...acc, [key]: target }),
-        {} as CollapsedBlocks,
-      );
-      return { ...settings, collapsedBlocks };
-    }
     case 'NOTE_SET_VIEW':
       return { ...settings, noteView: action.payload.view };
     default:

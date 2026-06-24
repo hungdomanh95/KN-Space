@@ -66,11 +66,15 @@ body {
   position: fixed; inset: 0; z-index: -2; pointer-events: none;
   background-size: cover; background-position: center;
 }
+/* 2 layer ping-pong crossfade (xem AppBackground.tsx) — layer chưa active nằm DƯỚI (z-index 0,
+   opacity 0); layer .visible nằm TRÊN (z-index 1, opacity 1) và fade vào đúng lúc ảnh mới sẵn
+   sàng, ảnh cũ ở layer dưới vẫn còn nguyên nên không có khoảng hở/gradient lộ ra giữa 2 ảnh. */
 .app-bg-image {
-  position: absolute; inset: 0;
+  position: absolute; inset: 0; z-index: 0; opacity: 0;
   background-size: cover; background-position: center;
   transition: opacity .6s ease;
 }
+.app-bg-image.visible { z-index: 1; opacity: 1; }
 
 /* ============================================================
    2 LAYER MÀN HÌNH (Home / Dashboard) — chỉ 1 hiển thị tại 1 thời điểm,
@@ -113,61 +117,58 @@ body {
 .home-quote {
   font-size: clamp(14px, 1.7vw, 18px); font-weight: 400; font-style: italic;
   opacity: .9; max-width: 620px; margin-top: 14px; line-height: 1.55;
+  transition: opacity .2s var(--ease-standard);
 }
-#home-enter-btn {
-  position: relative; z-index: 2; margin-top: 46px;
-  display: inline-flex; align-items: center; gap: 9px;
-  background: rgba(255,255,255,.16); color: #fff;
-  border: 1px solid rgba(255,255,255,.45); border-radius: 999px;
-  padding: 13px 26px; font-size: 0.9688rem; font-weight: 600;
-  backdrop-filter: blur(10px); cursor: pointer;
-  box-shadow: 0 6px 24px rgba(0,0,0,.22);
-  transition: background .15s, transform .15s, border-color .15s;
+/* Crossfade khi đổi quote (xem HomeScreen.tsx): fade-out ngắn .15s rồi fade-in .2s — đúng yêu
+   cầu mục 4.5/7 requirements, không đổi tức thì. */
+.home-quote.fading { opacity: 0; transition: opacity .15s var(--ease-standard); }
+/* Tín hiệu phụ rất nhẹ "X việc cần làm hôm nay" — góc dưới-phải Home, tách khỏi luồng nội
+   dung chính/quote. Component chỉ render khi count > 0 (xem HomeScreen.tsx) nên không cần
+   :empty/display:none ở đây như bản mockup gốc. */
+#home-today-hint {
+  position: absolute; bottom: 18px; right: 18px; z-index: 3;
+  font-size: clamp(11px, 1.1vw, 12.5px); font-weight: 400; opacity: .58;
+  letter-spacing: .01em; text-align: right; max-width: 280px;
 }
-#home-enter-btn:hover { background: rgba(255,255,255,.30); border-color: #fff; transform: translateY(-2px); }
-#home-enter-btn:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 
-/* nút quay về Home trên topbar dashboard */
-#btn-home:hover { color: var(--accent); border-color: var(--accent); }
+/* Nút "Vào Dashboard" — KHÔNG có khung/nền/viền/blur (đã bỏ hẳn kiểu FAB tròn kính mờ cũ).
+   Wrapper tăng margin-top rõ rệt để tạo ranh giới thị giác giữa "phần thông tin" (đồng hồ/
+   ngày/chào/quote) và "phần hành động" (nút). */
+.home-enter-wrap {
+  position: relative; z-index: 2; margin-top: 64px;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+}
+/* Button thật (giữ semantics/a11y) nhưng KHÔNG có khung/nền/viền/shadow/blur — padding mở
+   rộng vùng bấm tới ~44px (touch-target tối thiểu) mà không đổi kích thước nhìn thấy. */
+#home-enter-btn {
+  background: none; border: none; box-shadow: none; backdrop-filter: none;
+  padding: 10px 16px; margin: -10px -16px;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  color: #fff; cursor: pointer;
+  transition: opacity .15s var(--ease-standard);
+}
+#home-enter-btn:hover { opacity: .82; }
+#home-enter-btn:focus-visible { outline: 2px solid #fff; outline-offset: 4px; border-radius: 6px; }
+#home-enter-btn .icon {
+  width: 26px; height: 26px; stroke-width: 1.7;
+  animation: homeEnterBounce 1.6s ease-in-out infinite;
+}
+@keyframes homeEnterBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(4px); }
+}
+.home-enter-caption {
+  font-size: 0.7188rem; font-weight: 600; opacity: .75;
+  text-transform: uppercase; letter-spacing: .08em;
+}
+
 button { font-family: inherit; border: none; cursor: pointer; background: none; color: inherit; }
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 input, textarea, select { font-family: inherit; }
 .icon { width: 15px; height: 15px; stroke: currentColor; fill: none; flex: 0 0 auto; display: block; }
 
-/* ===== Top bar =====
-   Kính mờ nhẹ (alpha cao 88-90% + blur), dùng chung công thức với .main-block/.sub-block
-   để nổi đồng bộ trên ảnh nền chung Home/Dashboard.
-   backdrop-filter tự tạo 1 stacking context mới cho .topbar — nếu topbar không tự có
-   position+z-index riêng, dropdown con (.space-menu, z-index:60) chỉ thắng được TRONG
-   nội bộ topbar, không thắng được #dashboard/.dashboard-layer (đứng sau trong DOM) khi
-   2 vùng đè lên nhau → dropdown bị cắt. Cho topbar z-index riêng để cả khối (gồm dropdown)
-   luôn nổi trên dashboard, nhưng vẫn thấp hơn .overlay modal (z-index 50, portal riêng). */
-.topbar {
-  position: relative; z-index: 45;
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 11px 22px;
-  background: color-mix(in srgb, var(--panel-bg) 92%, transparent);
-  backdrop-filter: blur(12px) saturate(1.12);
-  -webkit-backdrop-filter: blur(12px) saturate(1.12);
-  border-bottom: 1px solid rgba(var(--accent-rgb), .2);
-  flex: 0 0 auto;
-  flex-wrap: wrap; gap: 10px;
-  transition: background .25s ease, border-color .25s ease;
-}
-[data-theme="dark"] .topbar {
-  background: color-mix(in srgb, var(--panel-bg) 90%, transparent);
-}
-.brand { display:flex; align-items:center; gap:10px; }
-.brand-mark {
-  width: 30px; height: 30px; border-radius: 9px;
-  overflow: hidden;
-  display: flex; align-items: center; justify-content: center;
-}
-.brand-mark img { width: 100%; height: 100%; display: block; }
-.brand h1 { font-size: 1.0312rem; margin: 0; font-weight: 700; letter-spacing: -.01em; }
-.brand .sub { font-size: 0.7812rem; color: var(--text-dim); font-weight: 500; }
-
-/* ===== Space switcher ===== */
+/* ===== Space switcher — dropdown dùng trong widget #dashboard-corner (đã bỏ hẳn topbar
+   ngang, xem requirements mục 4/4.1) ===== */
 .space-switcher { position: relative; margin-left: 6px; }
 .space-switcher-btn {
   display: flex; align-items: center; gap: 6px; background: var(--raised); border: 1px solid var(--border);
@@ -176,17 +177,33 @@ input, textarea, select { font-family: inherit; }
 }
 .space-switcher-btn:hover { border-color: var(--accent); color: var(--accent); }
 .space-switcher-btn .icon { width: 12px; height: 12px; color: var(--text-dim); }
+/* Dot màu trước tên — xoay vòng theo index (xem spaceDotColor() trong SpaceSwitcher.tsx) */
+.space-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
 .space-menu {
   position: absolute; top: calc(100% + 8px); left: 0; min-width: 220px; z-index: 60;
   background: var(--modal-bg); border: 1px solid var(--border); border-radius: 12px;
   box-shadow: 0 14px 40px rgba(0,0,0,.18); padding: 6px; max-height: 320px; overflow-y: auto;
 }
 .space-menu-item {
-  display: flex; align-items: center; gap: 8px; padding: 8px 9px; border-radius: 8px; cursor: pointer; font-size: 0.8438rem;
+  display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-radius: 8px; cursor: pointer; font-size: 0.8438rem;
 }
 .space-menu-item:hover { background: var(--raised); }
 .space-menu-item.active { color: var(--accent); font-weight: 700; }
-.space-menu-item .space-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.space-menu-item .space-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.space-menu-item .space-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Dòng phụ nhỏ mờ: "X việc hôm nay · Y note" — không in đậm/đổi màu accent dù item active,
+   để không cạnh tranh với tên space */
+.space-menu-item .space-meta {
+  font-size: 0.6875rem; font-weight: 500; color: var(--text-dim); overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; opacity: .85;
+}
+.space-menu-item.active .space-meta { color: var(--text-dim); }
+/* Gợi ý phím tắt cuối mỗi item — chỉ hiện cho 9 space đầu (Alt/Cmd+1..9) */
+.space-shortcut {
+  font-size: 0.6563rem; font-weight: 700; color: var(--text-dim); background: var(--bg);
+  border: 1px solid var(--border); border-radius: 5px; padding: 1px 5px; flex: 0 0 auto;
+  letter-spacing: .01em; opacity: .75;
+}
 .space-menu-item .space-tools { display: flex; align-items: center; gap: 3px; flex: 0 0 auto; }
 .space-menu-item .space-tools > .icon-btn { opacity: 0; transition: opacity .12s; }
 .space-menu-item:hover .space-tools > .icon-btn { opacity: 1; }
@@ -213,6 +230,44 @@ input, textarea, select { font-family: inherit; }
    khoảng trống lệch một chiều trên màn hình lớn). */
 #dashboard { flex: 1; display: flex; min-height: 0; padding: 14px; gap: 12px; background: transparent; }
 #main-row { display: flex; flex: 1; min-height: 0; min-width: 0; gap: 12px; width: 100%; height: 100%; }
+
+/* Cột bọc khối Thông báo + widget #dashboard-corner (Về Home/Space-switcher/Settings) —
+   wrapper flex-column nhận flex-basis (thay cho khối Thông báo nhận trực tiếp), để widget
+   nằm NGAY DƯỚI khối Thông báo, rộng đúng = width của cột, không position:fixed nổi tự do.
+   Cột này CỐ ĐỊNH vị trí cuối #main-row, không tham gia kéo-thả đổi thứ tự (xem AppLayout.tsx). */
+.reminders-col { display: flex; flex-direction: column; gap: 12px; min-width: 220px; min-height: 0; }
+
+/* Widget điều hướng cố định — kính mờ hairline đồng bộ phong cách .main-block/.sub-block. */
+#dashboard-corner {
+  flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  background: color-mix(in srgb, var(--panel-bg) 88%, transparent);
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  border: 1px solid var(--border-hairline);
+  border-radius: 12px; padding: 7px 9px;
+  box-shadow: 0 4px 16px rgba(10,12,40,.10), 0 1px 4px rgba(10,12,40,.08);
+}
+[data-theme="dark"] #dashboard-corner {
+  background: color-mix(in srgb, var(--panel-bg) 90%, transparent);
+}
+/* Space-switcher dãn full chiều rộng còn lại (flex:1), nội dung căn giữa thay vì dồn trái. */
+#dashboard-corner .space-switcher { position: relative; flex: 1; min-width: 0; margin-left: 0; }
+#dashboard-corner .space-switcher-btn { width: 100%; max-width: none; justify-content: center; }
+#dashboard-corner .space-switcher-btn #space-switcher-label {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Menu mở LÊN trên trigger (widget nằm ở phần dưới của cột) */
+#dashboard-corner .space-menu { top: auto; bottom: calc(100% + 8px); left: 0; right: auto; min-width: 240px; }
+#dashboard-corner-home-btn,
+#dashboard-corner-settings-btn {
+  background: var(--raised); border: 1px solid var(--border); border-radius: 9px;
+  width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center;
+  color: var(--text-dim); flex: 0 0 auto; transition: color .12s, border-color .12s;
+}
+#dashboard-corner-home-btn:hover,
+#dashboard-corner-settings-btn:hover { color: var(--accent); border-color: var(--accent); }
+#dashboard-corner-home-btn .icon,
+#dashboard-corner-settings-btn .icon { width: 16px; height: 16px; }
 
 /* Kính mờ NHẸ (mức trung gian, đã chốt qua nhiều vòng so sánh gồm "nền đặc" và "kính mờ
    trong suốt cao"): alpha panel ~92-94% giữ card đủ sáng/dễ đọc, blur 12px/saturate 1.12
@@ -321,8 +376,13 @@ input, textarea, select { font-family: inherit; }
 .filter-tabs button.active { background: rgba(var(--accent-rgb),.12); color: var(--accent); box-shadow: none; }
 
 /* ===== Việc cần làm ===== */
-.task-row { display: flex; align-items: flex-start; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 0.875rem; }
+.task-row { display: flex; align-items: flex-start; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 0.875rem; transition: opacity .15s var(--ease-standard); }
 .task-row:last-child { border-bottom: none; }
+/* Opacity khi kéo — đúng yêu cầu mục 9 (áp dụng cả khối chính, note card, và task row). */
+.task-row.dragging { opacity: .4; }
+/* Drop target outline nhẹ khi kéo task row qua (mục 9: "Drop target có outline/nhấn nhẹ") —
+   chèn TRƯỚC dòng đang hover, khớp đúng hành vi TASK_REORDER (luôn insert trước targetId). */
+.task-row.drag-over { box-shadow: inset 0 2px 0 0 var(--accent); }
 .check { width: 17px; height: 17px; border-radius: 6px; border: 1.6px solid var(--border); flex: 0 0 auto; margin-top: 1px; display:flex; align-items:center; justify-content:center; cursor:pointer; background: var(--raised); transition: all .12s; }
 .check .icon { width: 11px; height: 11px; stroke-width: 3; opacity: 0; transition: opacity .1s; color: white; }
 .check.checked { background: var(--done); border-color: var(--done); }
@@ -477,7 +537,18 @@ input, textarea, select { font-family: inherit; }
 .modal { background: var(--modal-bg); border: 1px solid var(--border-hairline); border-radius: 16px; width: 440px; max-width: 90vw; padding: 22px; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.16); animation: modalPopIn .22s var(--ease-standard); }
 @keyframes overlayFadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes modalPopIn { from { opacity: 0; transform: translateY(8px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
-.modal-settings { width: 760px; max-width: 92vw; }
+/* Modal Settings: kích thước CỐ ĐỊNH (không co giãn theo nội dung) — header + thanh tab +
+   nút Đóng luôn cố định, chỉ phần nội dung .settings-body bên trong được scroll riêng (mục 7
+   requirements). Ghi đè max-height/overflow-y/padding của .modal chung vì layout đổi sang
+   flex column — nếu không, cả modal sẽ cuộn lẫn header/tab theo nội dung dài. */
+.modal-settings {
+  width: 760px; max-width: 92vw; height: min(680px, 82vh); max-height: none;
+  display: flex; flex-direction: column; overflow: hidden; padding: 0;
+}
+.modal-settings h2 { margin: 0; padding: 16px 22px 8px; flex: 0 0 auto; }
+.modal-settings .settings-tabs { flex: 0 0 auto; margin: 0; padding: 0 22px 10px; border-bottom: 1px solid var(--border-hairline); }
+.modal-settings .settings-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 18px 22px; }
+.modal-settings .modal-actions { flex: 0 0 auto; margin: 0; padding: 14px 22px; border-top: 1px solid var(--border-hairline); }
 .modal-note { width: 620px; max-width: 92vw; }
 .modal-note .note-content-field { min-height: 320px; }
 .note-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
@@ -572,6 +643,45 @@ input, textarea, select { font-family: inherit; }
   cursor: pointer; padding: 0; text-align: left; width: 100%; display: inline-flex; align-items: center; gap: 4px;
 }
 
+/* ===== Lưới slot Quote Home — 10 ô CỐ ĐỊNH (không CRUD thêm/xoá), mỗi ô sửa nội dung
+   trực tiếp qua textarea. Cùng tinh thần .home-bg-grid (slot cố định + sửa tại chỗ) nhưng
+   hiển thị card text nhỏ thay cho thumbnail ảnh. 2 cột vì nội dung text dài hơn ảnh,
+   cần đủ rộng để đọc/sửa dễ; @640px về 1 cột. */
+.home-quote-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 4px; }
+.home-quote-item {
+  display: flex; flex-direction: column; gap: 6px; padding: 10px 11px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--raised); position: relative;
+  transition: border-color .15s var(--ease-standard);
+}
+.home-quote-item.active-slot { border-color: var(--accent); }
+.home-quote-item .home-quote-index {
+  font-size: 0.6562rem; font-weight: 700; color: var(--text-dim); text-transform: uppercase;
+  letter-spacing: .03em; display: flex; align-items: center; justify-content: space-between; gap: 6px;
+}
+.home-quote-item .home-quote-use-btn {
+  font-size: 0.6562rem; font-weight: 600; color: var(--accent); background: none; border: none;
+  cursor: pointer; padding: 2px 5px; border-radius: 5px; flex: 0 0 auto;
+}
+.home-quote-item .home-quote-use-btn:hover { background: rgba(var(--accent-rgb),.1); }
+.home-quote-item .home-quote-use-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.home-quote-item textarea {
+  width: 100%; min-height: 56px; resize: vertical; font-family: inherit; font-size: 0.7812rem;
+  line-height: 1.5; color: var(--text); background: var(--panel-bg); border: 1px solid var(--border);
+  border-radius: 7px; padding: 6px 8px;
+}
+.home-quote-item textarea:focus { outline: none; border-color: var(--accent); }
+
+/* ===== Segmented options — nhóm nút chọn 1-trong-nhiều (vd. tần suất tự động đổi ảnh
+   nền/quote) ===== */
+.segmented-options { display: flex; flex-wrap: wrap; gap: 6px; }
+.segmented-options button {
+  font-size: 0.7812rem; font-weight: 600; color: var(--text-dim); background: var(--raised);
+  border: 1px solid var(--border); border-radius: 8px; padding: 6px 11px; cursor: pointer;
+  transition: border-color .12s, color .12s, background .12s;
+}
+.segmented-options button:hover { border-color: var(--accent); color: var(--accent); }
+.segmented-options button.active { border-color: var(--accent); color: var(--accent); background: rgba(var(--accent-rgb),.08); }
+
 .size-row { display: flex; align-items: center; gap: 10px; margin-bottom: 11px; }
 .size-row label { flex: 0 0 150px; font-size: 0.8438rem; color: var(--text); font-weight: 500; }
 .layout-cols .size-row label { flex-basis: 140px; }
@@ -594,7 +704,7 @@ input, textarea, select { font-family: inherit; }
   html { font-size: 15px; }
   #main-row { flex-direction: column; max-height: none; align-items: stretch; }
   #dashboard { align-items: stretch; }
-  #block-combined, #block-notes, #block-reminders { flex: 1 1 0 !important; min-height: 260px; }
+  #block-combined, #block-notes, .reminders-col { flex: 1 1 0 !important; min-height: 260px; }
   #combined-sub { min-height: 0; }
 }
 @media (max-width: 640px) {
@@ -602,6 +712,7 @@ input, textarea, select { font-family: inherit; }
   #combined-bottom-row { flex-direction: column; }
   #sub-reminder, #sub-habits { flex: 1 1 0 !important; min-height: 160px; }
   .settings-grid, .layout-cols { grid-template-columns: 1fr; }
+  .home-quote-grid { grid-template-columns: 1fr; }
   .modal-settings { width: 94vw; }
   .modal-note { width: 94vw; }
   .modal-note .note-content-field { min-height: 220px; }
@@ -609,11 +720,9 @@ input, textarea, select { font-family: inherit; }
 }
 @media (max-width: 480px) {
   html { font-size: 13px; }
-  .topbar { padding: 9px 12px; }
-  .brand .sub { display: none; }
   .space-switcher-btn span { max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; }
   #dashboard { padding: 8px; gap: 8px; }
-  .main-block, #block-combined, #block-notes, #block-reminders { min-width: 0; }
+  .main-block, #block-combined, #block-notes, .reminders-col { min-width: 0; }
   .block-head { padding: 9px 10px; flex-wrap: wrap; }
   .notes-toolbar { padding: 8px 10px; }
 }

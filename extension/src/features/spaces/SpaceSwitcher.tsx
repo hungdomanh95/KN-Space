@@ -1,9 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp, Layers, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useAppState } from '../../state/AppStateContext';
 import { useConfirm } from '../../components/ConfirmContext';
 import { SpaceFormModal } from './SpaceFormModal';
+import { NOTE_PALETTE } from '../../state/reducers/notes';
+import { spaceShortcutLabel } from './spaceShortcuts';
 import type { Space } from '../../types';
+
+function todayStr(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/** Dot màu riêng từng Space — xoay vòng theo index trong `orderedSpaces` (theo NOTE_PALETTE
+ * có sẵn, không thêm field màu mới vào Space type). Không đổi khi sắp xếp lại thứ tự Space
+ * vì gán theo index hiện tại trong danh sách đã sort theo `order`, không gán theo id cố định —
+ * đơn giản hơn, đủ đáp ứng yêu cầu "1 màu cố định/space theo index". */
+function spaceDotColor(idx: number): string {
+  return NOTE_PALETTE[idx % NOTE_PALETTE.length];
+}
 
 export function SpaceSwitcher() {
   const { state, dispatch } = useAppState();
@@ -14,6 +28,8 @@ export function SpaceSwitcher() {
 
   const currentSpace = state.spaces.find((s) => s.id === state.currentSpaceId);
   const orderedSpaces = [...state.spaces].sort((a, b) => a.order - b.order);
+  const currentIdx = orderedSpaces.findIndex((s) => s.id === state.currentSpaceId);
+  const today = todayStr();
 
   useEffect(() => {
     function onMouseDown(e: MouseEvent) {
@@ -34,9 +50,14 @@ export function SpaceSwitcher() {
 
   return (
     <div className="space-switcher" ref={wrapRef}>
-      <button className="space-switcher-btn" onClick={() => setOpen((v) => !v)}>
-        <Layers className="icon" size={12} />
-        <span>{currentSpace?.name ?? ''}</span>
+      <button
+        className="space-switcher-btn"
+        onClick={() => setOpen((v) => !v)}
+        title="Đổi space"
+        aria-label="Đổi space hiện tại"
+      >
+        <span className="space-dot" aria-hidden="true" style={{ background: spaceDotColor(currentIdx) }} />
+        <span id="space-switcher-label">{currentSpace?.name ?? ''}</span>
         <ChevronDown className="icon" size={12} />
       </button>
       {open && (
@@ -44,6 +65,9 @@ export function SpaceSwitcher() {
           {orderedSpaces.map((space, idx) => {
             const isFirst = idx === 0;
             const isLast = idx === orderedSpaces.length - 1;
+            const taskCount = space.tasks.filter((t) => t.date === today && !t.done).length;
+            const noteCount = space.notes.length;
+            const shortcut = spaceShortcutLabel(idx);
             return (
               <div
                 key={space.id}
@@ -53,8 +77,14 @@ export function SpaceSwitcher() {
                   setOpen(false);
                 }}
               >
-                <Layers className="icon" size={15} />
-                <span className="space-name">{space.name}</span>
+                <span className="space-dot" aria-hidden="true" style={{ background: spaceDotColor(idx) }} />
+                <span className="space-main">
+                  <span className="space-name">{space.name}</span>
+                  <span className="space-meta">
+                    {taskCount} việc hôm nay · {noteCount} note
+                  </span>
+                </span>
+                {shortcut && <span className="space-shortcut">{shortcut}</span>}
                 <span className="space-tools">
                   <span className="space-move">
                     <button

@@ -7,33 +7,13 @@ import { computeNotifications } from './computeNotifications';
 
 interface NotificationsBlockProps {
   style?: React.CSSProperties;
-  className?: string;
-  rootRef?: React.Ref<HTMLDivElement>;
-  draggable?: boolean;
-  onMouseDownCapture?: (e: React.MouseEvent<HTMLDivElement>) => void;
-  onDragStart?: (e: React.DragEvent<HTMLDivElement>) => void;
-  onDragEnd?: (e: React.DragEvent<HTMLDivElement>) => void;
-  onDragOver?: (e: React.DragEvent<HTMLDivElement>) => void;
-  onDragLeave?: () => void;
-  onDrop?: (e: React.DragEvent<HTMLDivElement>) => void;
 }
 
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export function NotificationsBlock({
-  style,
-  className,
-  rootRef,
-  draggable,
-  onMouseDownCapture,
-  onDragStart,
-  onDragEnd,
-  onDragOver,
-  onDragLeave,
-  onDrop,
-}: NotificationsBlockProps) {
+export function NotificationsBlock({ style }: NotificationsBlockProps) {
   const { state, dispatch } = useAppState();
   const space = useCurrentSpace();
 
@@ -53,18 +33,11 @@ export function NotificationsBlock({
       iconBg="rgba(255,93,122,.12)"
       iconColor="var(--reminder-color)"
       title="Thông báo"
+      showGripHandle={false}
       collapsed={collapsed}
       onToggleCollapsed={() => dispatch({ type: 'BLOCK_TOGGLE_COLLAPSED', payload: { key: 'reminders' } })}
       style={style}
-      className={`main-block ${className ?? ''}`.trim()}
-      rootRef={rootRef}
-      draggable={draggable}
-      onMouseDownCapture={onMouseDownCapture}
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
+      className="main-block"
     >
       <div className="block-body">
         {rows.length === 0 ? (
