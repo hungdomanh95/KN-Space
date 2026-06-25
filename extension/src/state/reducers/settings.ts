@@ -1,14 +1,12 @@
 import type {
   CollapsedBlocks,
   HomeBgAutoRotateMs,
-  MainBlockKey,
   NoteView,
   QuoteRotateMode,
   Screen,
   Settings,
   ThemeMode,
 } from '../../types';
-import { defaultSettings } from '../seed';
 import { dayIndex } from '../../features/home/homeContent';
 
 export type SettingsAction =
@@ -25,9 +23,6 @@ export type SettingsAction =
   | { type: 'SETTINGS_SET_QUOTE_ROTATE_MODE'; payload: { mode: QuoteRotateMode } }
   | { type: 'SETTINGS_HOME_QUOTE_ROTATE_NEXT' }
   | { type: 'SETTINGS_SET_LAST_SCREEN'; payload: { screen: Screen } }
-  | { type: 'SETTINGS_SET_LAYOUT_SIZES'; payload: Partial<Settings['layoutSizes']> }
-  | { type: 'SETTINGS_RESET_LAYOUT' }
-  | { type: 'SETTINGS_SET_MAIN_BLOCK_ORDER'; payload: { order: MainBlockKey[] } }
   | { type: 'BLOCK_TOGGLE_COLLAPSED'; payload: { key: keyof CollapsedBlocks } }
   | { type: 'NOTE_SET_VIEW'; payload: { view: NoteView } };
 
@@ -90,12 +85,6 @@ export function settingsReducer(settings: Settings, action: SettingsAction): Set
     }
     case 'SETTINGS_SET_LAST_SCREEN':
       return { ...settings, lastScreen: action.payload.screen };
-    case 'SETTINGS_SET_LAYOUT_SIZES':
-      return { ...settings, layoutSizes: { ...settings.layoutSizes, ...action.payload } };
-    case 'SETTINGS_RESET_LAYOUT':
-      return { ...settings, layoutSizes: defaultSettings().layoutSizes };
-    case 'SETTINGS_SET_MAIN_BLOCK_ORDER':
-      return { ...settings, mainBlockOrder: action.payload.order };
     case 'BLOCK_TOGGLE_COLLAPSED':
       return {
         ...settings,

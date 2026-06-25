@@ -49,19 +49,28 @@ export function SpaceSwitcher() {
   }
 
   return (
-    <div className="space-switcher" ref={wrapRef}>
+    <div className="relative min-w-0 flex-1" ref={wrapRef}>
       <button
-        className="space-switcher-btn"
+        className="flex w-full items-center justify-center gap-1.5 rounded-[9px] border border-[color:var(--border)] bg-[var(--raised)]
+          px-3 py-[7px] text-[0.8125rem] font-semibold text-[var(--text)] transition-[border-color,color] duration-150
+          hover:border-[color:var(--accent)] hover:text-[var(--accent)] max-sm:[&_span]:inline-block max-sm:[&_span]:max-w-[90px]
+          max-sm:[&_span]:overflow-hidden max-sm:[&_span]:text-ellipsis max-sm:[&_span]:whitespace-nowrap"
         onClick={() => setOpen((v) => !v)}
         title="Đổi space"
         aria-label="Đổi space hiện tại"
       >
-        <span className="space-dot" aria-hidden="true" style={{ background: spaceDotColor(currentIdx) }} />
-        <span id="space-switcher-label">{currentSpace?.name ?? ''}</span>
-        <ChevronDown className="icon" size={12} />
+        <span
+          className="h-2 w-2 flex-none rounded-full"
+          aria-hidden="true"
+          style={{ background: spaceDotColor(currentIdx) }}
+        />
+        <span id="space-switcher-label" className="overflow-hidden text-ellipsis whitespace-nowrap">
+          {currentSpace?.name ?? ''}
+        </span>
+        <ChevronDown className="icon h-3 w-3 text-[var(--text-dim)]" size={12} />
       </button>
       {open && (
-        <div className="space-menu">
+        <div className="space-menu !left-[-42px] !right-[-42px] !min-w-[240px]">
           {orderedSpaces.map((space, idx) => {
             const isFirst = idx === 0;
             const isLast = idx === orderedSpaces.length - 1;
@@ -71,24 +80,32 @@ export function SpaceSwitcher() {
             return (
               <div
                 key={space.id}
-                className={`space-menu-item ${space.id === state.currentSpaceId ? 'active' : ''}`}
+                className={`space-menu-item group ${space.id === state.currentSpaceId ? 'active' : ''}`}
                 onClick={() => {
                   dispatch({ type: 'SPACE_SWITCH', payload: { id: space.id } });
                   setOpen(false);
                 }}
               >
-                <span className="space-dot" aria-hidden="true" style={{ background: spaceDotColor(idx) }} />
-                <span className="space-main">
-                  <span className="space-name">{space.name}</span>
-                  <span className="space-meta">
+                <span
+                  className="h-2 w-2 flex-none rounded-full"
+                  aria-hidden="true"
+                  style={{ background: spaceDotColor(idx) }}
+                />
+                <span className="flex min-w-0 flex-1 flex-col gap-px">
+                  <span className="overflow-hidden text-ellipsis whitespace-nowrap">{space.name}</span>
+                  <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[0.6875rem] font-medium text-[var(--text-dim)] opacity-[.85]">
                     {taskCount} việc hôm nay · {noteCount} note
                   </span>
                 </span>
-                {shortcut && <span className="space-shortcut">{shortcut}</span>}
-                <span className="space-tools">
-                  <span className="space-move">
+                {shortcut && (
+                  <span className="flex-none rounded-[5px] border border-[color:var(--border)] bg-[var(--bg)] px-[5px] py-px text-[0.6563rem] font-bold tracking-[.01em] text-[var(--text-dim)] opacity-75">
+                    {shortcut}
+                  </span>
+                )}
+                <span className="flex flex-none items-center gap-[3px]">
+                  <span className="mr-0.5 flex flex-none flex-col gap-px">
                     <button
-                      className="icon-btn icon-btn-mini"
+                      className="icon-btn h-[13px] w-[18px] rounded-[5px] opacity-0 transition-opacity duration-150 group-hover:opacity-100 [&_.icon]:h-[11px] [&_.icon]:w-[11px]"
                       disabled={isFirst}
                       title="Di chuyển lên"
                       aria-label="Di chuyển lên"
@@ -100,7 +117,7 @@ export function SpaceSwitcher() {
                       <ChevronUp className="icon" size={11} />
                     </button>
                     <button
-                      className="icon-btn icon-btn-mini"
+                      className="icon-btn h-[13px] w-[18px] rounded-[5px] opacity-0 transition-opacity duration-150 group-hover:opacity-100 [&_.icon]:h-[11px] [&_.icon]:w-[11px]"
                       disabled={isLast}
                       title="Di chuyển xuống"
                       aria-label="Di chuyển xuống"
@@ -113,7 +130,7 @@ export function SpaceSwitcher() {
                     </button>
                   </span>
                   <button
-                    className="icon-btn"
+                    className="icon-btn opacity-0 transition-opacity duration-150 group-hover:opacity-100"
                     title="Đổi tên space"
                     aria-label="Đổi tên space"
                     onClick={(e) => {
@@ -126,7 +143,7 @@ export function SpaceSwitcher() {
                   </button>
                   {state.spaces.length > 1 && (
                     <button
-                      className="icon-btn"
+                      className="icon-btn opacity-0 transition-opacity duration-150 group-hover:opacity-100"
                       title="Xoá space"
                       aria-label="Xoá space"
                       onClick={(e) => {
@@ -141,9 +158,9 @@ export function SpaceSwitcher() {
               </div>
             );
           })}
-          <div className="space-menu-divider" />
+          <div className="my-1.5 mx-0.5 h-px bg-[var(--border)]" />
           <div
-            className="space-menu-add"
+            className="flex cursor-pointer items-center gap-2 rounded-lg px-[9px] py-2 text-[0.8438rem] font-semibold text-[var(--accent)] hover:bg-[var(--raised)]"
             onClick={() => {
               setOpen(false);
               setFormSpace('new');

@@ -110,7 +110,7 @@ export function NotesBlock({
       collapsed={collapsed}
       onToggleCollapsed={() => dispatch({ type: 'BLOCK_TOGGLE_COLLAPSED', payload: { key: 'notes' } })}
       style={style}
-      className={`main-block ${className ?? ''}`.trim()}
+      className={`main-block max-sm:min-w-0 ${className ?? ''}`.trim()}
       rootRef={rootRef}
       draggable={draggable}
       onMouseDownCapture={onMouseDownCapture}
@@ -146,40 +146,52 @@ export function NotesBlock({
         </button>
       }
     >
-      <div className="notes-toolbar">
+      <div className="notes-toolbar flex flex-none flex-wrap gap-2 border-b border-[color:var(--border)] px-4 py-2.5 max-sm:px-2.5 max-sm:py-2">
         <input
           type="text"
           placeholder="Tìm note..."
           value={noteSearch}
           onChange={(e) => dispatch({ type: 'NOTE_SET_SEARCH', payload: { search: e.target.value } })}
+          className="min-w-[120px] flex-1 rounded-lg border border-[color:var(--border)] bg-[var(--raised)] px-2.5
+            py-1.5 text-[0.7812rem] text-[var(--text)] transition-[border-color] duration-150
+            hover:border-[color:var(--accent)] focus:border-[color:var(--accent)] focus:outline-none"
         />
-        <div className="note-view-toggle" role="group" aria-label="Chế độ hiển thị note">
+        <div className="flex flex-none gap-0.5 rounded-lg bg-[var(--bg)] p-[3px]" role="group" aria-label="Chế độ hiển thị note">
           <button
-            className={noteView === 'grid' ? 'active' : ''}
+            className={`flex h-[26px] w-7 items-center justify-center rounded-md text-[var(--text-dim)] transition-[background,color] duration-150 hover:text-[var(--text)] ${
+              noteView === 'grid' ? 'bg-[var(--raised)] text-[var(--accent)] shadow-[0_1px_3px_rgba(0,0,0,.08)]' : 'bg-transparent'
+            }`}
             title="Lưới tự động (CSS grid)"
             aria-label="Chế độ lưới"
             aria-pressed={noteView === 'grid'}
             onClick={() => dispatch({ type: 'NOTE_SET_VIEW', payload: { view: 'grid' } })}
           >
-            <Grid2x2 className="icon" size={14} />
+            <Grid2x2 className="icon h-3.5 w-3.5" size={14} />
           </button>
           <button
-            className={noteView === 'list' ? 'active' : ''}
+            className={`flex h-[26px] w-7 items-center justify-center rounded-md text-[var(--text-dim)] transition-[background,color] duration-150 hover:text-[var(--text)] ${
+              noteView === 'list' ? 'bg-[var(--raised)] text-[var(--accent)] shadow-[0_1px_3px_rgba(0,0,0,.08)]' : 'bg-transparent'
+            }`}
             title="Danh sách (1 cột)"
             aria-label="Chế độ danh sách"
             aria-pressed={noteView === 'list'}
             onClick={() => dispatch({ type: 'NOTE_SET_VIEW', payload: { view: 'list' } })}
           >
-            <Rows2 className="icon" size={14} />
+            <Rows2 className="icon h-3.5 w-3.5" size={14} />
           </button>
         </div>
-        <div className="sort-switcher" ref={sortWrapRef}>
-          <button className="sort-switcher-btn" onClick={() => setSortMenuOpen((v) => !v)}>
+        <div className="relative flex-none" ref={sortWrapRef}>
+          <button
+            className="flex items-center gap-1.5 rounded-lg border border-[color:var(--border)] bg-[var(--raised)]
+              px-2.5 py-1.5 text-[0.7812rem] font-semibold text-[var(--text)] transition-[border-color,color] duration-150
+              hover:border-[color:var(--accent)] hover:text-[var(--accent)]"
+            onClick={() => setSortMenuOpen((v) => !v)}
+          >
             <span>{SORT_OPTIONS.find((o) => o.value === noteSortBy)?.label}</span>
-            <ChevronDown className="icon" size={11} />
+            <ChevronDown className="icon h-[11px] w-[11px] text-[var(--text-dim)]" size={11} />
           </button>
           {sortMenuOpen && (
-            <div className="space-menu" id="sort-menu">
+            <div className="space-menu !left-auto !right-0 !min-w-[190px]" id="sort-menu">
               {SORT_OPTIONS.map((o) => (
                 <div
                   key={o.value}
@@ -189,7 +201,7 @@ export function NotesBlock({
                     setSortMenuOpen(false);
                   }}
                 >
-                  <span className="space-name">{o.label}</span>
+                  <span className="overflow-hidden text-ellipsis whitespace-nowrap">{o.label}</span>
                 </div>
               ))}
             </div>

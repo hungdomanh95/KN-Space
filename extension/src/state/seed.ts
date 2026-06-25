@@ -1,5 +1,33 @@
-import type { HomeBgSlot, Settings, Space } from '../types';
+import type { DashboardLayout, HomeBgSlot, Settings, Space } from '../types';
 import { DEFAULT_HOME_IMAGES, HOME_QUOTES, dayIndex, epochDay } from '../features/home/homeContent';
+
+/**
+ * Layout mặc định — tái tạo ĐÚNG hình ảnh layout cứng cũ (LayoutSizes mặc định:
+ * combined 45 / notes 40 / reminders ~15%, tasks 45 / bottomRow 55, reminder 50 / habits 50)
+ * để user cũ mở lại extension không bị xáo trộn cảm giác layout ban đầu:
+ * - Cột 1 (45%): tasks (trên, h=45) + reminder/habits ghép ngang (dưới, h=55, w=50/50)
+ * - Cột 2 (40%): today (trên, cố định theo nội dung) + notes (dưới, lớn)
+ * - Cột 3 (15%): settings (trên, cố định theo nội dung) + reminders/Thông báo (dưới)
+ */
+export function defaultDashboardLayout(): DashboardLayout {
+  return {
+    colWidths: [45, 40, 15],
+    cols: [
+      [
+        { type: 'single', id: 'tasks', h: 45 },
+        { type: 'row', items: [{ id: 'reminder', w: 50 }, { id: 'habits', w: 50 }], h: 55 },
+      ],
+      [
+        { type: 'single', id: 'today', h: 18 },
+        { type: 'single', id: 'notes', h: 82 },
+      ],
+      [
+        { type: 'single', id: 'settings', h: 14 },
+        { type: 'single', id: 'reminders', h: 86 },
+      ],
+    ],
+  };
+}
 
 export function defaultSettings(): Settings {
   return {
@@ -18,9 +46,6 @@ export function defaultSettings(): Settings {
       index: dayIndex(HOME_QUOTES.length),
       rotateMode: 'daily',
     },
-    // combined 45% + notes 40% -> khối Thông báo (auto = phần còn lại) mặc định 15%.
-    layoutSizes: { combined: 45, notes: 40, tasks: 45, reminder: 50 },
-    mainBlockOrder: ['combined', 'notes', 'reminders'],
     collapsedBlocks: { tasks: false, reminder: false, habits: false, notes: false, reminders: false },
     noteView: 'grid',
     lastScreen: 'home',
@@ -36,7 +61,8 @@ export function createSeedSpaces(): Space[] {
     id: crypto.randomUUID(),
     name: 'Cá nhân',
     order: 0,
-    enabledBlocks: { tasks: true, reminder: true, habits: true, notes: true, reminders: true },
+    enabledBlocks: { tasks: true, reminder: true, habits: true, notes: true, reminders: true, today: true },
+    dashboardLayout: defaultDashboardLayout(),
     tasks: [],
     reminders: [],
     habits: [],

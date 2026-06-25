@@ -26,7 +26,7 @@ export function NoteFormModal({ note, noteCount, onClose }: NoteFormModalProps) 
   }
 
   return (
-    <Modal onClose={onClose} className="modal-note">
+    <Modal onClose={onClose} className="modal-note w-[620px] max-w-[92vw] max-md:w-[94vw]">
       <div className="note-modal-head">
         <h2>{note ? 'Sửa card' : 'Note mới'}</h2>
         <div className="color-palette">
@@ -49,7 +49,11 @@ export function NoteFormModal({ note, noteCount, onClose }: NoteFormModalProps) 
       </div>
       <div className="field">
         <label>Nội dung</label>
-        <textarea className="note-content-field" value={content} onChange={(e) => setContent(e.target.value)} />
+        <textarea
+          className="note-content-field max-md:min-h-[220px]"
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+        />
       </div>
       <div className="modal-actions">
         <button className="btn-ghost" onClick={onClose}>

@@ -132,13 +132,21 @@ function Shell() {
   return (
     <>
       <AppBackground imageUrl={imageUrl} imageIndex={settings.homeBackground.index} />
-      <div className={`home-layer ${currentScreen === 'dashboard' ? 'screen-hidden' : ''}`}>
+      <div
+        className={`fixed inset-0 visible opacity-100 transition-[opacity,visibility] duration-[450ms] ease-linear ${
+          currentScreen === 'dashboard' ? 'invisible opacity-0 pointer-events-none' : ''
+        }`}
+      >
         <HomeScreen onEnterDashboard={enterDashboard} />
       </div>
-      <div className={`dashboard-layer ${currentScreen === 'home' ? 'screen-hidden' : ''}`}>
+      <div
+        className={`fixed inset-0 flex min-h-0 flex-col visible opacity-100 transition-[opacity,visibility] duration-[450ms] ease-linear ${
+          currentScreen === 'home' ? 'invisible opacity-0 pointer-events-none' : ''
+        }`}
+      >
         {storageFallbackActive && (
-          <div className="fallback-banner">
-            <AlertTriangle className="icon" size={15} />
+          <div className="fixed bottom-[14px] right-[14px] z-[80] flex max-w-[360px] items-start gap-2 rounded-xl border border-[color:var(--reminder-color)] bg-[var(--modal-bg)] px-[14px] py-3 text-[0.8125rem] text-[var(--text)] shadow-[var(--shadow)]">
+            <AlertTriangle className="icon mt-px flex-none text-[var(--reminder-color)]" size={15} />
             <span>
               Dữ liệu đã vượt giới hạn đồng bộ Chrome (chrome.storage.sync), nên một phần dữ liệu chỉ lưu cục bộ trên máy
               này (chrome.storage.local) và sẽ KHÔNG đồng bộ sang máy khác. Hãy cân nhắc giảm dữ liệu hoặc export backup

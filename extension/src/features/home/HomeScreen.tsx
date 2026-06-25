@@ -45,24 +45,49 @@ export function HomeScreen({ onEnterDashboard }: HomeScreenProps) {
   }, [currentQuoteText]);
 
   return (
-    <div className="home-screen" role="region" aria-label="Màn hình Home">
-      <div className="home-overlay" aria-hidden="true" />
-      <div className="home-content">
-        <div className="home-clock" aria-live="off">
+    <div
+      className="absolute inset-0 flex flex-col items-center justify-center overflow-hidden text-white"
+      role="region"
+      aria-label="Màn hình Home"
+    >
+      <div
+        className="absolute inset-0 z-[1] bg-[linear-gradient(180deg,rgba(0,0,0,.30)_0%,rgba(0,0,0,.14)_35%,rgba(0,0,0,.46)_100%)]"
+        aria-hidden="true"
+      />
+      <div className="relative z-[2] flex flex-col items-center gap-1.5 px-6 text-center [text-shadow:0_2px_12px_rgba(0,0,0,.45),0_1px_2px_rgba(0,0,0,.4)]">
+        <div
+          className="text-[clamp(64px,13vw,150px)] font-light leading-none tracking-[-.02em] [font-variant-numeric:tabular-nums]"
+          aria-live="off"
+        >
           {clock.hh}:{clock.mm}
-          <span className="sec">{clock.ss}</span>
+          <span className="ml-[.1em] align-super text-[.42em] font-normal opacity-80">{clock.ss}</span>
         </div>
-        <div className="home-date">{formatHomeDate(now)}</div>
-        <div className="home-greeting">{formatGreeting(now)}</div>
-        <div className={`home-quote ${quoteFading ? 'fading' : ''}`.trim()}>{displayedQuote}</div>
+        <div className="mt-1.5 text-[clamp(15px,2vw,20px)] font-medium opacity-[.92]">{formatHomeDate(now)}</div>
+        <div className="mt-[22px] text-[clamp(20px,3vw,30px)] font-semibold">{formatGreeting(now)}</div>
+        <div
+          className={`mt-3.5 max-w-[620px] text-[clamp(14px,1.7vw,18px)] font-normal italic leading-[1.55] opacity-90 transition-opacity duration-200 [transition-timing-function:var(--ease-standard)] ${
+            quoteFading ? 'opacity-0 duration-150' : ''
+          }`}
+        >
+          {displayedQuote}
+        </div>
       </div>
-      <div className="home-enter-wrap">
-        <button id="home-enter-btn" type="button" onClick={onEnterDashboard} aria-label="Vào Dashboard">
-          <ChevronsDown className="icon" size={17} />
-          <span className="home-enter-caption">Vào Dashboard</span>
+      <div className="relative z-[2] mt-16 flex flex-col items-center gap-1.5">
+        <button
+          type="button"
+          onClick={onEnterDashboard}
+          aria-label="Vào Dashboard"
+          className="-mx-4 -mt-[10px] -mb-[10px] flex flex-col items-center gap-1.5 px-4 py-[10px] text-white transition-opacity duration-150 [transition-timing-function:var(--ease-standard)] hover:opacity-[.82] focus-visible:rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
+        >
+          <ChevronsDown className="icon h-[26px] w-[26px] animate-homeEnterBounce" strokeWidth={1.7} size={17} />
+          <span className="text-[0.7188rem] font-semibold uppercase tracking-[.08em] opacity-75">Vào Dashboard</span>
         </button>
       </div>
-      {taskCount > 0 && <div id="home-today-hint">{taskCount} việc cần làm hôm nay</div>}
+      {taskCount > 0 && (
+        <div className="absolute bottom-[18px] right-[18px] z-[3] max-w-[280px] text-right text-[clamp(11px,1.1vw,12.5px)] font-normal tracking-[.01em] opacity-[.58]">
+          {taskCount} việc cần làm hôm nay
+        </div>
+      )}
     </div>
   );
 }

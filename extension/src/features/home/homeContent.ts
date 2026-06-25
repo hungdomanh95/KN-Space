@@ -81,6 +81,11 @@ export function formatHomeDate(now: Date): string {
   return `${DAY_NAMES[now.getDay()]}, ngày ${now.getDate()} tháng ${now.getMonth() + 1} năm ${now.getFullYear()}`;
 }
 
+/** Ngày rút gọn "Thứ X, DD/MM" (không có năm) — dùng cho khối Today, không gian hiển thị nhỏ. */
+export function formatHomeDateShort(now: Date): string {
+  return `${DAY_NAMES[now.getDay()]}, ${pad2(now.getDate())}/${pad2(now.getMonth() + 1)}`;
+}
+
 export function formatGreeting(now: Date, name = HOME_NAME): string {
   const h = now.getHours();
   const part = h < 11 ? 'Chào buổi sáng' : h < 14 ? 'Chào buổi trưa' : h < 18 ? 'Chào buổi chiều' : 'Chào buổi tối';

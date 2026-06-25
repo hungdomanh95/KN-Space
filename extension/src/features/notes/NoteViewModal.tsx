@@ -15,7 +15,7 @@ export function NoteViewModal({ note, onClose, onEdit }: NoteViewModalProps) {
   const isHidden = state.ui.hiddenNoteContentIds.has(note.id);
 
   return (
-    <Modal onClose={onClose} className="modal-note-view">
+    <Modal onClose={onClose} className="modal-note-view w-[720px] max-w-[92vw] max-h-[88vh] max-md:w-[94vw]">
       <div className="note-modal-head">
         <h2>{note.title}</h2>
         <button
@@ -27,7 +27,9 @@ export function NoteViewModal({ note, onClose, onEdit }: NoteViewModalProps) {
           {isHidden ? <Eye className="icon" size={13} /> : <EyeOff className="icon" size={13} />}
         </button>
       </div>
-      <div className="note-view-body">{isHidden ? maskContent(note.content) : note.content}</div>
+      <div className="max-h-[60vh] overflow-y-auto whitespace-pre-wrap px-0.5 py-1 text-[0.9375rem] leading-[1.65] text-[var(--text)]">
+        {isHidden ? maskContent(note.content) : note.content}
+      </div>
       <div className="modal-actions">
         <button className="btn-ghost" onClick={onClose}>
           Đóng

@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<title>KN-Space — Demo so sánh tuỳ biến layout</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: linear-gradient(160deg, #2b3a4a, #1c2530); min-height: 100vh; color: #232220;
+  }
+  .topbar {
+    display: flex; align-items: center; gap: 10px; padding: 14px 18px;
+    background: rgba(20,20,30,.55); backdrop-filter: blur(8px);
+  }
+  .topbar h1 { color: #fff; font-size: 15px; font-weight: 700; margin: 0; flex: 1; }
+  .hint { color: rgba(255,255,255,.65); font-size: 12px; padding: 0 18px 14px; }
+  .panel { padding: 18px; }
+
+  .block {
+    background: rgba(253,253,252,.95); border: 1px solid rgba(0,0,0,.08); border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.18); display: flex; flex-direction: column; overflow: hidden;
+    min-width: 0; min-height: 0; position: relative;
+  }
+  .block-head {
+    display: flex; align-items: center; gap: 8px; padding: 9px 12px; font-weight: 700; font-size: 13px;
+    cursor: grab; border-bottom: 1px solid rgba(0,0,0,.06); user-select: none; flex: 0 0 auto;
+  }
+  .block-head:active { cursor: grabbing; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+  .block-body { flex: 1; overflow: hidden; padding: 8px 12px 12px; font-size: 12.5px; color: #6b6760; }
+  .block-body .row { padding: 4px 0; border-bottom: 1px solid rgba(0,0,0,.05); }
+  .block.dragging { opacity: .4; }
+  .block.drag-over { outline: 2px dashed #5457d6; outline-offset: 3px; }
+  /* Khi rê đến gần mép trái/phải khối khác — đổi sang viền liền 1 bên để gợi ý "ghép ngang"
+     khác hẳn cảm giác "chèn trên/dưới" (outline nét đứt bao quanh cả khối). */
+  .block.drag-over.zone-side { outline: none; box-shadow: inset 4px 0 0 0 #5457d6, inset -4px 0 0 0 #5457d6; }
+  .slot-row { display: flex; gap: 12px; min-width: 0; min-height: 0; position: relative; }
+
+  /* ===== Layout cột tuỳ biến =====
+     GAP THẬT giữa khối/cột giữ nguyên 12px, đúng như dashboard hiện tại (.main-block gap) —
+     KHÔNG bỏ gap. Splitter không thay thế gap, mà là 1 lớp "tai nghe" tuyệt đối (position:
+     absolute) NẰM ĐÈ lên đúng giữa khoảng gap đã có sẵn (đo bằng offsetTop/offsetLeft sau khi
+     layout flex tính xong) — vùng bắt chuột rộng hơn (20px) để dễ kéo, nhưng phần hiển thị
+     (::after) mặc định trong suốt, chỉ sáng đường kẻ accent khi hover/đang kéo. */
+  #cols-wrap { display: flex; gap: 12px; align-items: stretch; height: calc(100vh - 130px); position: relative; }
+  .col { display: flex; flex-direction: column; gap: 12px; min-width: 0; position: relative; }
+  #cols-wrap .block { flex: 1 1 0; }
+
+  .col-splitter, .row-splitter { position: absolute; z-index: 5; }
+  .col-splitter { width: 20px; top: 0; bottom: 0; margin-left: -10px; cursor: col-resize; }
+  .row-splitter { height: 20px; left: 0; right: 0; margin-top: -10px; cursor: row-resize; }
+  .col-splitter::after {
+    content: ''; position: absolute; left: 50%; top: 8%; bottom: 8%; width: 2px; transform: translateX(-50%);
+    border-radius: 2px; background: transparent; transition: background .15s, width .15s;
+  }
+  .row-splitter::after {
+    content: ''; position: absolute; top: 50%; left: 8%; right: 8%; height: 2px; transform: translateY(-50%);
+    border-radius: 2px; background: transparent; transition: background .15s, height .15s;
+  }
+  .col-splitter:hover::after, .col-splitter.active::after { width: 3px; background: #5457d6; }
+  .row-splitter:hover::after, .row-splitter.active::after { height: 3px; background: #5457d6; }
+  /* ===== Widget Settings (Home/Space-switcher/Cài đặt) — dùng ĐÚNG class .block như mọi khối
+     khác (kéo-thả/ghép ngang được như thường), chỉ khác: chiều cao bị "khoá" hằng số trong
+     JS (xem HEIGHT_LOCKED_IDS) vì nội dung chỉ 1 dòng icon, không có gì để co giãn thêm. ===== */
+  .block[data-id="settings"] .block-head { cursor: grab; }
+  .cw-btn {
+    width: 30px; height: 30px; border-radius: 9px; background: rgba(0,0,0,.04);
+    display: flex; align-items: center; justify-content: center; font-size: 14px; flex: 0 0 auto;
+  }
+  .cw-space {
+    display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 9px;
+    background: rgba(0,0,0,.04); font-size: 13px; font-weight: 600; color: #232220; flex: 1;
+    justify-content: center;
+  }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <h1>KN-Space — Demo layout tuỳ biến (kéo-thả + resize trực tiếp)</h1>
+  </div>
+  <div class="hint">Kéo khối thả vào GIỮA khối khác để chèn trên/dưới · Thả vào MÉP TRÁI/PHẢI để ghép 2 khối nằm ngang · Kéo thanh ẩn giữa 2 khối/cột để resize.</div>
+
+  <div class="panel" id="panel-cols">
+    <div id="cols-wrap"></div>
+  </div>
+
+<script>
+const BLOCKS = [
+  { id: 'today', name: 'Today', color: '#f5a623', rows: ['10:42 · Thứ Tư 25/06'] },
+  { id: 'tasks', name: 'Việc cần làm', color: '#5457d6', rows: ['☑ Kiểm tra thông tin GĐKKH', '☐ Đăng ký học cầu lông T7', '☐ Đóng tiền sân cầu lông T7'] },
+  { id: 'reminders', name: 'Nhắc việc', color: '#14b8a6', rows: ['🔔 Họp team 14:00'] },
+  { id: 'notes', name: 'Ghi chú', color: '#8b7cf6', rows: ['Mật khẩu wifi công ty', 'Ý tưởng landing page', 'Note họp tuần này'] },
+  { id: 'noti', name: 'Thông báo', color: '#e2566f', rows: ['Đăng ký học cầu lông T7 · Xong', 'Push Up · Thói quen · Xong', 'Plank · Thói quen · Xong'] },
+  { id: 'habits', name: 'Thói quen', color: '#e8873d', rows: ['Push Up — 3 ngày liên tiếp', 'Battle Rope — 1 ngày', 'Plank — 5 ngày liên tiếp'] },
+  // Widget Settings — kéo-thả tự do như mọi khối khác, chỉ khác: chiều cao LUÔN cố định nhỏ
+  // (xem HEIGHT_LOCKED_IDS) vì nội dung chỉ 1 dòng icon, không có gì để co giãn thêm.
+  { id: 'settings', name: '', color: '', rows: [] },
+];
+const HEIGHT_LOCKED_IDS = new Set(['settings']);
+
+function blockEl(b) {
+  const el = document.createElement('div');
+  el.className = 'block';
+  el.dataset.id = b.id;
+  if (b.id === 'settings') {
+    el.innerHTML = `
+      <div class="block-head" style="border-bottom:none;">
+        <span class="cw-btn">🏠</span>
+        <span class="cw-space"><span class="dot" style="background:#5457d6"></span>Cá nhân ⌄</span>
+        <span class="cw-btn">⚙️</span>
+      </div>`;
+  } else {
+    el.innerHTML = `
+      <div class="block-head">
+        <span class="dot" style="background:${b.color}"></span>${b.name}
+      </div>
+      <div class="block-body">${b.rows.map(r => `<div class="row">${r}</div>`).join('')}</div>
+    `;
+  }
+  return el;
+}
+
+/* ================= Layout cột tuỳ biến (kéo-thả tự do + ghép ngang) =================
+   Mỗi cột là 1 danh sách "slot" xếp dọc. 1 slot có thể là:
+   - { type:'single', id, h }                      — 1 khối chiếm cả chiều rộng cột
+   - { type:'row', items:[{id,w},{id,w}], h }       — 2 khối nằm NGANG cạnh nhau trong slot đó
+   `h`/`w` chỉ là tỉ lệ flex-grow tương đối (không cần cộng = 100) nên thêm/bớt khối không
+   cần tính lại chuẩn hoá % — giữ đơn giản cho demo. */
+const colsState = {
+  widths: [32, 36, 32], // % mỗi cột
+  cols: [
+    [{ type: 'single', id: 'today', h: 18 }, { type: 'single', id: 'notes', h: 82 }],
+    [{ type: 'single', id: 'tasks', h: 65 }, { type: 'single', id: 'reminders', h: 35 }],
+    [{ type: 'single', id: 'settings', h: 14 }, { type: 'single', id: 'noti', h: 60 }, { type: 'single', id: 'habits', h: 40 }],
+  ],
+};
+const colsWrap = document.getElementById('cols-wrap');
+let draggedId = null;
+let activeSplitter = null; // { kind:'row'|'col'|'subcol', ci, slotIndex } — giữ highlight khi đang kéo
+
+function findLocation(id) {
+  for (let ci = 0; ci < colsState.cols.length; ci++) {
+    const col = colsState.cols[ci];
+    for (let si = 0; si < col.length; si++) {
+      const slot = col[si];
+      if (slot.type === 'single' && slot.id === id) return { ci, si, sub: null };
+      if (slot.type === 'row') {
+        const subIdx = slot.items.findIndex(it => it.id === id);
+        if (subIdx !== -1) return { ci, si, sub: subIdx };
+      }
+    }
+  }
+  return null;
+}
+
+function isHeightLocked(slot) {
+  return slot.type === 'single' && HEIGHT_LOCKED_IDS.has(slot.id);
+}
+function defaultHFor(id) {
+  return HEIGHT_LOCKED_IDS.has(id) ? 14 : 30;
+}
+
+function removeId(id) {
+  const loc = findLocation(id);
+  if (!loc) return;
+  const col = colsState.cols[loc.ci];
+  const slot = col[loc.si];
+  if (slot.type === 'single') {
+    col.splice(loc.si, 1);
+  } else {
+    slot.items.splice(loc.sub, 1);
+    if (slot.items.length === 1) {
+      col[loc.si] = { type: 'single', id: slot.items[0].id, h: slot.h };
+    }
+  }
+}
+
+function getZone(rect, x, y, allowSide) {
+  const relX = (x - rect.left) / rect.width;
+  const relY = (y - rect.top) / rect.height;
+  if (allowSide) {
+    if (relX < 0.25) return 'left';
+    if (relX > 0.75) return 'right';
+  }
+  return relY < 0.5 ? 'top' : 'bottom';
+}
+
+function dropOnTarget(targetId, zone) {
+  if (!draggedId || draggedId === targetId) return;
+  removeId(draggedId);
+  const loc = findLocation(targetId); // tìm lại SAU khi remove (vị trí có thể đã đổi)
+  if (!loc) return;
+  const col = colsState.cols[loc.ci];
+  if (loc.sub == null && (zone === 'left' || zone === 'right')) {
+    // ghép ngang với khối đơn -> thành 1 row 2 khối
+    const slot = col[loc.si];
+    col[loc.si] = zone === 'left'
+      ? { type: 'row', items: [{ id: draggedId, w: 50 }, { id: slot.id, w: 50 }], h: slot.h }
+      : { type: 'row', items: [{ id: slot.id, w: 50 }, { id: draggedId, w: 50 }], h: slot.h };
+  } else {
+    // chèn theo chiều dọc trước/sau slot hiện tại (row đã đầy 2 khối thì luôn chèn dọc)
+    const at = zone === 'top' ? loc.si : loc.si + 1;
+    col.splice(at, 0, { type: 'single', id: draggedId, h: defaultHFor(draggedId) });
+  }
+  draggedId = null;
+  renderCols();
+}
+
+function makeBlockEl(id, ci, si, sub) {
+  const bDef = BLOCKS.find(b => b.id === id);
+  const el = blockEl(bDef);
+  el.draggable = false;
+  el.querySelector('.block-head').addEventListener('mousedown', () => { el.draggable = true; });
+  document.addEventListener('mouseup', () => { el.draggable = false; });
+
+  el.addEventListener('dragstart', () => { draggedId = id; el.classList.add('dragging'); });
+  el.addEventListener('dragend', () => { el.classList.remove('dragging'); renderCols(); });
+  el.addEventListener('dragover', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    el.classList.add('drag-over');
+    const zone = getZone(el.getBoundingClientRect(), e.clientX, e.clientY, sub == null);
+    el.dataset.zone = zone;
+    el.classList.toggle('zone-side', zone === 'left' || zone === 'right');
+  });
+  el.addEventListener('dragleave', () => { el.classList.remove('drag-over', 'zone-side'); });
+  el.addEventListener('drop', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    el.classList.remove('drag-over', 'zone-side');
+    dropOnTarget(id, el.dataset.zone || 'bottom');
+  });
+  return el;
+}
+
+function renderCols() {
+  colsWrap.innerHTML = '';
+  const colEls = [];
+  const slotElsByCol = []; // [ci] -> [slotEl, ...] (slotEl = chính block, hoặc div.slot-row bọc 2 block)
+
+  // ---- PASS 1: dựng cột/slot theo flex layout bình thường ----
+  colsState.cols.forEach((col, ci) => {
+    const colEl = document.createElement('div');
+    colEl.className = 'col';
+    colEl.style.flex = `0 0 ${colsState.widths[ci]}%`;
+    const slotEls = [];
+
+    col.forEach((slot, si) => {
+      let slotEl;
+      if (slot.type === 'single') {
+        slotEl = makeBlockEl(slot.id, ci, si, null);
+      } else {
+        slotEl = document.createElement('div');
+        slotEl.className = 'slot-row';
+        slot.items.forEach((it, subIdx) => {
+          const sub = makeBlockEl(it.id, ci, si, subIdx);
+          sub.style.flex = `${it.w} 1 0`;
+          slotEl.appendChild(sub);
+        });
+      }
+      // Slot bị khoá chiều cao (vd settings) phải dùng flex:0 0 auto (cao THEO NỘI DUNG thật,
+      // tính bằng px) — KHÔNG dùng flex-grow theo trọng số `h`, vì flex-grow luôn chia tỉ lệ
+      // theo % không gian còn lại trong cột, nên dù trọng số nhỏ vẫn có thể bị kéo cao bất
+      // thường khi slot bên cạnh có trọng số nhỏ/cột cao — không phải pixel cố định thật.
+      slotEl.style.flex = isHeightLocked(slot) ? '0 0 auto' : `${slot.h} 1 0`;
+      colEl.appendChild(slotEl);
+      slotEls.push(slotEl);
+    });
+
+    colEl.addEventListener('dragover', (e) => e.preventDefault());
+    colEl.addEventListener('drop', (e) => {
+      if (e.target !== colEl || !draggedId) return;
+      removeId(draggedId);
+      colsState.cols[ci].push({ type: 'single', id: draggedId, h: defaultHFor(draggedId) });
+      draggedId = null;
+      renderCols();
+    });
+
+    colsWrap.appendChild(colEl);
+    colEls.push(colEl);
+    slotElsByCol.push(slotEls);
+  });
+
+  // ---- PASS 2: đo rect thật, đặt splitter đè giữa gap 12px sẵn có ----
+  const wrapRect = colsWrap.getBoundingClientRect();
+
+  colsState.cols.forEach((col, ci) => {
+    const colEl = colEls[ci];
+    const colRect = colEl.getBoundingClientRect();
+    const slotEls = slotElsByCol[ci];
+
+    // splitter chiều cao giữa 2 slot liền kề trong cột
+    for (let si = 0; si < slotEls.length - 1; si++) {
+      const aRect = slotEls[si].getBoundingClientRect();
+      const bRect = slotEls[si + 1].getBoundingClientRect();
+      const centerY = (aRect.bottom + bRect.top) / 2 - colRect.top;
+      const rs = document.createElement('div');
+      rs.className = 'row-splitter';
+      rs.style.top = `${centerY}px`;
+      if (activeSplitter && activeSplitter.kind === 'row' && activeSplitter.ci === ci && activeSplitter.si === si) rs.classList.add('active');
+      rs.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        activeSplitter = { kind: 'row', ci, si };
+        const startY = e.clientY;
+        const liveColRect = colEl.getBoundingClientRect();
+        const a = col[si], c = col[si + 1];
+        const startA = a.h, startC = c.h;
+        const aLocked = isHeightLocked(a), cLocked = isHeightLocked(c);
+        function onMove(ev) {
+          const dPct = ((ev.clientY - startY) / liveColRect.height) * (startA + startC);
+          // Slot bị "khoá chiều cao" (vd settings) giữ nguyên h — phía bên kia hấp thụ
+          // toàn bộ thay đổi, vẫn kéo được nhưng bản thân slot khoá không phình ra.
+          if (!aLocked) a.h = Math.max(8, startA + dPct);
+          if (!cLocked) c.h = Math.max(8, startC - dPct);
+          renderCols();
+        }
+        function onUp() {
+          activeSplitter = null;
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+          renderCols();
+        }
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      });
+      colEl.appendChild(rs);
+    }
+
+    // splitter chiều rộng giữa 2 cột
+    if (ci < colsState.cols.length - 1) {
+      const nextColRect = colEls[ci + 1].getBoundingClientRect();
+      const centerX = (colRect.right + nextColRect.left) / 2 - wrapRect.left;
+      const cs = document.createElement('div');
+      cs.className = 'col-splitter';
+      cs.style.left = `${centerX}px`;
+      if (activeSplitter && activeSplitter.kind === 'col' && activeSplitter.ci === ci) cs.classList.add('active');
+      cs.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        activeSplitter = { kind: 'col', ci };
+        const startX = e.clientX;
+        const liveWrapRect = colsWrap.getBoundingClientRect();
+        const startA = colsState.widths[ci], startB = colsState.widths[ci + 1];
+        function onMove(ev) {
+          const dPct = ((ev.clientX - startX) / liveWrapRect.width) * 100;
+          colsState.widths[ci] = Math.max(10, startA + dPct);
+          colsState.widths[ci + 1] = Math.max(10, startB - dPct);
+          renderCols();
+        }
+        function onUp() {
+          activeSplitter = null;
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+          renderCols();
+        }
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      });
+      colsWrap.appendChild(cs);
+    }
+
+    // splitter chiều rộng giữa 2 khối trong CÙNG 1 row-slot (ghép ngang)
+    col.forEach((slot, si) => {
+      if (slot.type !== 'row') return;
+      const slotEl = slotEls[si];
+      const subEls = Array.from(slotEl.children);
+      const slotRect = slotEl.getBoundingClientRect();
+      const aRect = subEls[0].getBoundingClientRect();
+      const bRect = subEls[1].getBoundingClientRect();
+      const centerX = (aRect.right + bRect.left) / 2 - slotRect.left;
+      const cs = document.createElement('div');
+      cs.className = 'col-splitter';
+      cs.style.left = `${centerX}px`;
+      if (activeSplitter && activeSplitter.kind === 'subcol' && activeSplitter.ci === ci && activeSplitter.si === si) cs.classList.add('active');
+      cs.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        activeSplitter = { kind: 'subcol', ci, si };
+        const startX = e.clientX;
+        const liveSlotRect = slotEl.getBoundingClientRect();
+        const startA = slot.items[0].w, startB = slot.items[1].w;
+        function onMove(ev) {
+          const dPct = ((ev.clientX - startX) / liveSlotRect.width) * (startA + startB);
+          slot.items[0].w = Math.max(10, startA + dPct);
+          slot.items[1].w = Math.max(10, startB - dPct);
+          renderCols();
+        }
+        function onUp() {
+          activeSplitter = null;
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+          renderCols();
+        }
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      });
+      slotEl.style.position = 'relative';
+      slotEl.appendChild(cs);
+    });
+  });
+}
+renderCols();
+
+window.addEventListener('resize', renderCols);
+</script>
+</body>
+</html>

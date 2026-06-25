@@ -1,5 +1,5 @@
 import type { AppState, ExportPayload, NoteSortBy, Screen, Settings, Space, TaskFilter } from '../types';
-import { buildUiInitialState, normalizeSettings } from '../storage/chromeStorage';
+import { buildUiInitialState, normalizeDashboardLayout, normalizeSettings } from '../storage/chromeStorage';
 import { dayIndex, epochDay } from '../features/home/homeContent';
 import type { HabitAction } from './reducers/habits';
 import { habitsReducer } from './reducers/habits';
@@ -61,9 +61,6 @@ const SETTINGS_ACTION_TYPES = new Set([
   'SETTINGS_HOME_BG_USE_LINK_MODE',
   'SETTINGS_SET_HOME_BG_AUTO_ROTATE',
   'SETTINGS_HOME_BG_ROTATE_NEXT',
-  'SETTINGS_SET_LAYOUT_SIZES',
-  'SETTINGS_RESET_LAYOUT',
-  'SETTINGS_SET_MAIN_BLOCK_ORDER',
   'BLOCK_TOGGLE_COLLAPSED',
   'SETTINGS_SET_HOME_QUOTE_TEXT',
   'SETTINGS_SET_HOME_QUOTE_INDEX',
@@ -78,6 +75,8 @@ const SPACES_ACTION_TYPES = new Set([
   'SPACE_SET_ENABLED_BLOCKS',
   'SPACE_DELETE',
   'SPACE_MOVE',
+  'SPACE_SET_DASHBOARD_LAYOUT',
+  'SPACE_RESET_DASHBOARD_LAYOUT',
 ]);
 
 /**
@@ -152,7 +151,9 @@ function normalizeImportedSpace(raw: Partial<Space> & { id?: string }): Space {
       notes: raw.enabledBlocks?.notes ?? true,
       // Khối Thông báo không có cấu hình tắt theo Space — luôn `true`, bất kể data import.
       reminders: true,
+      today: raw.enabledBlocks?.today ?? true,
     },
+    dashboardLayout: normalizeDashboardLayout(raw.dashboardLayout),
     tasks: Array.isArray(raw.tasks)
       ? raw.tasks.map((t, idx) => ({ ...t, content: t.content ?? '', order: t.order ?? idx }))
       : [],

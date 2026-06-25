@@ -17,12 +17,16 @@ interface ModalProps {
 export function Modal({ onClose, className, children }: ModalProps) {
   return createPortal(
     <div
-      className="overlay"
+      className="overlay fixed inset-0 z-50 flex items-center justify-center bg-[rgba(20,20,30,.45)] backdrop-blur-[2px] animate-overlayFadeIn"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className={`modal ${className ?? ''}`.trim()}>{children}</div>
+      <div
+        className={`modal max-h-[85vh] w-[440px] max-w-[90vw] overflow-y-auto rounded-2xl border border-[color:var(--border-hairline)] bg-[var(--modal-bg)] p-[22px] shadow-[0_20px_60px_rgba(0,0,0,.16)] animate-modalPopIn ${className ?? ''}`.trim()}
+      >
+        {children}
+      </div>
     </div>,
     document.body,
   );

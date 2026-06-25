@@ -85,32 +85,32 @@ export function BlockShell({
       onDragLeave={onDragLeave}
       onDrop={onDrop}
     >
-      <div className="block-head" ref={headRef} onMouseDown={onHeadMouseDown}>
-        <h2>
+      <div className="block-head max-sm:flex-wrap max-sm:px-2.5 max-sm:py-2.5" ref={headRef} onMouseDown={onHeadMouseDown}>
+        <h2 className="m-0 flex items-center gap-[9px] text-[0.9062rem] font-bold tracking-[-.01em]">
           {showGripHandle && (
-            <span className="grip-handle" aria-hidden="true">
-              <GripVertical className="icon" size={13} />
+            <span className="flex flex-none items-center text-[var(--text-dim)] opacity-45" aria-hidden="true">
+              <GripVertical className="icon h-[13px] w-[13px]" size={13} />
             </span>
           )}
           <IconChip icon={icon} background={iconBg} color={iconColor} />
-          <span className="title-text">{title}</span>
+          <span>{title}</span>
         </h2>
-        <div className="head-actions">
+        <div className="flex flex-none items-center gap-2">
           {!collapsed && headerActions}
-          {headerActions && <span className="head-divider" />}
+          {headerActions && <span className="h-[18px] w-px flex-none bg-[var(--border)]" />}
           <button
-            className="head-eye-btn"
+            className="flex flex-none items-center justify-center rounded-[7px] bg-transparent p-[5px] text-[var(--text-dim)] transition-[color,background] duration-150 hover:bg-[rgba(var(--accent-rgb),.1)] hover:text-[var(--accent)]"
             onClick={onToggleCollapsed}
             title={collapsed ? `Hiện nội dung ${title}` : `Ẩn nội dung ${title}`}
             aria-label={collapsed ? `Hiện nội dung ${title}` : `Ẩn nội dung ${title}`}
           >
-            {collapsed ? <EyeOff className="icon" size={14} /> : <Eye className="icon" size={14} />}
+            {collapsed ? <EyeOff className="icon h-[14px] w-[14px]" size={14} /> : <Eye className="icon h-[14px] w-[14px]" size={14} />}
           </button>
         </div>
       </div>
       {collapsed ? (
-        <div className="collapsed-placeholder">
-          <EyeOff className="icon" size={18} />
+        <div className="flex flex-1 flex-col items-center justify-center gap-1.5 p-4 text-[0.8438rem] text-[var(--text-dim)]">
+          <EyeOff className="icon h-[18px] w-[18px] opacity-50" size={18} />
           <span>Đã ẩn nội dung &quot;{title}&quot;</span>
         </div>
       ) : (

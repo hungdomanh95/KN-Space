@@ -105,7 +105,7 @@ export function HomeBackgroundSettings() {
   }
 
   return (
-    <div className="setting-block span-2">
+    <div className="setting-block span-2 col-span-2 mb-5">
       {/* Tần suất tự động đổi ảnh đặt ở ĐẦU tab, cùng style segmented-options với "Tần suất đổi
           quote" (tab Quote) — đúng vị trí + kiểu control trong mockup (#autorotate-options /
           #quoterotate-options dùng chung renderAutoRotateOptions-style), không phải dropdown. */}
@@ -125,21 +125,34 @@ export function HomeBackgroundSettings() {
           ))}
         </div>
       </div>
-      <label>Ảnh nền Home (link ảnh hoặc upload)</label>
-      <div className="home-bg-grid">
+      <label className="mb-2.5 flex items-center gap-[7px] text-[0.8438rem] font-bold uppercase tracking-[.03em] text-[var(--text-dim)]">
+        Ảnh nền Home (link ảnh hoặc upload)
+      </label>
+      <div className="mb-1 grid grid-cols-3 gap-3.5">
         {homeBackground.images.map((slot, i) => {
           const isUpload = slot.type === 'upload';
+          const isBroken = brokenSlots.has(i);
           return (
-            <div className="home-bg-item" key={i}>
+            <div className="flex flex-col gap-[7px]" key={i}>
               <button
                 type="button"
-                className={`home-bg-thumb ${i === homeBackground.index ? 'active-slot' : ''} ${brokenSlots.has(i) ? 'broken' : ''}`}
+                className={`relative w-full cursor-pointer overflow-hidden rounded-[10px] border-2 border-transparent
+                  bg-[var(--raised)] bg-cover bg-center p-0 shadow-[0_0_0_1px_var(--border)_inset]
+                  transition-[border-color,transform] duration-150 [transition-timing-function:var(--ease-standard)]
+                  [aspect-ratio:4/3] hover:scale-[1.02]
+                  ${i === homeBackground.index ? 'border-[color:var(--accent)]' : ''}`}
                 style={{ backgroundImage: `url('${slot.value}')` }}
                 title="Dùng ảnh này ngay"
                 aria-label={`Dùng ảnh nền số ${i + 1}`}
                 onClick={() => dispatch({ type: 'SETTINGS_SET_HOME_BG_INDEX', payload: { index: i } })}
-              />
-              <div className="home-bg-row">
+              >
+                {isBroken && (
+                  <span className="absolute inset-0 flex items-center justify-center bg-[rgba(220,60,60,.55)] text-[0.6875rem] font-semibold text-white">
+                    Link lỗi
+                  </span>
+                )}
+              </button>
+              <div className="flex items-center gap-1.5">
                 <input
                   type="url"
                   value={isUpload ? '' : drafts[i] ?? ''}
@@ -155,15 +168,19 @@ export function HomeBackgroundSettings() {
                     if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
                   }}
                   aria-label={`Sửa link ảnh nền số ${i + 1}`}
+                  className="min-w-0 w-full rounded-md border border-[color:var(--border)] bg-[var(--raised)] px-[7px]
+                    py-[5px] text-[0.7188rem] text-[var(--text)] disabled:cursor-default disabled:text-[var(--text-dim)]"
                 />
                 <button
                   type="button"
-                  className="home-bg-upload-btn"
+                  className="flex h-[26px] w-[26px] flex-none items-center justify-center rounded-md border
+                    border-[color:var(--border)] bg-[var(--raised)] text-[var(--text-dim)] transition-[color,border-color]
+                    duration-150 [transition-timing-function:var(--ease-standard)] hover:border-[color:var(--accent)] hover:text-[var(--accent)]"
                   title="Upload ảnh từ máy"
                   aria-label={`Upload ảnh từ máy cho ô số ${i + 1}`}
                   onClick={() => fileInputRefs.current[i]?.click()}
                 >
-                  <Upload className="icon" size={13} />
+                  <Upload className="icon h-[13px] w-[13px]" size={13} />
                 </button>
                 <input
                   ref={(el) => {
@@ -180,8 +197,13 @@ export function HomeBackgroundSettings() {
                 />
               </div>
               {isUpload && (
-                <button type="button" className="home-bg-use-link-btn" onClick={() => useLinkForSlot(i)}>
-                  <Link2 className="icon" size={11} /> Dùng link
+                <button
+                  type="button"
+                  className="inline-flex w-full items-center gap-1 bg-transparent p-0 text-left text-[0.6562rem]
+                    font-semibold text-[var(--accent)]"
+                  onClick={() => useLinkForSlot(i)}
+                >
+                  <Link2 className="icon h-[11px] w-[11px]" size={11} /> Dùng link
                 </button>
               )}
             </div>

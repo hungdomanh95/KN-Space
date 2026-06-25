@@ -115,7 +115,7 @@ export function NoteCard({
               aria-label="Kéo để đổi thứ tự card"
               onMouseDown={armDraggable}
             >
-              <GripVertical className="icon" size={13} />
+              <GripVertical className="icon h-[13px] w-[13px]" size={13} />
             </span>
           )}
           <button

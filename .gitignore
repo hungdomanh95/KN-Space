@@ -1,5 +1,8 @@
 .history/
 
+# File export/import dữ liệu cá nhân (qua Settings > Export JSON) — không phải code, không commit.
+kn-space-backup-*.json
+
 # extension (Chrome Extension MV3 + React + Vite)
 extension/node_modules/
 extension/dist/

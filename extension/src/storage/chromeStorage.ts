@@ -1,5 +1,5 @@
-import type { AppState, HomeBackground, HomeQuotes, QuoteRotateMode, Settings, Space, UiState } from '../types';
-import { createSeedSpaces, defaultSettings } from '../state/seed';
+import type { AppState, DashboardLayout, HomeBackground, HomeQuotes, QuoteRotateMode, Settings, Space, UiState } from '../types';
+import { createSeedSpaces, defaultDashboardLayout, defaultSettings } from '../state/seed';
 
 // ============================================================================
 // Chiến lược key
@@ -215,7 +215,12 @@ function normalizeSpace(space: Space): Space {
       notes: space.enabledBlocks?.notes ?? true,
       // Khối Thông báo không có cấu hình tắt theo Space — luôn `true`, không đọc từ data cũ.
       reminders: true,
+      // Space lưu TRƯỚC khi có field `today` -> mặc định hiện, không tự ẩn khối của user cũ.
+      today: space.enabledBlocks?.today ?? true,
     },
+    // Layout RIÊNG theo Space — Space lưu TRƯỚC khi field này được tách ra khỏi Settings
+    // chung sẽ thiếu hẳn -> fallback `defaultDashboardLayout()` qua normalizeDashboardLayout.
+    dashboardLayout: normalizeDashboardLayout(space.dashboardLayout),
     tasks: Array.isArray(space.tasks)
       ? space.tasks.map((t, idx) => ({ ...t, content: t.content ?? '', order: t.order ?? idx }))
       : [],
@@ -255,6 +260,66 @@ export function normalizeHomeBackground(raw: HomeBackground | undefined, fallbac
 
 const VALID_QUOTE_ROTATE_MODES = new Set<QuoteRotateMode>(['daily', 'onopen', 'every15m', 'every1h']);
 
+/** Mọi `LayoutBlockKey` từng tồn tại trong 1 slot (đơn hoặc ghép ngang) của layout đã lưu. */
+function collectLayoutBlockIds(layout: DashboardLayout): Set<string> {
+  const ids = new Set<string>();
+  layout.cols.forEach((col) =>
+    col.forEach((slot) => {
+      if (slot.type === 'single') ids.add(slot.id);
+      else slot.items.forEach((it) => ids.add(it.id));
+    }),
+  );
+  return ids;
+}
+
+/**
+ * Chuẩn hoá `dashboardLayout` của 1 Space (field RIÊNG theo từng Space, áp dụng qua
+ * `normalizeSpace` khi load TỪNG Space — không còn dùng chung 1 lần cho Settings). Không viết
+ * migration phức tạp từ schema cứng cũ (layoutSizes/mainBlockOrder, dự án giai đoạn cá nhân,
+ * quy mô nhỏ), nhưng vẫn cần vá 2 trường hợp thực tế đã gặp với layout đã lưu HỢP LỆ về cấu
+ * trúc nhưng sai dữ liệu:
+ *
+ * 1. Layout lưu TRƯỚC khi khối mới (`today`) ra đời — cấu trúc vẫn hợp lệ nên không rơi về
+ *    default, nhưng thiếu hẳn khối đó. Vá bằng cách chèn nó vào đầu cột chứa `notes` (đúng vị
+ *    trí mặc định đã chốt) nếu chưa có, không reset toàn bộ layout người dùng đã tự sắp xếp.
+ * 2. `colWidths` bị lệch quá xa 100% (vd do bug resize cộng-dồn-delta cũ trước khi sửa, đã có
+ *    người dùng lưu lại layout với 1 cột emoji rộng hàng trăm %) — vì cột dùng `flex-shrink:0`,
+ *    tổng vượt 100% làm cột cuối tràn ra ngoài viewport, sát mép phải dù vẫn còn padding.
+ *    KHÔNG rescale-giữ-tỉ-lệ ở đây — vì giá trị đã méo (vd 1 cột bị bug đẩy lên 900%, cột
+ *    khác bị kẹp xuống sàn tối thiểu 10%) nên chính TỈ LỆ cũng sai, giữ nguyên tỉ lệ vẫn ra
+ *    layout lệch (chỉ đỡ tràn). Phát hiện méo thì RESET THẲNG về tỉ lệ mặc định — an toàn hơn,
+ *    đúng tinh thần "không migration phức tạp" của dự án giai đoạn này; người dùng resize lại
+ *    bằng tay sau đó (đã sửa hết bug resize) là đủ.
+ */
+export function normalizeDashboardLayout(raw: DashboardLayout | undefined): DashboardLayout {
+  if (!raw || !Array.isArray(raw.colWidths) || !Array.isArray(raw.cols) || raw.colWidths.length !== raw.cols.length) {
+    return defaultDashboardLayout();
+  }
+
+  let layout = raw;
+
+  const widthSum = layout.colWidths.reduce((sum, w) => sum + (Number.isFinite(w) ? w : 0), 0);
+  const hasOutlier = layout.colWidths.some((w) => !Number.isFinite(w) || w > 90);
+  if (widthSum <= 0 || hasOutlier || Math.abs(widthSum - 100) > 1) {
+    const fallbackWidths = defaultDashboardLayout().colWidths;
+    layout = {
+      ...layout,
+      colWidths: layout.colWidths.map((_, i) => fallbackWidths[i] ?? 100 / layout.colWidths.length),
+    };
+  }
+
+  const ids = collectLayoutBlockIds(layout);
+  if (!ids.has('today')) {
+    const cols = layout.cols.map((col) => col.slice());
+    const notesColIdx = cols.findIndex((col) => col.some((slot) => slot.type === 'single' && slot.id === 'notes'));
+    const targetCi = notesColIdx !== -1 ? notesColIdx : 0;
+    cols[targetCi] = [{ type: 'single', id: 'today', h: 18 } as DashboardLayout['cols'][number][number], ...cols[targetCi]];
+    layout = { ...layout, cols };
+  }
+
+  return layout;
+}
+
 /** Chuẩn hoá `homeQuotes` — migrate dữ liệu cũ chưa có field này (extension trước khi có tab "Quote"). */
 function normalizeHomeQuotes(raw: HomeQuotes | undefined, fallback: HomeQuotes): HomeQuotes {
   const texts = Array.isArray(raw?.texts) && raw.texts.length === fallback.texts.length
@@ -278,10 +343,6 @@ export function normalizeSettings(settings: Settings, homeBgRaw?: HomeBackground
     accent: settings.accent ?? fallback.accent,
     homeBackground: normalizeHomeBackground(homeBgRaw ?? settings.homeBackground, fallback.homeBackground),
     homeQuotes: normalizeHomeQuotes(settings.homeQuotes, fallback.homeQuotes),
-    layoutSizes: { ...fallback.layoutSizes, ...settings.layoutSizes },
-    mainBlockOrder: Array.isArray(settings.mainBlockOrder) && settings.mainBlockOrder.length === 3
-      ? settings.mainBlockOrder
-      : fallback.mainBlockOrder,
     collapsedBlocks: { ...fallback.collapsedBlocks, ...settings.collapsedBlocks },
     noteView: settings.noteView ?? fallback.noteView,
     lastScreen: settings.lastScreen === 'dashboard' ? 'dashboard' : 'home',

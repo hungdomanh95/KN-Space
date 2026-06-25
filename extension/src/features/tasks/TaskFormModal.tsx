@@ -25,7 +25,7 @@ export function TaskFormModal({ task, onClose }: TaskFormModalProps) {
   }
 
   return (
-    <Modal onClose={onClose} className="modal-note">
+    <Modal onClose={onClose} className="modal-note w-[620px] max-w-[92vw] max-md:w-[94vw]">
       <h2>{task ? 'Sửa việc' : 'Việc mới'}</h2>
       <div className="field">
         <label>Tên việc</label>
@@ -40,7 +40,7 @@ export function TaskFormModal({ task, onClose }: TaskFormModalProps) {
       <div className="field">
         <label>Nội dung (tuỳ chọn)</label>
         <textarea
-          className="note-content-field"
+          className="note-content-field max-md:min-h-[220px]"
           value={content}
           placeholder="Vd: nội dung cần chuẩn bị, link tài liệu..."
           onChange={(e) => setContent(e.target.value)}

@@ -64,11 +64,13 @@ export function AppBackground({ imageUrl, imageIndex }: AppBackgroundProps) {
   }, [imageUrl, gradient]);
 
   return (
-    <div className="app-bg" aria-hidden="true">
+    <div className="fixed inset-0 z-[-2] pointer-events-none bg-cover bg-center" aria-hidden="true">
       {layers.map((layer, i) => (
         <div
           key={i}
-          className={`app-bg-image ${topLayer === i ? 'visible' : ''}`}
+          className={`absolute inset-0 bg-cover bg-center opacity-0 transition-opacity duration-[600ms] ease-linear ${
+            topLayer === i ? 'z-[1] opacity-100' : 'z-0'
+          }`}
           style={{ backgroundImage: layer.background }}
         />
       ))}

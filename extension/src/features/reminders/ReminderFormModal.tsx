@@ -47,11 +47,23 @@ export function ReminderFormModal({ reminder, onClose }: ReminderFormModalProps)
   return (
     <Modal onClose={onClose}>
       <h2>{reminder ? 'Sửa nhắc việc' : 'Nhắc việc mới'}</h2>
-      <div className="type-pick">
-        <button className={type === 'once' ? 'active' : ''} onClick={() => setType('once')}>
+      <div className="mb-4 flex gap-2">
+        <button
+          className={`flex flex-1 items-center justify-center gap-1.5 rounded-[9px] border-[1.5px] border-[color:var(--border)]
+            bg-[var(--raised)] p-[9px] text-[0.875rem] font-semibold text-[var(--text)] ${
+            type === 'once' ? 'border-[color:var(--accent)] bg-[rgba(var(--accent-rgb),.08)] text-[var(--accent)]' : ''
+          }`}
+          onClick={() => setType('once')}
+        >
           <Pin className="icon" size={14} /> 1 lần
         </button>
-        <button className={type === 'recurring' ? 'active' : ''} onClick={() => setType('recurring')}>
+        <button
+          className={`flex flex-1 items-center justify-center gap-1.5 rounded-[9px] border-[1.5px] border-[color:var(--border)]
+            bg-[var(--raised)] p-[9px] text-[0.875rem] font-semibold text-[var(--text)] ${
+            type === 'recurring' ? 'border-[color:var(--accent)] bg-[rgba(var(--accent-rgb),.08)] text-[var(--accent)]' : ''
+          }`}
+          onClick={() => setType('recurring')}
+        >
           <Repeat className="icon" size={14} /> Lặp lại
         </button>
       </div>

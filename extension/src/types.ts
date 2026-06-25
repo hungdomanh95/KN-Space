@@ -61,17 +61,7 @@ export interface EnabledBlocks {
   habits: boolean;
   notes: boolean;
   reminders: boolean;
-}
-
-export interface Space {
-  id: string;
-  name: string;
-  order: number;
-  enabledBlocks: EnabledBlocks;
-  tasks: Task[];
-  reminders: ReminderDefinition[];
-  habits: Habit[];
-  notes: Note[];
+  today: boolean;
 }
 
 export type ThemeMode = 'light' | 'dark';
@@ -95,14 +85,40 @@ export interface HomeBackground {
   autoRotateMs: HomeBgAutoRotateMs;
 }
 
-export interface LayoutSizes {
-  combined: number; // % chiều rộng khối tổng hợp
-  notes: number; // % chiều rộng khối Ghi chú (Thông báo = phần còn lại)
-  tasks: number; // % chiều cao "Việc cần làm" so với hàng dưới (Nhắc việc + Thói quen)
-  reminder: number; // % chiều rộng "Nhắc việc" so với hàng dưới (Thói quen = phần còn lại)
+/**
+ * 6 phần tử tham gia layout tự do của Dashboard. `reminder` (số ít) = khối "Nhắc việc";
+ * `reminders` = khối "Thông báo" (tên field cũ giữ nguyên để không phải đổi schema
+ * EnabledBlocks/CollapsedBlocks ở nơi khác). `settings` = widget điều hướng DashboardCorner.
+ */
+export type LayoutBlockKey = 'tasks' | 'reminder' | 'habits' | 'notes' | 'reminders' | 'settings' | 'today';
+
+/**
+ * 1 slot xếp dọc trong 1 cột — `single` chiếm cả chiều rộng cột, `row` ghép 2 khối nằm
+ * ngang cạnh nhau trong cùng 1 slot. `h`/`w` là trọng số flex-grow tương đối (không cần
+ * cộng = 100) — xem demo docs/demo-layout-options/index.html.
+ */
+export type LayoutSlot =
+  | { type: 'single'; id: LayoutBlockKey; h: number }
+  | { type: 'row'; items: { id: LayoutBlockKey; w: number }[]; h: number };
+
+/** Layout Dashboard tự do: N cột, mỗi cột là 1 danh sách slot xếp dọc. */
+export interface DashboardLayout {
+  colWidths: number[]; // % mỗi cột, không cần cộng đúng 100
+  cols: LayoutSlot[][];
 }
 
-export type MainBlockKey = 'combined' | 'notes' | 'reminders';
+export interface Space {
+  id: string;
+  name: string;
+  order: number;
+  enabledBlocks: EnabledBlocks;
+  /** Bố cục Dashboard RIÊNG của Space này — không chia sẻ giữa các Space (xem AppLayout/useDashboardLayout). */
+  dashboardLayout: DashboardLayout;
+  tasks: Task[];
+  reminders: ReminderDefinition[];
+  habits: Habit[];
+  notes: Note[];
+}
 
 export interface CollapsedBlocks {
   tasks: boolean;
@@ -131,8 +147,6 @@ export interface Settings {
   accent: string;
   homeBackground: HomeBackground;
   homeQuotes: HomeQuotes;
-  layoutSizes: LayoutSizes;
-  mainBlockOrder: MainBlockKey[];
   collapsedBlocks: CollapsedBlocks;
   noteView: NoteView;
   /**

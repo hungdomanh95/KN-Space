@@ -42,7 +42,6 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { settings } = state;
-  const { layoutSizes } = settings;
 
   function setTheme(theme: ThemeMode) {
     dispatch({ type: 'SETTINGS_SET_THEME', payload: { theme } });
@@ -89,17 +88,17 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
     reader.readAsText(file);
   }
 
-  function setSize(key: keyof typeof layoutSizes, value: number) {
-    dispatch({ type: 'SETTINGS_SET_LAYOUT_SIZES', payload: { [key]: value } });
-  }
-
-  const remindersPct = Math.max(10, 100 - layoutSizes.combined - layoutSizes.notes);
-  const habitsPct = Math.max(10, 100 - layoutSizes.reminder);
-
   return (
-    <Modal onClose={onClose} className="modal-settings">
-      <h2>Cài đặt</h2>
-      <div className="settings-tabs" role="tablist" aria-label="Nhóm cài đặt">
+    <Modal
+      onClose={onClose}
+      className="modal-settings flex h-[min(680px,82vh)] w-[760px] max-w-[92vw] flex-col overflow-hidden p-0 max-md:w-[94vw]"
+    >
+      <h2 className="m-0 flex-none px-[22px] pb-2 pt-4">Cài đặt</h2>
+      <div
+        className="settings-tabs mb-0 flex flex-none flex-wrap gap-1 border-b border-[color:var(--border-hairline)] px-[22px] pb-2.5"
+        role="tablist"
+        aria-label="Nhóm cài đặt"
+      >
         <button
           type="button"
           role="tab"
@@ -107,7 +106,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
           className={`settings-tab ${activeTab === 'general' ? 'active' : ''}`}
           onClick={() => setActiveTab('general')}
         >
-          <SettingsIcon className="icon" size={14} /> Chung
+          <SettingsIcon className="icon h-3.5 w-3.5" size={14} /> Chung
         </button>
         <button
           type="button"
@@ -116,7 +115,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
           className={`settings-tab ${activeTab === 'background' ? 'active' : ''}`}
           onClick={() => setActiveTab('background')}
         >
-          <ImageIcon className="icon" size={14} /> Ảnh nền
+          <ImageIcon className="icon h-3.5 w-3.5" size={14} /> Ảnh nền
         </button>
         <button
           type="button"
@@ -125,30 +124,42 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
           className={`settings-tab ${activeTab === 'quote' ? 'active' : ''}`}
           onClick={() => setActiveTab('quote')}
         >
-          <MessageSquareQuote className="icon" size={14} /> Quote
+          <MessageSquareQuote className="icon h-3.5 w-3.5" size={14} /> Quote
         </button>
       </div>
 
-      <div className="settings-body">
+      <div className="settings-body min-h-0 flex-1 overflow-y-auto px-[22px] py-[18px]">
       {activeTab === 'general' && (
-        <div className="settings-grid">
-          <div className="setting-block">
-            <label>
-              <Sun className="icon" size={13} /> Giao diện
+        <div className="settings-grid grid grid-cols-2 items-start gap-x-7 gap-y-[22px] max-md:grid-cols-1">
+          <div className="setting-block mb-5">
+            <label className="mb-2.5 flex items-center gap-[7px] text-[0.8438rem] font-bold uppercase tracking-[.03em] text-[var(--text-dim)]">
+              <Sun className="icon h-[13px] w-[13px]" size={13} /> Giao diện
             </label>
-            <div className="theme-toggle">
-              <button className={settings.theme === 'light' ? 'active' : ''} onClick={() => setTheme('light')}>
-                <Sun className="icon" size={14} /> Sáng
+            <div className="theme-toggle flex gap-2.5">
+              <button
+                className={`flex flex-1 items-center justify-center gap-[7px] rounded-[10px] border-[1.5px] border-[color:var(--border)]
+                  bg-[var(--raised)] p-2.5 text-[0.9062rem] font-semibold text-[var(--text)] ${
+                  settings.theme === 'light' ? 'border-[color:var(--accent)] bg-[rgba(var(--accent-rgb),.08)] text-[var(--accent)]' : ''
+                }`}
+                onClick={() => setTheme('light')}
+              >
+                <Sun className="icon h-3.5 w-3.5" size={14} /> Sáng
               </button>
-              <button className={settings.theme === 'dark' ? 'active' : ''} onClick={() => setTheme('dark')}>
-                <Moon className="icon" size={14} /> Tối
+              <button
+                className={`flex flex-1 items-center justify-center gap-[7px] rounded-[10px] border-[1.5px] border-[color:var(--border)]
+                  bg-[var(--raised)] p-2.5 text-[0.9062rem] font-semibold text-[var(--text)] ${
+                  settings.theme === 'dark' ? 'border-[color:var(--accent)] bg-[rgba(var(--accent-rgb),.08)] text-[var(--accent)]' : ''
+                }`}
+                onClick={() => setTheme('dark')}
+              >
+                <Moon className="icon h-3.5 w-3.5" size={14} /> Tối
               </button>
             </div>
           </div>
 
-          <div className="setting-block">
-            <label>
-              <LayoutGrid className="icon" size={13} /> Màu chủ đạo
+          <div className="setting-block mb-5">
+            <label className="mb-2.5 flex items-center gap-[7px] text-[0.8438rem] font-bold uppercase tracking-[.03em] text-[var(--text-dim)]">
+              <LayoutGrid className="icon h-[13px] w-[13px]" size={13} /> Màu chủ đạo
             </label>
             <div className="color-palette">
               {ACCENT_OPTIONS.map((a) => (
@@ -165,16 +176,16 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
             </div>
           </div>
 
-          <div className="setting-block">
-            <label>
-              <Database className="icon" size={13} /> Dữ liệu
+          <div className="setting-block mb-5">
+            <label className="mb-2.5 flex items-center gap-[7px] text-[0.8438rem] font-bold uppercase tracking-[.03em] text-[var(--text-dim)]">
+              <Database className="icon h-[13px] w-[13px]" size={13} /> Dữ liệu
             </label>
-            <div className="export-import">
-              <button className="btn-ghost" onClick={handleExport}>
-                <Download className="icon" size={14} /> Export JSON
+            <div className="export-import flex gap-2.5">
+              <button className="btn-ghost flex-1" onClick={handleExport}>
+                <Download className="icon h-3.5 w-3.5" size={14} /> Export JSON
               </button>
-              <button className="btn-ghost" onClick={() => fileInputRef.current?.click()}>
-                <Upload className="icon" size={14} /> Import JSON
+              <button className="btn-ghost flex-1" onClick={() => fileInputRef.current?.click()}>
+                <Upload className="icon h-3.5 w-3.5" size={14} /> Import JSON
               </button>
               <input
                 ref={fileInputRef}
@@ -185,97 +196,45 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
               />
             </div>
             {statusMsg && (
-              <p className="hint" style={{ marginTop: 8, color: statusError ? 'var(--reminder-color)' : 'var(--text-dim)' }}>
+              <p className="hint mt-2" style={{ color: statusError ? 'var(--reminder-color)' : 'var(--text-dim)' }}>
                 {statusMsg}
               </p>
             )}
           </div>
 
-          <div className="setting-block span-2">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-              <label style={{ marginBottom: 0 }}>Bố cục — kích thước khối</label>
-              <button className="add-link" style={{ marginBottom: 0 }} onClick={() => dispatch({ type: 'SETTINGS_RESET_LAYOUT' })}>
-                <Repeat className="icon" size={13} /> Khôi phục mặc định
-              </button>
-            </div>
-            <div className="layout-cols">
-              <div>
-                <div className="size-row">
-                  <label>Khối trái (Việc làm+Nhắc việc+Thói quen)</label>
-                  <input
-                    type="range"
-                    min={20}
-                    max={60}
-                    value={layoutSizes.combined}
-                    onChange={(e) => setSize('combined', Number(e.target.value))}
-                  />
-                  <span className="size-val">{layoutSizes.combined}%</span>
-                </div>
-                <div className="size-row">
-                  <label>Khối Ghi chú</label>
-                  <input
-                    type="range"
-                    min={10}
-                    max={60}
-                    value={layoutSizes.notes}
-                    onChange={(e) => setSize('notes', Number(e.target.value))}
-                  />
-                  <span className="size-val">{layoutSizes.notes}%</span>
-                </div>
-                <div className="size-row">
-                  <label>Khối Thông báo</label>
-                  <span className="size-auto">Tự động = phần còn lại</span>
-                  <span className="size-val">{remindersPct}%</span>
-                </div>
-              </div>
-              <div>
-                <div className="size-row">
-                  <label>↳ Việc cần làm (cao, so hàng dưới)</label>
-                  <input
-                    type="range"
-                    min={15}
-                    max={70}
-                    value={layoutSizes.tasks}
-                    onChange={(e) => setSize('tasks', Number(e.target.value))}
-                  />
-                  <span className="size-val">{layoutSizes.tasks}%</span>
-                </div>
-                <div className="size-row">
-                  <label>↳ Nhắc việc (rộng, hàng dưới)</label>
-                  <input
-                    type="range"
-                    min={15}
-                    max={85}
-                    value={layoutSizes.reminder}
-                    onChange={(e) => setSize('reminder', Number(e.target.value))}
-                  />
-                  <span className="size-val">{layoutSizes.reminder}%</span>
-                </div>
-                <div className="size-row">
-                  <label>↳ Thói quen (rộng, hàng dưới)</label>
-                  <span className="size-auto">Tự động = phần còn lại</span>
-                  <span className="size-val">{habitsPct}%</span>
-                </div>
-              </div>
-            </div>
+          <div className="setting-block span-2 col-span-2 mb-5">
+            <label className="mb-2.5 flex items-center gap-[7px] text-[0.8438rem] font-bold uppercase tracking-[.03em] text-[var(--text-dim)]">
+              <LayoutGrid className="icon h-[13px] w-[13px]" size={13} /> Bố cục Dashboard
+            </label>
+            <p className="hint mb-2.5 mt-0">
+              Kéo-thả khối bất kỳ vào vị trí khác để sắp xếp lại (thả vào giữa khối khác để
+              chèn trên/dưới, thả vào mép trái/phải để ghép 2 khối nằm ngang). Kéo đường kẻ ẩn
+              giữa các khối/cột để đổi kích thước.
+            </p>
+            <button
+              className="btn-ghost"
+              onClick={() => dispatch({ type: 'SPACE_RESET_DASHBOARD_LAYOUT', payload: { spaceId: state.currentSpaceId } })}
+            >
+              <Repeat className="icon h-3.5 w-3.5" size={14} /> Khôi phục bố cục mặc định
+            </button>
           </div>
         </div>
       )}
 
       {activeTab === 'background' && (
-        <div className="settings-grid">
+        <div className="settings-grid grid grid-cols-2 items-start gap-x-7 gap-y-[22px] max-md:grid-cols-1">
           <HomeBackgroundSettings />
         </div>
       )}
 
       {activeTab === 'quote' && (
-        <div className="settings-grid">
+        <div className="settings-grid grid grid-cols-2 items-start gap-x-7 gap-y-[22px] max-md:grid-cols-1">
           <HomeQuoteSettings />
         </div>
       )}
       </div>
 
-      <div className="modal-actions">
+      <div className="modal-actions mt-0 flex-none border-t border-[color:var(--border-hairline)] px-[22px] py-3.5">
         <button className="btn-primary" onClick={onClose}>
           Đóng
         </button>

@@ -10,9 +10,29 @@ import type { Habit } from '../../types';
 
 interface HabitsBlockProps {
   style?: React.CSSProperties;
+  className?: string;
+  rootRef?: React.Ref<HTMLDivElement>;
+  draggable?: boolean;
+  onMouseDownCapture?: (e: React.MouseEvent<HTMLDivElement>) => void;
+  onDragStart?: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragEnd?: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragOver?: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragLeave?: () => void;
+  onDrop?: (e: React.DragEvent<HTMLDivElement>) => void;
 }
 
-export function HabitsBlock({ style }: HabitsBlockProps) {
+export function HabitsBlock({
+  style,
+  className,
+  rootRef,
+  draggable,
+  onMouseDownCapture,
+  onDragStart,
+  onDragEnd,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+}: HabitsBlockProps) {
   const { state, dispatch } = useAppState();
   const space = useCurrentSpace();
   const showConfirm = useConfirm();
@@ -28,7 +48,8 @@ export function HabitsBlock({ style }: HabitsBlockProps) {
 
   return (
     <BlockShell
-      domId="sub-habits"
+      domId="block-habits"
+      className={`main-block max-sm:min-w-0 ${className ?? ''}`.trim()}
       icon={Flame}
       iconBg="rgba(255,138,61,.14)"
       iconColor="var(--habit-color)"
@@ -36,6 +57,14 @@ export function HabitsBlock({ style }: HabitsBlockProps) {
       collapsed={collapsed}
       onToggleCollapsed={() => dispatch({ type: 'BLOCK_TOGGLE_COLLAPSED', payload: { key: 'habits' } })}
       style={style}
+      rootRef={rootRef}
+      draggable={draggable}
+      onMouseDownCapture={onMouseDownCapture}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
       modals={
         editingHabit && (
           <HabitFormModal habit={editingHabit === 'new' ? null : editingHabit} onClose={() => setEditingHabit(null)} />
@@ -61,10 +90,17 @@ export function HabitsBlock({ style }: HabitsBlockProps) {
             const todayIdx = week.length - 1;
             const doneToday = isHabitDoneToday(habit);
             return (
-              <div key={habit.id} className="habit-row">
-                <div className={`habit-top ${doneToday ? 'done' : ''}`}>
+              <div
+                key={habit.id}
+                className="group flex flex-col gap-[9px] border-b border-[color:var(--border)] py-3 last:border-b-0"
+              >
+                <div
+                  className={`flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5 text-[0.875rem] ${
+                    doneToday ? '[&_.habit-title]:text-[var(--done)]' : ''
+                  }`}
+                >
                   <span
-                    className="habit-left"
+                    className="flex min-w-0 flex-[1_1_120px] cursor-pointer items-center gap-[9px]"
                     role="checkbox"
                     aria-checked={doneToday}
                     tabIndex={0}
@@ -77,16 +113,21 @@ export function HabitsBlock({ style }: HabitsBlockProps) {
                       }
                     }}
                   >
-                    <span className={`check ${doneToday ? 'checked' : ''}`}>
-                      <Check className="icon" size={11} strokeWidth={3} />
+                    <span
+                      className={`mt-px flex h-[17px] w-[17px] flex-none cursor-pointer items-center justify-center
+                        rounded-[6px] border-[1.6px] border-[color:var(--border)] bg-[var(--raised)] transition-all
+                        duration-150 [&_.icon]:opacity-0 [&_.icon]:transition-opacity [&_.icon]:duration-100
+                        ${doneToday ? 'border-[color:var(--done)] bg-[var(--done)] [&_.icon]:opacity-100' : ''}`}
+                    >
+                      <Check className="icon h-[11px] w-[11px] text-white" size={11} strokeWidth={3} />
                     </span>
-                    <span className="habit-title">{habit.title}</span>
+                    <span className="habit-title overflow-hidden text-ellipsis whitespace-nowrap">{habit.title}</span>
                   </span>
-                  <span className="habit-right">
-                    <span className="streak-pill">
-                      <Flame className="icon" size={12} /> {streak} ngày liên tiếp
+                  <span className="flex flex-none items-center gap-1.5">
+                    <span className="inline-flex flex-none items-center gap-1.5 whitespace-nowrap rounded-[20px] bg-[rgba(255,138,61,.12)] px-[9px] py-1 text-[0.7812rem] font-bold text-[var(--habit-color)]">
+                      <Flame className="icon h-3 w-3" size={12} /> {streak} ngày liên tiếp
                     </span>
-                    <span className="row-tools">
+                    <span className="flex gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
                       <button className="icon-btn" title="Sửa thói quen" aria-label="Sửa thói quen" onClick={() => setEditingHabit(habit)}>
                         <Pencil className="icon" size={13} />
                       </button>
@@ -96,11 +137,13 @@ export function HabitsBlock({ style }: HabitsBlockProps) {
                     </span>
                   </span>
                 </div>
-                <div className="week-track">
+                <div className="flex items-center gap-[7px]">
                   {week.map((done, i) => (
                     <span
                       key={i}
-                      className={`week-dot ${done ? 'filled' : ''} ${i === todayIdx ? 'today' : ''}`}
+                      className={`h-[13px] w-[13px] flex-[0_0_13px] cursor-default rounded-full border-[1.5px] border-[color:var(--border)] bg-[var(--raised)] ${
+                        done ? 'border-[color:var(--habit-color)] bg-[var(--habit-color)]' : ''
+                      } ${i === todayIdx ? 'shadow-[0_0_0_3px_rgba(255,138,61,.25)]' : ''}`}
                       title={`${DAY_LABELS[i]}${i === todayIdx ? ' (hôm nay)' : ''}: ${done ? 'đã hoàn thành' : 'chưa hoàn thành'}`}
                     />
                   ))}

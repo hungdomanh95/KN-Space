@@ -9,6 +9,15 @@ import type { Task, TaskFilter } from '../../types';
 
 interface TasksBlockProps {
   style?: React.CSSProperties;
+  className?: string;
+  rootRef?: React.Ref<HTMLDivElement>;
+  draggable?: boolean;
+  onMouseDownCapture?: (e: React.MouseEvent<HTMLDivElement>) => void;
+  onDragStart?: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragEnd?: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragOver?: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragLeave?: () => void;
+  onDrop?: (e: React.DragEvent<HTMLDivElement>) => void;
 }
 
 /**
@@ -79,7 +88,10 @@ function TaskRow({ task, draggedId, onDragStartId, onDragEndAll, onEdit, onDelet
   return (
     <div
       ref={rowRef}
-      className={`task-row ${task.done ? 'done' : ''} ${isDragging ? 'dragging' : ''} ${isDropTarget ? 'drag-over' : ''}`.trim()}
+      className={`group flex items-start gap-2.5 border-b border-[color:var(--border)] py-[9px] text-[0.875rem]
+        transition-opacity duration-150 [transition-timing-function:var(--ease-standard)] last:border-b-0
+        ${task.done ? '[&_.row-title]:text-[var(--text-dim)] [&_.row-title]:line-through' : ''}
+        ${isDragging ? 'opacity-40' : ''} ${isDropTarget ? 'shadow-[inset_0_2px_0_0_var(--accent)]' : ''}`.trim()}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onDragOver={handleDragOver}
@@ -87,15 +99,18 @@ function TaskRow({ task, draggedId, onDragStartId, onDragEndAll, onEdit, onDelet
       onDrop={handleDrop}
     >
       <span
-        className="card-grip"
+        className="flex h-6 w-6 flex-none cursor-grab items-center justify-center text-[var(--text-dim)] active:cursor-grabbing"
         title="Kéo để đổi thứ tự"
         aria-label="Kéo để đổi thứ tự việc"
         onMouseDown={armDraggable}
       >
-        <GripVertical className="icon" size={13} />
+        <GripVertical className="icon h-[13px] w-[13px]" size={13} />
       </span>
       <span
-        className={`check ${task.done ? 'checked' : ''}`}
+        className={`mt-px flex h-[17px] w-[17px] flex-none cursor-pointer items-center justify-center rounded-[6px]
+          border-[1.6px] border-[color:var(--border)] bg-[var(--raised)] transition-all duration-150
+          [&_.icon]:opacity-0 [&_.icon]:transition-opacity [&_.icon]:duration-100
+          ${task.done ? 'border-[color:var(--done)] bg-[var(--done)] [&_.icon]:opacity-100' : ''}`}
         role="checkbox"
         aria-checked={task.done}
         tabIndex={0}
@@ -108,10 +123,10 @@ function TaskRow({ task, draggedId, onDragStartId, onDragEndAll, onEdit, onDelet
           }
         }}
       >
-        <Check className="icon" size={11} strokeWidth={3} />
+        <Check className="icon text-white" size={11} strokeWidth={3} />
       </span>
-      <div className="row-main">
-        <div className="row-title">
+      <div className="flex-1">
+        <div className="row-title font-medium">
           {task.title}
           {hasContent && (
             <span title="Có nội dung chi tiết" aria-label="Có nội dung chi tiết">
@@ -120,12 +135,14 @@ function TaskRow({ task, draggedId, onDragStartId, onDragEndAll, onEdit, onDelet
           )}
         </div>
         {meta && (
-          <div className="row-meta">
-            <span className="meta-tag">{meta}</span>
+          <div className="mt-1 flex gap-1.5">
+            <span className="inline-flex items-center gap-1 rounded-md bg-[var(--raised)] px-[7px] py-0.5 text-[0.7188rem] font-semibold text-[var(--text-dim)]">
+              {meta}
+            </span>
           </div>
         )}
       </div>
-      <div className="row-tools">
+      <div className="flex gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
         <button className="icon-btn" title="Sửa việc" aria-label="Sửa việc" onClick={() => onEdit(task)}>
           <Pencil className="icon" size={13} />
         </button>
@@ -137,7 +154,18 @@ function TaskRow({ task, draggedId, onDragStartId, onDragEndAll, onEdit, onDelet
   );
 }
 
-export function TasksBlock({ style }: TasksBlockProps) {
+export function TasksBlock({
+  style,
+  className,
+  rootRef,
+  draggable,
+  onMouseDownCapture,
+  onDragStart,
+  onDragEnd,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+}: TasksBlockProps) {
   const { state, dispatch } = useAppState();
   const space = useCurrentSpace();
   const showConfirm = useConfirm();
@@ -161,7 +189,7 @@ export function TasksBlock({ style }: TasksBlockProps) {
 
   return (
     <BlockShell
-      domId="sub-tasks"
+      domId="block-tasks"
       icon={CheckSquare}
       iconBg="rgba(var(--accent-rgb),.12)"
       iconColor="var(--accent)"
@@ -169,6 +197,15 @@ export function TasksBlock({ style }: TasksBlockProps) {
       collapsed={collapsed}
       onToggleCollapsed={() => dispatch({ type: 'BLOCK_TOGGLE_COLLAPSED', payload: { key: 'tasks' } })}
       style={style}
+      className={`main-block max-sm:min-w-0 ${className ?? ''}`.trim()}
+      rootRef={rootRef}
+      draggable={draggable}
+      onMouseDownCapture={onMouseDownCapture}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
       modals={
         editingTask && (
           <TaskFormModal task={editingTask === 'new' ? null : editingTask} onClose={() => setEditingTask(null)} />
@@ -176,14 +213,29 @@ export function TasksBlock({ style }: TasksBlockProps) {
       }
       headerActions={
         <>
-          <div className="filter-tabs">
-            <button className={filter === 'all' ? 'active' : ''} onClick={() => setFilter('all')}>
+          <div className="flex gap-[3px] rounded-lg bg-[var(--bg)] p-[3px]">
+            <button
+              className={`rounded-md px-[9px] py-1 text-[0.7812rem] font-semibold text-[var(--text-dim)] ${
+                filter === 'all' ? 'bg-[rgba(var(--accent-rgb),.12)] text-[var(--accent)]' : 'bg-transparent'
+              }`}
+              onClick={() => setFilter('all')}
+            >
               Tất cả
             </button>
-            <button className={filter === 'pending' ? 'active' : ''} onClick={() => setFilter('pending')}>
+            <button
+              className={`rounded-md px-[9px] py-1 text-[0.7812rem] font-semibold text-[var(--text-dim)] ${
+                filter === 'pending' ? 'bg-[rgba(var(--accent-rgb),.12)] text-[var(--accent)]' : 'bg-transparent'
+              }`}
+              onClick={() => setFilter('pending')}
+            >
               Chưa xong
             </button>
-            <button className={filter === 'done' ? 'active' : ''} onClick={() => setFilter('done')}>
+            <button
+              className={`rounded-md px-[9px] py-1 text-[0.7812rem] font-semibold text-[var(--text-dim)] ${
+                filter === 'done' ? 'bg-[rgba(var(--accent-rgb),.12)] text-[var(--accent)]' : 'bg-transparent'
+              }`}
+              onClick={() => setFilter('done')}
+            >
               Đã xong
             </button>
           </div>
