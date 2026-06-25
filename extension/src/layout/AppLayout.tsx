@@ -156,12 +156,12 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
       <div id="main-row">
         {reorderableOrder.map((key) => blockNodes[key])}
         {/* Cột Thông báo CỐ ĐỊNH cuối #main-row, không tham gia kéo-thả đổi thứ tự, width
-            luôn = phần còn lại (không slider riêng) — widget điều hướng nằm ngay dưới nó,
+            luôn = phần còn lại (không slider riêng) — widget điều hướng nằm ngay TRÊN nó,
             cùng cột nên width khớp đúng (xem requirements mục 4/4.1). */}
         {flex.remindersDisplay && (
           <div className="reminders-col" style={{ flex: flex.reminders }}>
-            <NotificationsBlock style={{ flex: 1, minHeight: 0 }} />
             <DashboardCorner onGoHome={onGoHome} />
+            <NotificationsBlock style={{ flex: 1, minHeight: 0 }} />
           </div>
         )}
       </div>

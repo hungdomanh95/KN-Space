@@ -231,14 +231,20 @@ input, textarea, select { font-family: inherit; }
 #dashboard { flex: 1; display: flex; min-height: 0; padding: 14px; gap: 12px; background: transparent; }
 #main-row { display: flex; flex: 1; min-height: 0; min-width: 0; gap: 12px; width: 100%; height: 100%; }
 
-/* Cột bọc khối Thông báo + widget #dashboard-corner (Về Home/Space-switcher/Settings) —
+/* Cột bọc widget #dashboard-corner (Về Home/Space-switcher/Settings) + khối Thông báo —
    wrapper flex-column nhận flex-basis (thay cho khối Thông báo nhận trực tiếp), để widget
-   nằm NGAY DƯỚI khối Thông báo, rộng đúng = width của cột, không position:fixed nổi tự do.
+   nằm NGAY TRÊN khối Thông báo, rộng đúng = width của cột, không position:fixed nổi tự do.
    Cột này CỐ ĐỊNH vị trí cuối #main-row, không tham gia kéo-thả đổi thứ tự (xem AppLayout.tsx). */
 .reminders-col { display: flex; flex-direction: column; gap: 12px; min-width: 220px; min-height: 0; }
 
-/* Widget điều hướng cố định — kính mờ hairline đồng bộ phong cách .main-block/.sub-block. */
+/* Widget điều hướng cố định — kính mờ hairline đồng bộ phong cách .main-block/.sub-block.
+   position:relative + z-index riêng (không chỉ auto) là BẮT BUỘC: backdrop-filter tự tạo
+   stacking context mới, nên dù .space-menu bên trong có z-index:60, nó vẫn bị giới hạn
+   trong context của #dashboard-corner — nếu #dashboard-corner không có z-index riêng,
+   nó sẽ bị card #block-reminders (đứng SAU trong DOM, cũng backdrop-filter) đè lên khi
+   menu mở xuống tràn vào vùng card. */
 #dashboard-corner {
+  position: relative; z-index: 5;
   flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 8px;
   background: color-mix(in srgb, var(--panel-bg) 88%, transparent);
   backdrop-filter: blur(14px) saturate(1.15);
@@ -256,8 +262,11 @@ input, textarea, select { font-family: inherit; }
 #dashboard-corner .space-switcher-btn #space-switcher-label {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-/* Menu mở LÊN trên trigger (widget nằm ở phần dưới của cột) */
-#dashboard-corner .space-menu { top: auto; bottom: calc(100% + 8px); left: 0; right: auto; min-width: 240px; }
+/* Menu mở XUỐNG dưới trigger (widget nằm ở phần trên của cột). Căn left/right theo TOÀN BỘ
+   #dashboard-corner (không chỉ .space-switcher ở giữa) — lệch đúng 1 khoảng = gap(8px) +
+   width nút Home/Settings(34px) = 42px mỗi bên, để menu thẳng mép với cả widget (Home/Settings),
+   không chỉ thẳng với phần switcher ở giữa. */
+#dashboard-corner .space-menu { top: calc(100% + 8px); bottom: auto; left: -42px; right: -42px; min-width: 240px; }
 #dashboard-corner-home-btn,
 #dashboard-corner-settings-btn {
   background: var(--raised); border: 1px solid var(--border); border-radius: 9px;
