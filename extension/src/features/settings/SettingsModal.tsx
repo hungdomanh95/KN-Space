@@ -211,10 +211,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
               chèn trên/dưới, thả vào mép trái/phải để ghép 2 khối nằm ngang). Kéo đường kẻ ẩn
               giữa các khối/cột để đổi kích thước.
             </p>
-            <button
-              className="btn-ghost"
-              onClick={() => dispatch({ type: 'SPACE_RESET_DASHBOARD_LAYOUT', payload: { spaceId: state.currentSpaceId } })}
-            >
+            <button className="btn-ghost" onClick={() => dispatch({ type: 'SETTINGS_RESET_DASHBOARD_LAYOUT' })}>
               <Repeat className="icon h-3.5 w-3.5" size={14} /> Khôi phục bố cục mặc định
             </button>
           </div>

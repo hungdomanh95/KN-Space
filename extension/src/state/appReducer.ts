@@ -1,5 +1,5 @@
 import type { AppState, ExportPayload, NoteSortBy, Screen, Settings, Space, TaskFilter } from '../types';
-import { buildUiInitialState, normalizeDashboardLayout, normalizeSettings } from '../storage/chromeStorage';
+import { buildUiInitialState, normalizeSettings } from '../storage/chromeStorage';
 import { dayIndex, epochDay } from '../features/home/homeContent';
 import type { HabitAction } from './reducers/habits';
 import { habitsReducer } from './reducers/habits';
@@ -14,6 +14,7 @@ import { spacesReducer } from './reducers/spaces';
 import type { TaskAction } from './reducers/tasks';
 import { tasksReducer } from './reducers/tasks';
 import { defaultSettings } from './seed';
+import { findLegacyDashboardLayout } from '../storage/chromeStorage';
 
 export type AppAction =
   | { type: 'HYDRATE'; payload: { spaces: Space[]; currentSpaceId: string; settings: AppState['settings']; storageFallbackActive: boolean } }
@@ -67,6 +68,8 @@ const SETTINGS_ACTION_TYPES = new Set([
   'SETTINGS_SET_QUOTE_ROTATE_MODE',
   'SETTINGS_HOME_QUOTE_ROTATE_NEXT',
   'NOTE_SET_VIEW',
+  'SETTINGS_SET_DASHBOARD_LAYOUT',
+  'SETTINGS_RESET_DASHBOARD_LAYOUT',
 ]);
 
 const SPACES_ACTION_TYPES = new Set([
@@ -75,8 +78,6 @@ const SPACES_ACTION_TYPES = new Set([
   'SPACE_SET_ENABLED_BLOCKS',
   'SPACE_DELETE',
   'SPACE_MOVE',
-  'SPACE_SET_DASHBOARD_LAYOUT',
-  'SPACE_RESET_DASHBOARD_LAYOUT',
 ]);
 
 /**
@@ -153,7 +154,6 @@ function normalizeImportedSpace(raw: Partial<Space> & { id?: string }): Space {
       reminders: true,
       today: raw.enabledBlocks?.today ?? true,
     },
-    dashboardLayout: normalizeDashboardLayout(raw.dashboardLayout),
     tasks: Array.isArray(raw.tasks)
       ? raw.tasks.map((t, idx) => ({ ...t, content: t.content ?? '', order: t.order ?? idx }))
       : [],
@@ -230,12 +230,21 @@ export function appReducer(state: AppState, action: AppAction): AppState {
     }
 
     case 'IMPORT_DATA': {
-      const importedSpaces = Array.isArray(action.payload.spaces) ? action.payload.spaces.map(normalizeImportedSpace) : [];
+      const rawSpaces = Array.isArray(action.payload.spaces) ? action.payload.spaces : [];
+      const importedSpaces = rawSpaces.map(normalizeImportedSpace);
       if (importedSpaces.length === 0) return state; // không có space hợp lệ — bỏ qua import lỗi
       const currentSpaceId = importedSpaces.some((s) => s.id === action.payload.currentSpaceId)
         ? action.payload.currentSpaceId
         : importedSpaces[0].id;
-      const settings = normalizeSettings(action.payload.settings ?? defaultSettings());
+      // File export CŨ (trước khi dashboardLayout chuyển về dùng chung) lưu layout riêng trong
+      // từng Space — `findLegacyDashboardLayout` đọc thẳng field đó từ JSON thô (rawSpaces, chưa
+      // qua normalizeImportedSpace nên còn field cũ) làm fallback khi `action.payload.settings`
+      // chưa có `dashboardLayout` (file export càng cũ).
+      const settings = normalizeSettings(
+        action.payload.settings ?? defaultSettings(),
+        undefined,
+        findLegacyDashboardLayout(rawSpaces),
+      );
       return {
         spaces: importedSpaces,
         currentSpaceId,

@@ -112,8 +112,6 @@ export interface Space {
   name: string;
   order: number;
   enabledBlocks: EnabledBlocks;
-  /** Bố cục Dashboard RIÊNG của Space này — không chia sẻ giữa các Space (xem AppLayout/useDashboardLayout). */
-  dashboardLayout: DashboardLayout;
   tasks: Task[];
   reminders: ReminderDefinition[];
   habits: Habit[];
@@ -161,6 +159,13 @@ export interface Settings {
    * -1 = chưa từng hydrate (luôn coi là "ngày mới" ở lần đầu).
    */
   lastOpenedEpochDay: number;
+  /**
+   * Bố cục Dashboard — DÙNG CHUNG cho mọi Space (đúng yêu cầu mục 4 requirements.md: "Lưu tỉ lệ
+   * layout + thứ tự khối vào storage, dùng chung cho mọi Space"). Khối nào 1 Space không bật
+   * (`enabledBlocks`) thì tự ẩn khỏi layout lúc render (xem `deriveVisibleLayout`), không cần
+   * layout riêng từng Space — tránh hẳn việc đồng bộ/copy layout giữa các Space.
+   */
+  dashboardLayout: DashboardLayout;
 }
 
 /** UI state ephemeral — KHÔNG persist xuống storage. */

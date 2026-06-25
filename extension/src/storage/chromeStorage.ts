@@ -165,10 +165,12 @@ export async function loadAppState(): Promise<LoadResult | null> {
   }
 
   const spaces: Space[] = [];
+  const rawSpaces: unknown[] = [];
   for (const id of index.order) {
     const known = locationMap.get(id);
     const { value, area } = await readKeySelfHeal<Space>(spaceKey(id), known);
     if (value) {
+      rawSpaces.push(value);
       spaces.push(normalizeSpace(value));
       if (area === 'local') fallbackActive = true;
     }
@@ -190,7 +192,14 @@ export async function loadAppState(): Promise<LoadResult | null> {
   // Dữ liệu cũ (trước khi tách key) có thể vẫn có homeBackground lồng trong SETTINGS_KEY —
   // dùng làm fallback khi chưa từng ghi HOME_BG_KEY riêng (lần đầu sau khi cập nhật extension).
   const legacyHomeBg = (settingsResult.value as Settings | undefined)?.homeBackground;
-  const settings = normalizeSettings(settingsRaw as Settings, homeBgResult.value ?? legacyHomeBg);
+  // Dữ liệu cũ (trước khi dashboardLayout chuyển từ riêng-từng-Space sang dùng chung ở Settings)
+  // không có `settings.dashboardLayout` — `findLegacyDashboardLayout` đọc thẳng field cũ đó từ
+  // `rawSpaces` (ưu tiên Space tên "MAFC", Space mẫu người dùng đã tự chốt làm chuẩn) làm fallback.
+  const settings = normalizeSettings(
+    settingsRaw as Settings,
+    homeBgResult.value ?? legacyHomeBg,
+    findLegacyDashboardLayout(rawSpaces),
+  );
   if (settingsResult.area === 'local') fallbackActive = true;
   // Không tính ảnh nền ở `local` là "fallback do vượt quota" — đây là khu vực CHÍNH THỨC/cố ý
   // của riêng homeBackground (ảnh upload), không phải hệ quả của lỗi quota cần cảnh báo banner.
@@ -218,9 +227,6 @@ function normalizeSpace(space: Space): Space {
       // Space lưu TRƯỚC khi có field `today` -> mặc định hiện, không tự ẩn khối của user cũ.
       today: space.enabledBlocks?.today ?? true,
     },
-    // Layout RIÊNG theo Space — Space lưu TRƯỚC khi field này được tách ra khỏi Settings
-    // chung sẽ thiếu hẳn -> fallback `defaultDashboardLayout()` qua normalizeDashboardLayout.
-    dashboardLayout: normalizeDashboardLayout(space.dashboardLayout),
     tasks: Array.isArray(space.tasks)
       ? space.tasks.map((t, idx) => ({ ...t, content: t.content ?? '', order: t.order ?? idx }))
       : [],
@@ -273,11 +279,29 @@ function collectLayoutBlockIds(layout: DashboardLayout): Set<string> {
 }
 
 /**
- * Chuẩn hoá `dashboardLayout` của 1 Space (field RIÊNG theo từng Space, áp dụng qua
- * `normalizeSpace` khi load TỪNG Space — không còn dùng chung 1 lần cho Settings). Không viết
- * migration phức tạp từ schema cứng cũ (layoutSizes/mainBlockOrder, dự án giai đoạn cá nhân,
- * quy mô nhỏ), nhưng vẫn cần vá 2 trường hợp thực tế đã gặp với layout đã lưu HỢP LỆ về cấu
- * trúc nhưng sai dữ liệu:
+ * Đọc `dashboardLayout` LEGACY (schema cũ: lưu RIÊNG theo từng Space, trước khi gộp về dùng
+ * chung ở `Settings`) từ mảng Space thô (chưa qua `normalizeSpace`/`normalizeImportedSpace` —
+ * 2 hàm đó đã bỏ field này khỏi `Space` type nên đọc sau sẽ luôn `undefined`). Ưu tiên Space tên
+ * "MAFC" (Space mẫu người dùng đã tự chốt làm chuẩn khi còn dùng layout riêng-từng-Space), nếu
+ * không có thì lấy Space đầu tiên tìm thấy field này. Trả `undefined` nếu không Space nào có
+ * (dữ liệu đã ở schema mới, hoặc cài mới hoàn toàn) — caller tự fallback `defaultDashboardLayout()`.
+ */
+export function findLegacyDashboardLayout(rawSpaces: unknown[]): DashboardLayout | undefined {
+  let fallback: DashboardLayout | undefined;
+  for (const raw of rawSpaces) {
+    const space = raw as { name?: unknown; dashboardLayout?: DashboardLayout } | null;
+    if (!space || !space.dashboardLayout) continue;
+    if (space.name === 'MAFC') return space.dashboardLayout;
+    fallback ??= space.dashboardLayout;
+  }
+  return fallback;
+}
+
+/**
+ * Chuẩn hoá `dashboardLayout` DÙNG CHUNG (xem `Settings.dashboardLayout`). Không viết migration
+ * phức tạp từ schema cứng cũ (layoutSizes/mainBlockOrder, dự án giai đoạn cá nhân, quy mô nhỏ),
+ * nhưng vẫn cần vá 2 trường hợp thực tế đã gặp với layout đã lưu HỢP LỆ về cấu trúc nhưng sai
+ * dữ liệu:
  *
  * 1. Layout lưu TRƯỚC khi khối mới (`today`) ra đời — cấu trúc vẫn hợp lệ nên không rơi về
  *    default, nhưng thiếu hẳn khối đó. Vá bằng cách chèn nó vào đầu cột chứa `notes` (đúng vị
@@ -334,9 +358,15 @@ function normalizeHomeQuotes(raw: HomeQuotes | undefined, fallback: HomeQuotes):
 
 /**
  * `homeBgRaw` được truyền RIÊNG (đọc từ HOME_BG_KEY, hoặc legacy nếu chưa migrate) —
- * `settings.homeBackground` không còn được lưu/đọc cùng SETTINGS_KEY.
+ * `settings.homeBackground` không còn được lưu/đọc cùng SETTINGS_KEY. `legacyDashboardLayout`
+ * (xem `findLegacyDashboardLayout`) chỉ dùng khi `settings.dashboardLayout` chưa có (dữ liệu từ
+ * trước khi gộp layout về dùng chung) — migrate đúng layout Space "MAFC" lên làm mặc định chung.
  */
-export function normalizeSettings(settings: Settings, homeBgRaw?: HomeBackground): Settings {
+export function normalizeSettings(
+  settings: Settings,
+  homeBgRaw?: HomeBackground,
+  legacyDashboardLayout?: DashboardLayout,
+): Settings {
   const fallback = defaultSettings();
   return {
     theme: settings.theme ?? fallback.theme,
@@ -349,6 +379,7 @@ export function normalizeSettings(settings: Settings, homeBgRaw?: HomeBackground
     // Dữ liệu cũ (trước khi có field này) không có `lastOpenedEpochDay` -> -1 để HYDRATE coi
     // là "ngày mới", tự snap lại ảnh nền/quote theo dayIndex đúng 1 lần khi nâng cấp lên.
     lastOpenedEpochDay: typeof settings.lastOpenedEpochDay === 'number' ? settings.lastOpenedEpochDay : -1,
+    dashboardLayout: normalizeDashboardLayout(settings.dashboardLayout ?? legacyDashboardLayout),
   };
 }
 

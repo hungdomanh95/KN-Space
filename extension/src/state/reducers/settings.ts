@@ -1,5 +1,6 @@
 import type {
   CollapsedBlocks,
+  DashboardLayout,
   HomeBgAutoRotateMs,
   NoteView,
   QuoteRotateMode,
@@ -8,6 +9,7 @@ import type {
   ThemeMode,
 } from '../../types';
 import { dayIndex } from '../../features/home/homeContent';
+import { defaultDashboardLayout } from '../seed';
 
 export type SettingsAction =
   | { type: 'SETTINGS_SET_THEME'; payload: { theme: ThemeMode } }
@@ -24,7 +26,9 @@ export type SettingsAction =
   | { type: 'SETTINGS_HOME_QUOTE_ROTATE_NEXT' }
   | { type: 'SETTINGS_SET_LAST_SCREEN'; payload: { screen: Screen } }
   | { type: 'BLOCK_TOGGLE_COLLAPSED'; payload: { key: keyof CollapsedBlocks } }
-  | { type: 'NOTE_SET_VIEW'; payload: { view: NoteView } };
+  | { type: 'NOTE_SET_VIEW'; payload: { view: NoteView } }
+  | { type: 'SETTINGS_SET_DASHBOARD_LAYOUT'; payload: { layout: DashboardLayout } }
+  | { type: 'SETTINGS_RESET_DASHBOARD_LAYOUT' };
 
 export function settingsReducer(settings: Settings, action: SettingsAction): Settings {
   switch (action.type) {
@@ -95,6 +99,10 @@ export function settingsReducer(settings: Settings, action: SettingsAction): Set
       };
     case 'NOTE_SET_VIEW':
       return { ...settings, noteView: action.payload.view };
+    case 'SETTINGS_SET_DASHBOARD_LAYOUT':
+      return { ...settings, dashboardLayout: action.payload.layout };
+    case 'SETTINGS_RESET_DASHBOARD_LAYOUT':
+      return { ...settings, dashboardLayout: defaultDashboardLayout() };
     default:
       return settings;
   }

@@ -106,23 +106,6 @@ export function dropOnColumnEnd(layout: DashboardLayout, draggedId: LayoutBlockK
 }
 
 /**
- * Đảm bảo mọi id trong `requiredIds` đều có vị trí trong layout — id nào chưa có (vd vừa copy
- * bố cục từ 1 Space có tập khối khác, thiếu hẳn entry cho khối Space đích đang bật) thì chèn
- * vào cuối cột đầu tiên (cột 0), KHÔNG đè/xoá gì khác. Dùng khi copy bố cục giữa 2 Space có tập
- * khối hiển thị khác nhau — id dư (có trong layout nguồn nhưng Space đích không bật) không cần
- * xử lý gì thêm vì `deriveVisibleLayout` đã tự lọc ẩn lúc render, không lỗi gì nếu giữ lại.
- */
-export function ensureBlocksPresent(layout: DashboardLayout, requiredIds: LayoutBlockKey[]): DashboardLayout {
-  let result = layout;
-  for (const id of requiredIds) {
-    if (!findLocation(result, id)) {
-      result = dropOnColumnEnd(result, id, 0);
-    }
-  }
-  return result;
-}
-
-/**
  * Đổi trọng số `h` của 2 slot liền kề trong 1 cột (kéo splitter dọc).
  * QUAN TRỌNG: nhận giá trị TUYỆT ĐỐI `newAH`/`newBH` (đã tính từ baseline cố định lúc
  * mousedown + delta hiện tại, xem AppLayout.onRowSplitterMouseDown), KHÔNG nhận delta rồi

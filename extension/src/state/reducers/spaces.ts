@@ -1,14 +1,11 @@
-import type { DashboardLayout, EnabledBlocks, Space } from '../../types';
-import { defaultDashboardLayout } from '../seed';
+import type { EnabledBlocks, Space } from '../../types';
 
 export type SpacesAction =
   | { type: 'SPACE_CREATE'; payload: { name: string; enabledBlocks: EnabledBlocks } }
   | { type: 'SPACE_RENAME'; payload: { id: string; name: string } }
   | { type: 'SPACE_SET_ENABLED_BLOCKS'; payload: { id: string; enabledBlocks: EnabledBlocks } }
   | { type: 'SPACE_DELETE'; payload: { id: string } }
-  | { type: 'SPACE_MOVE'; payload: { id: string; direction: -1 | 1 } }
-  | { type: 'SPACE_SET_DASHBOARD_LAYOUT'; payload: { spaceId: string; layout: DashboardLayout } }
-  | { type: 'SPACE_RESET_DASHBOARD_LAYOUT'; payload: { spaceId: string } };
+  | { type: 'SPACE_MOVE'; payload: { id: string; direction: -1 | 1 } };
 
 /**
  * Khối Thông báo (`reminders`) không nằm trong cấu hình bật/tắt theo Space — luôn `true`
@@ -29,7 +26,6 @@ function emptySpace(name: string, order: number, enabledBlocks: EnabledBlocks): 
     name: name.trim() || 'Space chưa đặt tên',
     order,
     enabledBlocks,
-    dashboardLayout: defaultDashboardLayout(),
     tasks: [],
     reminders: [],
     habits: [],
@@ -66,14 +62,6 @@ export function spacesReducer(spaces: Space[], action: SpacesAction): Space[] {
       [ordered[idx], ordered[targetIdx]] = [ordered[targetIdx], ordered[idx]];
       return ordered.map((s, i) => ({ ...s, order: i }));
     }
-    case 'SPACE_SET_DASHBOARD_LAYOUT':
-      return spaces.map((s) =>
-        s.id === action.payload.spaceId ? { ...s, dashboardLayout: action.payload.layout } : s,
-      );
-    case 'SPACE_RESET_DASHBOARD_LAYOUT':
-      return spaces.map((s) =>
-        s.id === action.payload.spaceId ? { ...s, dashboardLayout: defaultDashboardLayout() } : s,
-      );
     default:
       return spaces;
   }
