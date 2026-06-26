@@ -1,6 +1,7 @@
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { BookOpen, CheckSquare, ChevronUp, type LucideIcon } from 'lucide-react';
+import { BookOpen, CheckSquare, ChevronUp, MessageCircle, ListChecks, type LucideIcon } from 'lucide-react';
+import { MobileChatScreen } from './MobileChatScreen';
 import { useCurrentSpace } from '../state/AppStateContext';
 import { TasksBlock } from '../features/tasks/TasksBlock';
 import { RemindersBlock } from '../features/reminders/RemindersBlock';
@@ -20,7 +21,8 @@ import type { EnabledBlocks, LayoutBlockKey, LayoutSlot } from '../types';
  * trên mobile, KHÔNG đụng tới `space.enabledBlocks` (cài đặt ẩn/hiện khối của desktop, đồng bộ
  * mọi máy) — đây là 1 lớp lọc RENDER riêng, tách biệt hoàn toàn. */
 const MOBILE_VISIBLE_BLOCKS = new Set<LayoutBlockKey>(['tasks', 'notes']);
-const MOBILE_BREAKPOINT_QUERY = '(max-width: 639px)';
+/** Export để App.tsx dùng đúng breakpoint này quyết định bỏ màn Home trên mobile. */
+export const MOBILE_BREAKPOINT_QUERY = '(max-width: 639px)';
 
 interface AppLayoutProps {
   onGoHome: () => void;
@@ -114,6 +116,11 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
   // Accordion mobile: khối nào đang mở 80% (khối còn lại thu nhỏ 20%) — mặc định "Việc cần
   // làm" vì đây là khối hành động, ưu tiên kiểm tra trước khi ghi note (đã chốt với chủ dự án).
   const [mobileExpanded, setMobileExpanded] = useState<'tasks' | 'notes'>('tasks');
+  // Mobile có 2 tab riêng: "Trò chuyện" (MobileChatScreen — màn chính, thay Home) và "Chi tiết"
+  // (accordion Task/Notes đầy đủ y như trước). Mặc định mở Chat — đúng yêu cầu "gõ nhanh là
+  // việc đầu tiên thấy khi mở app", không qua Home/accordion nữa (xem App.tsx bỏ Home hẳn
+  // trên mobile).
+  const [mobileTab, setMobileTab] = useState<'chat' | 'details'>('chat');
 
   function isBlockVisible(id: LayoutBlockKey): boolean {
     // `settings` (DashboardCorner) là chrome điều hướng (home/space/cài đặt), không phải khối
@@ -476,46 +483,53 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
     return (
       <div className="flex h-full min-h-0 flex-1 flex-col">
         <DashboardCorner onGoHome={onGoHome} compact />
-        <div className="flex min-h-0 flex-1 flex-col gap-2 py-2">
-          {showTasks &&
-            (tasksExpanded ? (
-              <div id="mobile-block-tasks" className="flex min-h-0 flex-[4] flex-col transition-[flex-grow] duration-200 ease-out">
-                {renderBlock('tasks', false)}
+
+        {mobileTab === 'chat' ? (
+          <MobileChatScreen />
+        ) : (
+          <div className="flex min-h-0 flex-1 flex-col gap-2 py-2">
+            {showTasks &&
+              (tasksExpanded ? (
+                <div id="mobile-block-tasks" className="flex min-h-0 flex-[4] flex-col transition-[flex-grow] duration-200 ease-out">
+                  {renderBlock('tasks', false)}
+                </div>
+              ) : (
+                <MobileCollapsedSummary
+                  icon={CheckSquare}
+                  iconBg="rgba(var(--accent-rgb),.12)"
+                  iconColor="var(--accent)"
+                  label="Việc cần làm"
+                  expandedId="mobile-block-tasks"
+                  count={taskCount()}
+                  onClick={() => setMobileExpanded('tasks')}
+                />
+              ))}
+            {showNotes &&
+              (notesExpanded ? (
+                <div id="mobile-block-notes" className="flex min-h-0 flex-[4] flex-col transition-[flex-grow] duration-200 ease-out">
+                  {renderBlock('notes', false)}
+                </div>
+              ) : (
+                <MobileCollapsedSummary
+                  icon={BookOpen}
+                  iconBg="rgba(139,92,246,.12)"
+                  iconColor="var(--note-color)"
+                  label="Ghi chú"
+                  expandedId="mobile-block-notes"
+                  count={noteCount()}
+                  onClick={() => setMobileExpanded('notes')}
+                />
+              ))}
+            {!showTasks && !showNotes && (
+              <div className="flex flex-1 flex-col items-center justify-center gap-1.5 px-4 text-center text-[0.8438rem] text-[var(--text-dim)]">
+                <span>Space này đã tắt cả 2 khối hiện trên mobile.</span>
+                <span>Vào Settings trên desktop để bật lại Việc cần làm hoặc Ghi chú.</span>
               </div>
-            ) : (
-              <MobileCollapsedSummary
-                icon={CheckSquare}
-                iconBg="rgba(var(--accent-rgb),.12)"
-                iconColor="var(--accent)"
-                label="Việc cần làm"
-                expandedId="mobile-block-tasks"
-                count={taskCount()}
-                onClick={() => setMobileExpanded('tasks')}
-              />
-            ))}
-          {showNotes &&
-            (notesExpanded ? (
-              <div id="mobile-block-notes" className="flex min-h-0 flex-[4] flex-col transition-[flex-grow] duration-200 ease-out">
-                {renderBlock('notes', false)}
-              </div>
-            ) : (
-              <MobileCollapsedSummary
-                icon={BookOpen}
-                iconBg="rgba(139,92,246,.12)"
-                iconColor="var(--note-color)"
-                label="Ghi chú"
-                expandedId="mobile-block-notes"
-                count={noteCount()}
-                onClick={() => setMobileExpanded('notes')}
-              />
-            ))}
-          {!showTasks && !showNotes && (
-            <div className="flex flex-1 flex-col items-center justify-center gap-1.5 px-4 text-center text-[0.8438rem] text-[var(--text-dim)]">
-              <span>Space này đã tắt cả 2 khối hiện trên mobile.</span>
-              <span>Vào Settings trên desktop để bật lại Việc cần làm hoặc Ghi chú.</span>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
+
+        <MobileTabBar activeTab={mobileTab} onChange={setMobileTab} />
       </div>
     );
   }
@@ -648,5 +662,51 @@ function MobileCollapsedSummary({
       </span>
       <ChevronUp className="icon h-4 w-4 flex-none text-[var(--text-dim)]" size={16} />
     </button>
+  );
+}
+
+/** Tab bar dính đáy mobile — chuyển giữa "Trò chuyện" (MobileChatScreen, màn chính) và
+ * "Chi tiết" (accordion Task/Notes đầy đủ). Đặt ở đáy vì đỉnh đã có DashboardCorner
+ * (Space-switcher + Settings) — tách 2 hệ điều hướng riêng biệt, không chồng chéo. */
+function MobileTabBar({
+  activeTab,
+  onChange,
+}: {
+  activeTab: 'chat' | 'details';
+  onChange: (tab: 'chat' | 'details') => void;
+}) {
+  return (
+    <div
+      role="tablist"
+      aria-label="Chuyển màn Trò chuyện/Chi tiết"
+      className="flex flex-none border-t border-[color:var(--border-hairline)]
+        bg-[color-mix(in_srgb,var(--panel-bg)_88%,transparent)] [backdrop-filter:blur(14px)_saturate(1.15)]
+        dark:bg-[color-mix(in_srgb,var(--panel-bg)_90%,transparent)]"
+    >
+      <button
+        type="button"
+        role="tab"
+        aria-selected={activeTab === 'chat'}
+        onClick={() => onChange('chat')}
+        className={`flex flex-1 flex-col items-center gap-1 py-2 text-[0.6875rem] font-semibold ${
+          activeTab === 'chat' ? 'text-[var(--accent)]' : 'text-[var(--text-dim)]'
+        }`}
+      >
+        <MessageCircle className="icon h-5 w-5" size={20} />
+        Trò chuyện
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={activeTab === 'details'}
+        onClick={() => onChange('details')}
+        className={`flex flex-1 flex-col items-center gap-1 py-2 text-[0.6875rem] font-semibold ${
+          activeTab === 'details' ? 'text-[var(--accent)]' : 'text-[var(--text-dim)]'
+        }`}
+      >
+        <ListChecks className="icon h-5 w-5" size={20} />
+        Chi tiết
+      </button>
+    </div>
   );
 }

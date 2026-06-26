@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { CheckSquare, FileText, GripVertical, Pencil, Plus, SendHorizontal, Trash2, Check } from 'lucide-react';
+import { CheckSquare, FileText, GripVertical, Pencil, Plus, Trash2, Check } from 'lucide-react';
 import { BlockShell } from '../../components/BlockShell';
 import { EmptyState } from '../../components/EmptyState';
 import { useAppState, useCurrentSpace } from '../../state/AppStateContext';
@@ -187,18 +187,6 @@ export function TasksBlock({
     );
   }
 
-  const [quickText, setQuickText] = useState('');
-
-  /** Thêm việc kiểu chat — gõ 1 câu, Enter/bấm gửi là thành Task ngay (không ngày/giờ/nội
-   * dung, không qua modal). Đáp ứng đúng nhu cầu "gõ nhanh nhiều việc liên tiếp" trên mobile
-   * lẫn desktop — vẫn giữ nút "Thêm" mở TaskFormModal cho khi cần đặt ngày/giờ/nội dung. */
-  function submitQuickTask() {
-    const title = quickText.trim();
-    if (!title) return;
-    dispatch({ type: 'TASK_CREATE', payload: { title, content: '', date: '', time: '' } });
-    setQuickText('');
-  }
-
   return (
     <BlockShell
       domId="block-tasks"
@@ -258,36 +246,11 @@ export function TasksBlock({
       }
     >
       <div className="block-body">
-        <div className="flex flex-none items-center gap-2 px-4 pt-3 max-sm:px-2.5 max-sm:pt-2.5">
-          <input
-            type="text"
-            value={quickText}
-            onChange={(e) => setQuickText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') submitQuickTask();
-            }}
-            placeholder="Gõ 1 việc rồi Enter — vd: Mua đồ ăn sáng"
-            className="min-w-0 flex-1 rounded-full border border-[color:var(--border)] bg-[var(--raised)] px-4 py-2.5
-              text-[0.875rem] text-[var(--text)] transition-[border-color] duration-150
-              hover:border-[color:var(--accent)] focus:border-[color:var(--accent)] focus:outline-none"
-          />
-          <button
-            type="button"
-            onClick={submitQuickTask}
-            disabled={!quickText.trim()}
-            title="Thêm việc"
-            aria-label="Thêm việc"
-            className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-[var(--accent)]
-              text-white transition-opacity duration-150 disabled:opacity-40"
-          >
-            <SendHorizontal className="icon h-4 w-4" size={16} />
-          </button>
-        </div>
         {list.length === 0 ? (
           <EmptyState
             icon={CheckSquare}
             title="Chưa có việc cần làm"
-            hint="Gõ việc đầu tiên vào ô phía trên rồi Enter."
+            hint='Bấm "+ Thêm" ở góc trên để tạo việc đầu tiên.'
           />
         ) : (
           list.map((task) => (

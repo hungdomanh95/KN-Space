@@ -2,7 +2,8 @@ import { useEffect } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { AppStateProvider, useAppState } from './state/AppStateContext';
 import { ConfirmProvider } from './components/ConfirmContext';
-import { AppLayout } from './layout/AppLayout';
+import { AppLayout, MOBILE_BREAKPOINT_QUERY } from './layout/AppLayout';
+import { useMediaQuery } from './layout/useMediaQuery';
 import { AppBackground } from './components/AppBackground';
 import { LoadingScreen } from './components/LoadingScreen';
 import { HomeScreen } from './features/home/HomeScreen';
@@ -25,6 +26,9 @@ function Shell() {
   const { state, dispatch, isLoading } = useAppState();
   const { settings, storageFallbackActive } = state;
   const currentScreen = state.ui.currentScreen;
+  // Mobile bỏ hẳn màn Home — Chat (trong AppLayout) là màn chính, không qua bước xem
+  // đồng hồ/quote/ảnh nền trước nữa (đã chốt với chủ dự án).
+  const isMobile = useMediaQuery(MOBILE_BREAKPOINT_QUERY);
 
   useEffect(() => {
     document.body.setAttribute('data-theme', settings.theme);
@@ -55,6 +59,7 @@ function Shell() {
   // Esc ở Dashboard -> Home. Không hoạt động khi đang gõ trong input/textarea/select hoặc có modal mở.
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      if (isMobile) return; // không còn màn Home trên mobile — phím tắt này vô nghĩa
       if (isTypingTarget(e.target)) return;
       if (isAnyModalOpen()) return; // để Esc đóng modal nếu lỡ mở, không bị màn Home/Dashboard chặn trước
       if (currentScreen === 'home') {
@@ -70,7 +75,7 @@ function Shell() {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentScreen, dispatch]);
+  }, [currentScreen, dispatch, isMobile]);
 
   // Phím tắt đổi nhanh Space: Alt+1..9 (Win/Linux) hoặc Cmd+1..9 (Mac) — chỉ hoạt động khi
   // không đang gõ input/textarea/select và không có modal mở (mục 4.1/6 requirements).
@@ -131,24 +136,28 @@ function Shell() {
   return (
     <>
       <AppBackground imageUrl={imageUrl} imageIndex={settings.homeBackground.index} />
-      {/* Giảm duration vẫn không hết giật — vì các card desktop (.main-block/.sub-block/
+      {/* Mobile: bỏ hẳn màn Home, luôn vào AppLayout (Chat là tab mặc định trong đó) — không
+          cần animate/toggle gì cả. Desktop: giữ nguyên cơ chế crossfade Home<->Dashboard.
+          Giảm duration vẫn không hết giật trên desktop — vì các card (.main-block/.sub-block/
           DashboardCorner) dùng backdrop-filter blur, ANIMATE OPACITY của khối chứa hàng loạt
           layer blur này luôn nặng bất kể duration ngắn/dài (trình duyệt phải vẽ lại blur ở MỌI
           frame trong suốt animation). Đổi chiến lược: bỏ animation hẳn ở chiều ẨN ĐI (Dashboard
           biến mất NGAY, không có gì để vẽ lại) — chỉ còn fade-in ở chiều XUẤT HIỆN (Home không
           có blur nên fade-in vẫn nhẹ, mượt). Bấm Esc giờ không phải vẽ lại blur lúc fade nữa. */}
-      <div
-        className={`fixed inset-0 ${
-          currentScreen === 'home'
-            ? 'visible opacity-100 transition-opacity duration-200 ease-out [will-change:opacity]'
-            : 'invisible opacity-0 pointer-events-none transition-none'
-        }`}
-      >
-        <HomeScreen onEnterDashboard={enterDashboard} />
-      </div>
+      {!isMobile && (
+        <div
+          className={`fixed inset-0 ${
+            currentScreen === 'home'
+              ? 'visible opacity-100 transition-opacity duration-200 ease-out [will-change:opacity]'
+              : 'invisible opacity-0 pointer-events-none transition-none'
+          }`}
+        >
+          <HomeScreen onEnterDashboard={enterDashboard} />
+        </div>
+      )}
       <div
         className={`fixed inset-0 flex min-h-0 flex-col ${
-          currentScreen === 'dashboard'
+          isMobile || currentScreen === 'dashboard'
             ? 'visible opacity-100 transition-opacity duration-200 ease-out [will-change:opacity]'
             : 'invisible opacity-0 pointer-events-none transition-none'
         }`}
