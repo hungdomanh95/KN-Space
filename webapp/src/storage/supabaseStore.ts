@@ -1,0 +1,148 @@
+import { supabase } from '../lib/supabaseClient';
+import type { Settings, Space } from '../types';
+import { createSeedSpaces, defaultSettings } from '../state/seed';
+import { findLegacyDashboardLayout, normalizeSettings, normalizeSpace } from './normalize';
+import type { LoadResult, SaveSnapshot } from './types';
+
+// ============================================================================
+// Schema Supabase: 1 hàng/user trong bảng `kn_space_state` (PK = user_id), gồm
+// `spaces` (jsonb), `current_space_id` (text), `settings` (jsonb). KHÔNG tách key
+// theo space/settings như bản chrome.storage cũ — đó là workaround riêng cho giới
+// hạn ~8KB/item của chrome.storage.sync, không tồn tại với Postgres jsonb (giới hạn
+// thực tế là kích thước row/toast, hàng GB) — gộp lại cho đơn giản, đúng quy mô 1-2
+// người dùng hiện tại. Xem schema.sql (RLS auth.uid() = user_id) để chạy trên Supabase.
+// ============================================================================
+
+const TABLE = 'kn_space_state';
+
+interface Row {
+  spaces: unknown[];
+  current_space_id: string;
+  settings: Settings;
+}
+
+async function getUserId(): Promise<string> {
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data.user) throw new Error('Chưa đăng nhập');
+  return data.user.id;
+}
+
+/**
+ * Load toàn bộ app state từ Supabase. Trả về `null` nếu chưa có hàng nào (user mới)
+ * — caller cần seed dữ liệu demo trong trường hợp này.
+ */
+export async function loadAppState(): Promise<LoadResult | null> {
+  const userId = await getUserId();
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select('spaces,current_space_id,settings')
+    .eq('user_id', userId)
+    .maybeSingle<Row>();
+
+  if (error) {
+    console.warn('[KN-Space] Đọc dữ liệu từ Supabase lỗi:', error.message);
+    throw error;
+  }
+  if (!data || !Array.isArray(data.spaces) || data.spaces.length === 0) {
+    return null;
+  }
+
+  const rawSpaces = data.spaces;
+  const spaces = rawSpaces.map((s) => normalizeSpace(s as Space));
+  const settings = normalizeSettings(data.settings, undefined, findLegacyDashboardLayout(rawSpaces));
+  const currentSpaceId = spaces.some((s) => s.id === data.current_space_id) ? data.current_space_id : spaces[0].id;
+
+  return { spaces, currentSpaceId, settings, storageFallbackActive: false };
+}
+
+/** Ghi snapshot lên Supabase (upsert 1 hàng theo user_id). */
+export async function flushSave(snapshot: SaveSnapshot): Promise<{ fellBack: boolean }> {
+  try {
+    const userId = await getUserId();
+    const { error } = await supabase.from(TABLE).upsert({
+      user_id: userId,
+      spaces: snapshot.spaces,
+      current_space_id: snapshot.currentSpaceId,
+      settings: snapshot.settings,
+      updated_at: new Date().toISOString(),
+    });
+    if (error) throw error;
+    return { fellBack: false };
+  } catch (err) {
+    console.warn('[KN-Space] Lưu dữ liệu lên Supabase lỗi:', err instanceof Error ? err.message : err);
+    return { fellBack: true };
+  }
+}
+
+/** Seed dữ liệu demo + lưu ngay lên Supabase (chỉ gọi khi user mới, chưa có hàng nào). */
+export async function seedAndPersist(): Promise<LoadResult> {
+  const spaces = createSeedSpaces();
+  const settings = defaultSettings();
+  const currentSpaceId = spaces[0].id;
+  const { fellBack } = await flushSave({ spaces, currentSpaceId, settings });
+  return { spaces, currentSpaceId, settings, storageFallbackActive: fellBack };
+}
+
+// ============================================================================
+// Debounce save (giữ nguyên cơ chế từ bản chrome.storage — tránh ghi network dồn
+// dập theo từng keystroke/tick checkbox).
+// ============================================================================
+
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingSnapshot: SaveSnapshot | null = null;
+let onFallbackChange: ((active: boolean) => void) | null = null;
+
+export function setFallbackListener(listener: (active: boolean) => void): void {
+  onFallbackChange = listener;
+}
+
+export function scheduleSave(snapshot: SaveSnapshot, debounceMs = 600): void {
+  pendingSnapshot = snapshot;
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    void flushPendingSave();
+  }, debounceMs);
+}
+
+async function flushPendingSave(): Promise<void> {
+  if (!pendingSnapshot) return;
+  const snapshot = pendingSnapshot;
+  pendingSnapshot = null;
+  const { fellBack } = await flushSave(snapshot);
+  onFallbackChange?.(fellBack);
+}
+
+/** Đảm bảo lưu ngay, không đợi debounce — gọi trước khi rời trang (xem AppStateContext). */
+export async function forceFlush(): Promise<void> {
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  await flushPendingSave();
+}
+
+/**
+ * Đăng ký lắng nghe thay đổi từ Supabase Realtime (đổi từ máy khác) để đồng bộ UI.
+ * Trả về hàm hủy đăng ký.
+ */
+export function subscribeStorageChanges(callback: () => void): () => void {
+  let channel: ReturnType<typeof supabase.channel> | null = null;
+  let unsubscribed = false;
+
+  void getUserId().then((userId) => {
+    if (unsubscribed) return;
+    channel = supabase
+      .channel(`kn-space-state-${userId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: TABLE, filter: `user_id=eq.${userId}` },
+        () => callback(),
+      )
+      .subscribe();
+  });
+
+  return () => {
+    unsubscribed = true;
+    if (channel) void supabase.removeChannel(channel);
+  };
+}

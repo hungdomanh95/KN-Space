@@ -1,0 +1,296 @@
+/*
+ * Component classes dùng @apply cho các pattern lặp lại ở >3 component (theo nguyên tắc đã
+ * chốt trong yêu cầu migrate Tailwind). Giữ đúng tên class hiện có trong JSX để không phải
+ * sửa lại 29 file .tsx khi các class này được dùng — chỉ thân class đổi từ CSS thuần sang
+ * @apply Tailwind utilities. KHÔNG bake giá trị --accent/--accent-rgb tĩnh: dùng arbitrary
+ * value tham chiếu var(...) để vẫn nhận đổi màu runtime qua SettingsModal.
+ */
+@layer components {
+  .main-block,
+  .sub-block {
+    @apply flex min-w-[220px] min-h-0 flex-col overflow-hidden rounded-[14px] border border-[color:var(--border-hairline)]
+      bg-[color-mix(in_srgb,var(--panel-bg)_92%,transparent)] backdrop-blur-[12px] [backdrop-filter:blur(12px)_saturate(1.12)]
+      shadow-[0_2px_10px_rgba(10,12,40,.10),0_10px_28px_rgba(10,12,40,.12)]
+      transition-[flex,outline-offset,opacity,box-shadow] duration-150 [transition-timing-function:var(--ease-standard)];
+  }
+  [data-theme='dark'] .main-block,
+  [data-theme='dark'] .sub-block {
+    @apply bg-[color-mix(in_srgb,var(--panel-bg)_90%,transparent)];
+  }
+  /* #dashboard-corner (DashboardCorner.tsx) không dùng class .main-block/.sub-block (tự style
+     riêng kiểu pill), nhưng vẫn tham gia kéo-thả chung trong layout tự do (AppLayout.tsx gán
+     cùng modifier class dragging/drag-over/zone-side) — cần khai báo riêng để hiệu ứng kéo-thả
+     áp dụng đúng lên nó, không chỉ 5 khối dữ liệu dùng BlockShell. */
+  .main-block.drag-over,
+  .sub-block.drag-over,
+  #dashboard-corner.drag-over {
+    @apply outline outline-2 outline-dashed outline-[color:var(--accent)] outline-offset-4;
+  }
+  .main-block.dragging,
+  .sub-block.dragging,
+  #dashboard-corner.dragging {
+    @apply opacity-45;
+  }
+  .sub-block.drag-over.zone-side,
+  #dashboard-corner.drag-over.zone-side {
+    @apply outline-none shadow-[inset_4px_0_0_0_var(--accent),inset_-4px_0_0_0_var(--accent)];
+  }
+  .main-block .block-head,
+  .sub-block .block-head {
+    @apply cursor-grab;
+  }
+  .main-block .block-head:active,
+  .sub-block .block-head:active {
+    @apply cursor-grabbing;
+  }
+
+  .block-head {
+    @apply flex flex-none items-center justify-between gap-[10px] border-b border-[color:var(--border)] px-4 py-[11px];
+  }
+  /* block-head dùng border ngăn cách nhạt hơn trên kính mờ để liền mạch (mục main-block/sub-block). */
+  .block-head,
+  .notes-toolbar {
+    @apply [border-bottom-color:var(--border-hairline)];
+  }
+
+  .block-body {
+    @apply flex-1 min-h-0 overflow-y-auto px-4 py-3;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center gap-1.5 rounded-[9px] bg-[var(--accent)] px-[14px] py-[7px] text-[0.9062rem] font-semibold text-white;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center gap-1.5 rounded-[9px] border border-[color:var(--border)] bg-[var(--raised)] px-[13px] py-[7px]
+      text-[0.9062rem] text-[var(--text)] transition-[border-color,color] duration-150;
+  }
+  .btn-ghost:hover {
+    @apply border-[color:var(--accent)] text-[var(--accent)];
+  }
+
+  .icon-btn {
+    @apply flex h-6 w-6 flex-none items-center justify-center rounded-[7px] border border-[color:var(--border)]
+      bg-[var(--raised)] text-[var(--text-dim)] transition-[color,border-color] duration-150;
+  }
+  .icon-btn:hover {
+    @apply border-[color:var(--accent)] text-[var(--accent)];
+  }
+  .icon-btn .icon {
+    @apply h-[13px] w-[13px];
+  }
+  .icon-btn:disabled {
+    @apply pointer-events-none cursor-default opacity-30;
+  }
+
+  .add-link {
+    @apply inline-flex items-center gap-[5px] whitespace-nowrap rounded-md bg-transparent px-[7px] py-[3px]
+      text-[0.8438rem] font-semibold text-[var(--accent)];
+  }
+  .add-link:hover {
+    @apply bg-[rgba(var(--accent-rgb),.1)];
+  }
+
+  .field {
+    @apply mb-[14px];
+  }
+  .field label {
+    @apply mb-1.5 block text-[0.8438rem] font-semibold text-[var(--text-dim)];
+  }
+  .field input,
+  .field textarea,
+  .field select {
+    @apply w-full rounded-[9px] border border-[color:var(--border)] bg-[var(--raised)] px-[11px] py-[9px]
+      font-sans text-[0.9375rem] text-[var(--text)];
+  }
+  .field input:focus,
+  .field textarea:focus,
+  .field select:focus {
+    @apply border-[color:var(--accent)] outline outline-2 outline-[color:rgba(var(--accent-rgb),.35)];
+  }
+  .field textarea {
+    @apply min-h-[90px] resize-y;
+  }
+  .field-row {
+    @apply flex gap-[10px];
+  }
+  .field-row .field {
+    @apply flex-1;
+  }
+
+  .modal-actions {
+    @apply mt-1.5 flex justify-end gap-[10px];
+  }
+
+  .modal h2 {
+    @apply mb-[18px] text-[1.0938rem] font-bold;
+  }
+
+  /* Dùng chung cho dropdown Space switcher (SpaceSwitcher.tsx) và dropdown sort note
+     (NotesBlock.tsx) — cùng 1 visual "dropdown menu kính" lặp lại nhiều item con. */
+  .space-menu {
+    @apply absolute top-[calc(100%+8px)] left-0 z-[60] min-w-[220px] max-h-80 overflow-y-auto rounded-xl
+      border border-[color:var(--border)] bg-[var(--modal-bg)] p-1.5 shadow-[0_14px_40px_rgba(0,0,0,.18)];
+  }
+  .space-menu-item {
+    @apply flex cursor-pointer items-center gap-2 rounded-lg px-[9px] py-[7px] text-[0.8438rem];
+  }
+  .space-menu-item:hover {
+    @apply bg-[var(--raised)];
+  }
+  .space-menu-item.active {
+    @apply font-bold text-[var(--accent)];
+  }
+
+  .hint {
+    @apply m-0 text-[0.7812rem] leading-[1.5] text-[var(--text-dim)];
+  }
+
+  .block-check-row {
+    @apply flex cursor-pointer select-none items-center gap-[9px] text-[0.875rem];
+  }
+  .block-check-row input[type='checkbox'] {
+    @apply h-4 w-4 flex-none cursor-pointer accent-[var(--accent)];
+  }
+
+  /* ===== Ghi chú: note card (grid + list) =====
+     Giữ class literal `note-card`/`dragging`/`nc-tools` vì NotesBlock.tsx dùng
+     document.querySelectorAll('.note-card')/classList.contains('dragging') trực tiếp (kỹ
+     thuật kéo-thả arm/disarm draggable) — không thể đổi tên khi migrate sang Tailwind. */
+  .notes-grid {
+    @apply grid w-full content-start gap-2.5 [grid-template-columns:repeat(auto-fill,minmax(180px,1fr))];
+  }
+  .note-card {
+    @apply relative cursor-pointer rounded-[10px] border border-[color:var(--border-hairline)] bg-[var(--note-card-bg)]
+      px-[11px] pb-6 pt-[9px] text-[0.875rem] shadow-[0_1px_3px_rgba(20,20,43,.04)]
+      transition-[transform,box-shadow] duration-[180ms] [transition-timing-function:var(--ease-standard)];
+    border-left-width: 3px;
+  }
+  .note-card:hover {
+    @apply -translate-y-0.5 shadow-[0_6px_16px_rgba(20,20,43,.08)];
+  }
+  .note-card.dragging {
+    @apply opacity-40;
+  }
+  .nc-head {
+    @apply mb-[3px] flex min-h-[18px] items-center justify-end gap-1.5;
+  }
+  .note-card .nc-title {
+    @apply m-0 mb-[3px] font-bold;
+  }
+  .note-card .nc-content {
+    @apply overflow-hidden text-[var(--note-content-text)] [-webkit-box-orient:vertical] [-webkit-line-clamp:4] [display:-webkit-box] [line-clamp:4] whitespace-pre-wrap leading-[1.5];
+  }
+  .nc-date {
+    @apply absolute bottom-[7px] right-[11px] text-[0.6562rem] font-medium text-[var(--text-dim)] opacity-70;
+  }
+  .note-card .nc-tools {
+    @apply flex flex-none items-center gap-[3px] opacity-0 transition-opacity duration-150;
+  }
+  .note-card:hover .nc-tools {
+    @apply opacity-100;
+  }
+  .card-grip {
+    @apply flex h-6 w-6 flex-none cursor-grab items-center justify-center text-[var(--text-dim)];
+  }
+  .card-grip:active {
+    @apply cursor-grabbing;
+  }
+  .card-grip .icon {
+    @apply h-[13px] w-[13px];
+  }
+  .notes-list {
+    @apply flex flex-col gap-[9px];
+  }
+  .notes-list .note-card {
+    @apply w-full;
+  }
+  .notes-list .note-card.drop-before {
+    @apply shadow-[0_-3px_0_-1px_var(--accent)];
+  }
+  .notes-list .note-card.drop-after {
+    @apply shadow-[0_3px_0_-1px_var(--accent)];
+  }
+  .notes-list .nc-head {
+    @apply absolute right-[11px] top-[9px] mb-0 min-h-0;
+  }
+  .notes-list .nc-title {
+    @apply pr-[130px];
+  }
+  .notes-list .note-card.expanded .nc-content {
+    @apply overflow-visible [-webkit-line-clamp:unset] [line-clamp:unset];
+  }
+
+  /* Dùng ở NoteFormModal (palette màu note) và SettingsModal (palette màu accent) — size
+     mặc định 26px, riêng trong .note-modal-head thu nhỏ 18px (xem rule override dưới). */
+  .color-palette {
+    @apply flex gap-[11px];
+  }
+  .swatch {
+    @apply h-[26px] w-[26px] cursor-pointer rounded-full border-2 border-transparent p-0 shadow-[0_0_0_1px_var(--border)_inset];
+  }
+  .swatch.active {
+    @apply border-[color:var(--text)];
+  }
+  .swatch:focus-visible {
+    @apply outline outline-2 outline-offset-2 outline-[color:var(--accent)];
+  }
+  .note-modal-head .color-palette {
+    @apply gap-1.5;
+  }
+  .note-modal-head .swatch {
+    @apply h-[18px] w-[18px];
+  }
+
+  /* Header modal note (tên card + color-palette) — dùng ở NoteFormModal/NoteViewModal. */
+  .note-modal-head {
+    @apply mb-[18px] flex flex-wrap items-center justify-between gap-3;
+  }
+  .note-modal-head h2 {
+    @apply m-0 flex-none;
+  }
+
+  /* Textarea nội dung note/task — dùng ở NoteFormModal/TaskFormModal, min-height responsive
+     theo .modal-note (xem media query max-width:640px ở cuối styles.css). */
+  .note-content-field {
+    @apply min-h-[90px];
+  }
+  .modal-note .note-content-field {
+    @apply min-h-[320px];
+  }
+
+  /* Tab Settings (Chung/Ảnh nền/Quote) — 3 instance lặp lại trong cùng SettingsModal.tsx. */
+  .settings-tab {
+    @apply -mb-px flex items-center gap-[7px] rounded-t-lg border-b-2 border-transparent bg-transparent
+      px-[13px] py-[9px] text-[0.8438rem] font-semibold text-[var(--text-dim)]
+      transition-[color,border-color,background] duration-150 [transition-timing-function:var(--ease-standard)];
+  }
+  .settings-tab:hover {
+    @apply bg-[rgba(var(--accent-rgb),.06)] text-[var(--text)];
+  }
+  .settings-tab.active {
+    @apply border-b-[color:var(--accent)] bg-[rgba(var(--accent-rgb),.08)] text-[var(--accent)];
+  }
+
+  /* Segmented options — dùng ở HomeBackgroundSettings (tần suất đổi ảnh) và HomeQuoteSettings
+     (tần suất đổi quote), cùng 1 visual "nhóm nút chọn 1-trong-nhiều". */
+  .segmented-options {
+    @apply flex flex-wrap gap-1.5;
+  }
+  .segmented-options button {
+    @apply cursor-pointer rounded-lg border border-[color:var(--border)] bg-[var(--raised)] px-[11px] py-1.5
+      text-[0.7812rem] font-semibold text-[var(--text-dim)] transition-[border-color,color,background] duration-150;
+  }
+  .segmented-options button:hover {
+    @apply border-[color:var(--accent)] text-[var(--accent)];
+  }
+  .segmented-options button.active {
+    @apply border-[color:var(--accent)] bg-[rgba(var(--accent-rgb),.08)] text-[var(--accent)];
+  }
+
+  /* Splitter ẨN resize layout Dashboard tự do (xem layout/Splitter.tsx + useDashboardLayout) —
+     đường kẻ accent chỉ hiện khi hover/đang kéo, mặc định trong suốt nên không phá vỡ gap 12px
+     sẵn có giữa các khối/cột. */
+  .splitter-hidden:hover .splitter-hidden-line {
+    @apply bg-[var(--accent)];
+  }
+}
