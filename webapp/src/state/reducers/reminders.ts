@@ -48,7 +48,9 @@ export function remindersReducer(space: Space, action: ReminderAction): Space {
     case 'REMINDER_CREATE': {
       const todayStr = new Date().toISOString().slice(0, 10);
       const newReminder = buildReminder(action.payload, crypto.randomUUID(), todayStr);
-      return { ...space, reminders: [...space.reminders, newReminder] };
+      // RemindersBlock hiện thị thẳng theo thứ tự mảng (không sort) — thêm vào ĐẦU để nhắc việc
+      // mới luôn nổi lên trên cùng, thấy ngay không cần cuộn xuống cuối danh sách.
+      return { ...space, reminders: [newReminder, ...space.reminders] };
     }
     case 'REMINDER_UPDATE': {
       return {

@@ -11,7 +11,10 @@ export type TaskAction =
 export function tasksReducer(space: Space, action: TaskAction): Space {
   switch (action.type) {
     case 'TASK_CREATE': {
-      const maxOrder = space.tasks.reduce((max, t) => Math.max(max, t.order), -1);
+      // `order` nhỏ hơn mọi task hiện có (không phải lớn hơn) — sortTasksForDisplay sort tăng
+      // dần theo order, nên việc mới luôn nổi lên ĐẦU danh sách (chưa-xong) ngay khi tạo, đúng
+      // yêu cầu thực tế: vừa thêm là thấy ngay, không phải cuộn xuống cuối mới thấy.
+      const minOrder = space.tasks.reduce((min, t) => Math.min(min, t.order), 0);
       const newTask: Task = {
         id: crypto.randomUUID(),
         title: action.payload.title.trim() || 'Việc chưa đặt tên',
@@ -19,7 +22,7 @@ export function tasksReducer(space: Space, action: TaskAction): Space {
         date: action.payload.date,
         time: action.payload.time,
         done: false,
-        order: maxOrder + 1,
+        order: minOrder - 1,
       };
       return { ...space, tasks: [...space.tasks, newTask] };
     }
