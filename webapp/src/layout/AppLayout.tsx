@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useCurrentSpace } from '../state/AppStateContext';
 import { TasksBlock } from '../features/tasks/TasksBlock';
@@ -11,7 +11,15 @@ import { TodayBlock } from '../features/today/TodayBlock';
 import { useDashboardLayout } from './useDashboardLayout';
 import { deriveVisibleLayout, getZone, isHeightLocked } from './dashboardLayoutUtils';
 import { Splitter } from './Splitter';
+import { useMediaQuery } from './useMediaQuery';
 import type { EnabledBlocks, LayoutBlockKey, LayoutSlot } from '../types';
+
+/** Trên mobile (xem MOBILE_BREAKPOINT_QUERY), chỉ hiện 2 khối chính dùng để note nhanh/xem việc
+ * cần làm — Nhắc việc/Thói quen/Thông báo/Hôm nay ẩn đi để đỡ rối trên màn hẹp. CHỈ áp dụng
+ * trên mobile, KHÔNG đụng tới `space.enabledBlocks` (cài đặt ẩn/hiện khối của desktop, đồng bộ
+ * mọi máy) — đây là 1 lớp lọc RENDER riêng, tách biệt hoàn toàn. */
+const MOBILE_VISIBLE_BLOCKS = new Set<LayoutBlockKey>(['tasks', 'notes']);
+const MOBILE_BREAKPOINT_QUERY = '(max-width: 639px)';
 
 interface AppLayoutProps {
   onGoHome: () => void;
@@ -99,17 +107,14 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
   // không còn nằm cạnh nhau), nhưng vẫn được đo/render đè dọc suốt chiều cao trang nếu không
   // chặn riêng, gây ra 1 đường kẻ dọc vô nghĩa xuyên qua toàn bộ Dashboard (nặng hơn trên màn
   // cảm ứng vì thiếu sự kiện mouseleave nên dễ dính trạng thái `:hover` làm đường kẻ luôn hiện).
-  const [isStackedLayout, setIsStackedLayout] = useState(() => window.matchMedia('(max-width: 979px)').matches);
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 979px)');
-    function handleChange(e: MediaQueryListEvent) {
-      setIsStackedLayout(e.matches);
-    }
-    mq.addEventListener('change', handleChange);
-    return () => mq.removeEventListener('change', handleChange);
-  }, []);
+  const isStackedLayout = useMediaQuery('(max-width: 979px)');
+  // Mobile thật (≤639px) — thu hẹp số khối hiện ra, xem MOBILE_VISIBLE_BLOCKS phía trên.
+  const isMobileBlocksOnly = useMediaQuery(MOBILE_BREAKPOINT_QUERY);
 
   function isBlockVisible(id: LayoutBlockKey): boolean {
+    // `settings` (DashboardCorner) là chrome điều hướng (home/space/cài đặt), không phải khối
+    // nội dung — luôn hiện cả trên mobile, không tính vào MOBILE_VISIBLE_BLOCKS.
+    if (isMobileBlocksOnly && id !== 'settings' && !MOBILE_VISIBLE_BLOCKS.has(id)) return false;
     const key = ENABLED_BLOCKS_KEY[id];
     if (!key) return true; // reminders/settings luôn hiện, không theo Space
     return space.enabledBlocks[key];
