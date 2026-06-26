@@ -4,6 +4,7 @@ import { AppStateProvider, useAppState } from './state/AppStateContext';
 import { ConfirmProvider } from './components/ConfirmContext';
 import { AppLayout, MOBILE_BREAKPOINT_QUERY } from './layout/AppLayout';
 import { useMediaQuery } from './layout/useMediaQuery';
+import { useKeyboardAwareHeight } from './layout/useKeyboardAwareHeight';
 import { AppBackground } from './components/AppBackground';
 import { LoadingScreen } from './components/LoadingScreen';
 import { HomeScreen } from './features/home/HomeScreen';
@@ -29,6 +30,9 @@ function Shell() {
   // Mobile bỏ hẳn màn Home — Chat (trong AppLayout) là màn chính, không qua bước xem
   // đồng hồ/quote/ảnh nền trước nữa (đã chốt với chủ dự án).
   const isMobile = useMediaQuery(MOBILE_BREAKPOINT_QUERY);
+  // Xem useKeyboardAwareHeight.ts — khung chứa input PHẢI tự co theo bàn phím ảo thật (khác
+  // AppBackground, vốn cần khoá cứng vì không chứa input).
+  const keyboardAwareHeight = useKeyboardAwareHeight();
 
   useEffect(() => {
     document.body.setAttribute('data-theme', settings.theme);
@@ -145,30 +149,33 @@ function Shell() {
           biến mất NGAY, không có gì để vẽ lại) — chỉ còn fade-in ở chiều XUẤT HIỆN (Home không
           có blur nên fade-in vẫn nhẹ, mượt). Bấm Esc giờ không phải vẽ lại blur lúc fade nữa.
 
-          QUAN TRỌNG: khung này KHÔNG khoá chiều cao như AppBackground — phải để `inset-0` co
-          theo bàn phím ảo thật, để input (trong AppLayout/MobileChatScreen) luôn co lên nằm
-          phía trên bàn phím. Đã thử khoá cứng chiều cao ở đây trước đó — hậu quả là input/tab
-          bar bị đẩy xuống nằm SAU bàn phím (ngoài tầm nhìn), Safari phải tự ZOOM THẬT vào để
-          kéo input lên cho thấy được (xác nhận qua test thật: pinch-out tự thu zoom lại được =
-          zoom thật của trình duyệt, không phải ảo giác CSS). Chỉ ảnh nền (AppBackground, không
-          chứa input) mới cần khoá cứng để tránh hiệu ứng crop/zoom ảnh khi khung đó co lại. */}
+          QUAN TRỌNG: khung này dùng `useKeyboardAwareHeight` (window.visualViewport.height) —
+          KHÔNG dùng `inset-0` thuần (Safari iOS không tự co `position:fixed` theo bàn phím ảo,
+          đây là bug WebKit đã xác nhận qua test thật) và KHÔNG khoá cứng như AppBackground.
+          Nếu khung không co đúng theo bàn phím, input/tab bar bị đẩy xuống nằm SAU bàn phím
+          (ngoài tầm nhìn), Safari phải tự ZOOM THẬT vào để kéo input lên cho thấy được (xác
+          nhận: pinch-out tự thu zoom lại được = zoom thật của trình duyệt, không phải ảo giác
+          CSS). Chỉ ảnh nền (AppBackground, không chứa input) mới khoá cứng để tránh crop/zoom
+          ảnh khi khung đó co lại — 2 khung có yêu cầu ngược nhau, không dùng chung 1 cơ chế. */}
       {!isMobile && (
         <div
-          className={`fixed inset-0 ${
+          className={`fixed left-0 right-0 top-0 ${
             currentScreen === 'home'
               ? 'visible opacity-100 transition-opacity duration-200 ease-out [will-change:opacity]'
               : 'invisible opacity-0 pointer-events-none transition-none'
           }`}
+          style={{ height: keyboardAwareHeight }}
         >
           <HomeScreen onEnterDashboard={enterDashboard} />
         </div>
       )}
       <div
-        className={`fixed inset-0 flex min-h-0 flex-col ${
+        className={`fixed left-0 right-0 top-0 flex min-h-0 flex-col ${
           isMobile || currentScreen === 'dashboard'
             ? 'visible opacity-100 transition-opacity duration-200 ease-out [will-change:opacity]'
             : 'invisible opacity-0 pointer-events-none transition-none'
         }`}
+        style={{ height: keyboardAwareHeight }}
       >
         {storageFallbackActive && (
           <div className="fixed bottom-[14px] right-[14px] z-[80] flex max-w-[360px] items-start gap-2 rounded-xl border border-[color:var(--reminder-color)] bg-[var(--modal-bg)] px-[14px] py-3 text-[0.8125rem] text-[var(--text)] shadow-[var(--shadow)]">

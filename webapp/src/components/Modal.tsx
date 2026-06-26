@@ -1,5 +1,6 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
+import { useKeyboardAwareHeight } from '../layout/useKeyboardAwareHeight';
 
 interface ModalProps {
   onClose: () => void;
@@ -13,11 +14,19 @@ interface ModalProps {
  * (kính mờ) nên tự tạo containing block cho mọi descendant position:fixed — nếu modal nằm
  * lồng trong cây DOM của các khối đó, "fixed" sẽ bị kẹt trong khung khối cha thay vì phủ
  * toàn viewport. Portal thoát hẳn ra ngoài cây đó để fixed luôn tính theo viewport.
+ *
+ * `height: keyboardAwareHeight` (thay `inset-0` thuần) — Safari iOS không tự co
+ * `position:fixed` theo bàn phím ảo (bug WebKit đã xác nhận qua test thật), nên modal full-
+ * screen mobile (`max-md:h-full`) cứ giữ chiều cao gốc dù bàn phím che mất 1 phần — input/nút
+ * Lưu phía dưới có thể nằm sau bàn phím, buộc Safari phải tự zoom thật để kéo lên cho thấy
+ * được. Co theo `window.visualViewport.height` để modal luôn vừa khít phần màn hình còn thấy.
  */
 export function Modal({ onClose, className, children }: ModalProps) {
+  const keyboardAwareHeight = useKeyboardAwareHeight();
   return createPortal(
     <div
-      className="overlay fixed inset-0 z-50 flex items-center justify-center bg-[rgba(20,20,30,.45)] backdrop-blur-[2px] animate-overlayFadeIn"
+      className="overlay fixed left-0 right-0 top-0 z-50 flex items-center justify-center bg-[rgba(20,20,30,.45)] backdrop-blur-[2px] animate-overlayFadeIn"
+      style={{ height: keyboardAwareHeight }}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
