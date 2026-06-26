@@ -1,5 +1,6 @@
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { BookOpen, CheckSquare, type LucideIcon } from 'lucide-react';
 import { useCurrentSpace } from '../state/AppStateContext';
 import { TasksBlock } from '../features/tasks/TasksBlock';
 import { RemindersBlock } from '../features/reminders/RemindersBlock';
@@ -110,6 +111,9 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
   const isStackedLayout = useMediaQuery('(max-width: 979px)');
   // Mobile thật (≤639px) — thu hẹp số khối hiện ra, xem MOBILE_VISIBLE_BLOCKS phía trên.
   const isMobileBlocksOnly = useMediaQuery(MOBILE_BREAKPOINT_QUERY);
+  // Accordion mobile: khối nào đang mở 80% (khối còn lại thu nhỏ 20%) — mặc định "Việc cần
+  // làm" vì đây là khối hành động, ưu tiên kiểm tra trước khi ghi note (đã chốt với chủ dự án).
+  const [mobileExpanded, setMobileExpanded] = useState<'tasks' | 'notes'>('tasks');
 
   function isBlockVisible(id: LayoutBlockKey): boolean {
     // `settings` (DashboardCorner) là chrome điều hướng (home/space/cài đặt), không phải khối
@@ -445,19 +449,63 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
     };
   }
 
+  /** Khối "Việc cần làm" chưa xong gần nhất (theo `order`) — dùng làm dòng preview khi khối
+   * này thu nhỏ trên mobile. */
+  function taskSummary(): { count: number; preview: string } {
+    const undone = space.tasks.filter((t) => !t.done);
+    const next = [...undone].sort((a, b) => a.order - b.order)[0];
+    return { count: undone.length, preview: next?.title || 'Không có việc nào' };
+  }
+  /** Note sửa gần nhất (theo `updatedAt`) — dùng làm dòng preview khi khối Ghi chú thu nhỏ. */
+  function noteSummary(): { count: number; preview: string } {
+    const newest = [...space.notes].sort((a, b) => b.updatedAt - a.updatedAt)[0];
+    return { count: space.notes.length, preview: newest?.title || newest?.content || 'Chưa có note nào' };
+  }
+
   // Mobile thật: KHÔNG dùng hệ thống cột tự do bên dưới (3 cột desktop chia đều 1/3 chiều cao
   // khi dồn dọc, kể cả cột chỉ chứa "settings" cao vài chục px — để lại khoảng trống lớn lộ
   // background phía dưới, xem ảnh lỗi thực tế khi test). Dựng riêng 1 layout tĩnh: thanh
-  // Space-switcher dính TRÊN cùng, 2 khối Ghi chú/Việc cần làm lấp đầy chiều cao còn lại.
+  // Space-switcher dính TRÊN cùng; "Việc cần làm" + "Ghi chú" hoạt động dạng accordion — khối
+  // đang mở chiếm 80% chiều cao, khối còn lại thu nhỏ về thanh tóm tắt (tiêu đề + số lượng +
+  // 1 dòng preview, bấm vào để đổi chỗ) — KHÔNG ẩn hẳn 0%, để không mất hoàn toàn context của
+  // khối kia (đã cân nhắc với uiux, xem record quyết định kèm câu hỏi này).
   if (isMobileBlocksOnly) {
     const showNotes = isBlockVisible('notes');
     const showTasks = isBlockVisible('tasks');
+    const bothVisible = showNotes && showTasks;
+    const tasksExpanded = !bothVisible || mobileExpanded === 'tasks';
+    const notesExpanded = !bothVisible || mobileExpanded === 'notes';
+
     return (
       <div className="flex h-full min-h-0 flex-1 flex-col">
         <DashboardCorner onGoHome={onGoHome} compact />
-        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2">
-          {showNotes && <div className="flex min-h-0 flex-[3] flex-col">{renderBlock('notes', false)}</div>}
-          {showTasks && <div className="flex min-h-0 flex-[2] flex-col">{renderBlock('tasks', false)}</div>}
+        <div className="flex min-h-0 flex-1 flex-col gap-2 p-2">
+          {showTasks &&
+            (tasksExpanded ? (
+              <div className="flex min-h-0 flex-[4] flex-col transition-[flex-grow] duration-200 ease-out">
+                {renderBlock('tasks', false)}
+              </div>
+            ) : (
+              <MobileCollapsedSummary
+                icon={CheckSquare}
+                label="Việc cần làm"
+                {...taskSummary()}
+                onClick={() => setMobileExpanded('tasks')}
+              />
+            ))}
+          {showNotes &&
+            (notesExpanded ? (
+              <div className="flex min-h-0 flex-[4] flex-col transition-[flex-grow] duration-200 ease-out">
+                {renderBlock('notes', false)}
+              </div>
+            ) : (
+              <MobileCollapsedSummary
+                icon={BookOpen}
+                label="Ghi chú"
+                {...noteSummary()}
+                onClick={() => setMobileExpanded('notes')}
+              />
+            ))}
         </div>
       </div>
     );
@@ -544,4 +592,39 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
  */
 function SubColSplitterPortal({ targetEl, children }: { targetEl: HTMLElement; children: React.ReactNode }) {
   return createPortal(children, targetEl);
+}
+
+/**
+ * Thanh tóm tắt cho khối "Việc cần làm"/"Ghi chú" khi đang thu nhỏ (accordion mobile, xem
+ * isMobileBlocksOnly trong AppLayout) — tiêu đề + số lượng + 1 dòng preview, bấm để mở rộng
+ * khối này (đồng thời tự thu nhỏ khối đang mở kia, vì luôn chỉ đúng 1 khối mở tại 1 thời điểm).
+ */
+function MobileCollapsedSummary({
+  icon: Icon,
+  label,
+  count,
+  preview,
+  onClick,
+}: {
+  icon: LucideIcon;
+  label: string;
+  count: number;
+  preview: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex flex-1 items-center gap-2.5 rounded-xl border border-[color:var(--border-hairline)]
+        bg-[var(--panel-bg)] px-3.5 py-3 text-left transition-[flex-grow] duration-200 ease-out"
+    >
+      <Icon className="icon h-4 w-4 flex-none text-[var(--accent)]" size={16} />
+      <span className="flex-none text-[0.9rem] font-semibold text-[var(--text)]">{label}</span>
+      <span className="flex-none rounded-full bg-[var(--raised)] px-2 py-0.5 text-[0.7rem] font-medium text-[var(--text-dim)]">
+        {count}
+      </span>
+      <span className="min-w-0 flex-1 truncate text-[0.8125rem] text-[var(--text-dim)]">{preview}</span>
+    </button>
+  );
 }
