@@ -1,12 +1,8 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { BookOpen, CheckSquare, SendHorizontal } from 'lucide-react';
+import { BookOpen, Check, SendHorizontal } from 'lucide-react';
 import { useAppState, useCurrentSpace } from '../state/AppStateContext';
 
-interface ChatBubble {
-  id: string;
-  type: 'task' | 'note';
-  title: string;
-}
+type ChatBubble = { id: string; type: 'task'; title: string; done: boolean } | { id: string; type: 'note'; title: string };
 
 /**
  * Màn hình chính mobile (thay Home) — gõ 1 câu, Enter, thành Task ngay; gõ bắt đầu bằng
@@ -23,16 +19,20 @@ export function MobileChatScreen() {
   const [sessionBubbles, setSessionBubbles] = useState<ChatBubble[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const historyBubbles = useMemo<ChatBubble[]>(
+  // Lấy LIVE từ space.tasks (không lưu state riêng) — tự phản ánh đúng trạng thái done ngay
+  // cả khi tick xong ở tab Chi tiết, không bị "đông cứng" theo lúc tạo.
+  const taskBubbles = useMemo<ChatBubble[]>(
     () =>
       [...space.tasks]
         .sort((a, b) => a.order - b.order)
         .slice(-30)
-        .map((t) => ({ id: t.id, type: 'task', title: t.title })),
+        .map((t) => ({ id: t.id, type: 'task' as const, title: t.title, done: t.done })),
     [space.tasks],
   );
 
-  const bubbles = [...historyBubbles, ...sessionBubbles];
+  // Note KHÔNG có chỗ hiển thị live nào trong màn này — chỉ track Note tạo trong PHIÊN hiện
+  // tại (sessionBubbles), Task thì để taskBubbles tự lo, tránh hiện trùng 2 lần.
+  const bubbles = [...taskBubbles, ...sessionBubbles];
 
   useLayoutEffect(() => {
     const el = scrollRef.current;
@@ -49,10 +49,12 @@ export function MobileChatScreen() {
 
     if (isNote) {
       dispatch({ type: 'NOTE_CREATE', payload: { title, content: '', color: '' } });
+      setSessionBubbles((prev) => [...prev, { id: crypto.randomUUID(), type: 'note', title }]);
     } else {
+      // KHÔNG tự thêm bubble ở đây — taskBubbles (live từ space.tasks) sẽ tự hiện task này
+      // ngay khi reducer thêm xong, tránh hiện trùng 2 lần (1 từ đây + 1 từ taskBubbles).
       dispatch({ type: 'TASK_CREATE', payload: { title, content: '', date: '', time: '' } });
     }
-    setSessionBubbles((prev) => [...prev, { id: crypto.randomUUID(), type: isNote ? 'note' : 'task', title }]);
     setText('');
   }
 
@@ -69,14 +71,13 @@ export function MobileChatScreen() {
               <div
                 className={`flex max-w-[85%] items-center gap-2 rounded-2xl px-3.5 py-2.5 text-[0.875rem] text-white ${
                   b.type === 'note' ? 'bg-[var(--note-color)]' : 'bg-[var(--accent)]'
-                }`}
+                } ${b.type === 'task' && b.done ? 'opacity-60' : ''}`}
               >
-                {b.type === 'note' ? (
-                  <BookOpen className="icon h-3.5 w-3.5 flex-none" size={14} />
-                ) : (
-                  <CheckSquare className="icon h-3.5 w-3.5 flex-none" size={14} />
-                )}
-                <span>{b.title}</span>
+                {b.type === 'note' && <BookOpen className="icon h-3.5 w-3.5 flex-none" size={14} />}
+                {/* Chỉ Task ĐÃ XONG mới có icon check — Task chưa xong không hiện icon gì, tránh
+                    nhìn như đã hoàn thành hết (đúng phản hồi thực tế khi test). */}
+                {b.type === 'task' && b.done && <Check className="icon h-3.5 w-3.5 flex-none" size={14} />}
+                <span className={b.type === 'task' && b.done ? 'line-through' : ''}>{b.title}</span>
               </div>
             </div>
           ))
