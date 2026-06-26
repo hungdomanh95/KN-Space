@@ -6,8 +6,9 @@ import { SettingsModal } from '../features/settings/SettingsModal';
 
 interface DashboardCornerProps {
   onGoHome: () => void;
-  /** Mobile: chỉ cần chuyển Space, không cần về Home/mở Settings (xem AppLayout) — ẩn 2 nút đó,
-   * chỉ còn SpaceSwitcher, và đổi sang dạng thanh full-width dính đáy màn hình thay vì card nổi. */
+  /** Mobile: không cần nút về Home (xem AppLayout) — ẩn riêng nút đó, đổi sang dạng thanh
+   * full-width dính trên đầu màn hình thay vì card nổi. Vẫn giữ nút Settings (đổi theme,
+   * export/import, đăng xuất...) — không có cách nào khác để vào Settings trên mobile. */
   compact?: boolean;
   className?: string;
   rootRef?: React.Ref<HTMLDivElement>;
@@ -47,7 +48,7 @@ export function DashboardCorner({
       id="dashboard-corner"
       ref={rootRef}
       role="group"
-      aria-label={compact ? 'Chuyển space' : 'Về Home, chuyển space và cài đặt'}
+      aria-label={compact ? 'Chuyển space và cài đặt' : 'Về Home, chuyển space và cài đặt'}
       draggable={draggable}
       onMouseDownCapture={onMouseDownCapture}
       onDragStart={onDragStart}
@@ -78,20 +79,18 @@ export function DashboardCorner({
         </button>
       )}
       <SpaceSwitcher />
-      {!compact && (
-        <button
-          id="dashboard-corner-settings-btn"
-          type="button"
-          onClick={() => setSettingsOpen(true)}
-          title="Cài đặt"
-          aria-label="Cài đặt"
-          className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-[9px] border
-            border-[color:var(--border)] bg-[var(--raised)] text-[var(--text-dim)] transition-[color,border-color]
-            duration-150 hover:border-[color:var(--accent)] hover:text-[var(--accent)]"
-        >
-          <SettingsIcon className="icon h-4 w-4" size={16} />
-        </button>
-      )}
+      <button
+        id="dashboard-corner-settings-btn"
+        type="button"
+        onClick={() => setSettingsOpen(true)}
+        title="Cài đặt"
+        aria-label="Cài đặt"
+        className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-[9px] border
+          border-[color:var(--border)] bg-[var(--raised)] text-[var(--text-dim)] transition-[color,border-color]
+          duration-150 hover:border-[color:var(--accent)] hover:text-[var(--accent)]"
+      >
+        <SettingsIcon className="icon h-4 w-4" size={16} />
+      </button>
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
     </div>
   );
