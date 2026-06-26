@@ -3,16 +3,6 @@
 # File export/import dữ liệu cá nhân (qua Settings > Export JSON) — không phải code, không commit.
 kn-space-backup-*.json
 
-# extension (Chrome Extension MV3 + React + Vite)
-extension/node_modules/
-extension/dist/
-extension/*.tsbuildinfo
-extension/*.zip
-extension/*.crx
-# Private key dùng để giữ cố định extension ID (cho chrome.storage.sync đồng bộ đúng
-# giữa nhiều máy) — KHÔNG commit, tự backup riêng (vd. password manager/USB riêng).
-extension/*.pem
-
 # webapp (web app cá nhân — Phase 2: React + Vite + Supabase)
 webapp/node_modules/
 webapp/dist/
