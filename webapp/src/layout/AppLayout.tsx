@@ -450,25 +450,22 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
   }
 
   /** Khối "Việc cần làm" chưa xong gần nhất (theo `order`) — dùng làm dòng preview khi khối
-   * này thu nhỏ trên mobile. */
-  function taskSummary(): { count: number; preview: string } {
-    const undone = space.tasks.filter((t) => !t.done);
-    const next = [...undone].sort((a, b) => a.order - b.order)[0];
-    return { count: undone.length, preview: next?.title || 'Không có việc nào' };
+   * này thu nhỏ trên mobile (chỉ còn số lượng — đã bỏ dòng preview nội dung, xem
+   * MobileCollapsedSummary). */
+  function taskCount(): number {
+    return space.tasks.filter((t) => !t.done).length;
   }
-  /** Note sửa gần nhất (theo `updatedAt`) — dùng làm dòng preview khi khối Ghi chú thu nhỏ. */
-  function noteSummary(): { count: number; preview: string } {
-    const newest = [...space.notes].sort((a, b) => b.updatedAt - a.updatedAt)[0];
-    return { count: space.notes.length, preview: newest?.title || newest?.content || 'Chưa có note nào' };
+  function noteCount(): number {
+    return space.notes.length;
   }
 
   // Mobile thật: KHÔNG dùng hệ thống cột tự do bên dưới (3 cột desktop chia đều 1/3 chiều cao
   // khi dồn dọc, kể cả cột chỉ chứa "settings" cao vài chục px — để lại khoảng trống lớn lộ
   // background phía dưới, xem ảnh lỗi thực tế khi test). Dựng riêng 1 layout tĩnh: thanh
   // Space-switcher dính TRÊN cùng; "Việc cần làm" + "Ghi chú" hoạt động dạng accordion — khối
-  // đang mở chiếm 80% chiều cao, khối còn lại thu nhỏ về thanh tóm tắt (tiêu đề + số lượng +
-  // 1 dòng preview, bấm vào để đổi chỗ) — KHÔNG ẩn hẳn 0%, để không mất hoàn toàn context của
-  // khối kia (đã cân nhắc với uiux, xem record quyết định kèm câu hỏi này).
+  // đang mở chiếm 80% chiều cao, khối còn lại thu nhỏ về thanh tóm tắt (tiêu đề + số lượng),
+  // bấm vào để đổi chỗ — KHÔNG ẩn hẳn 0%, để không mất hoàn toàn context của khối kia (đã cân
+  // nhắc với uiux, xem record quyết định kèm câu hỏi này).
   if (isMobileBlocksOnly) {
     const showNotes = isBlockVisible('notes');
     const showTasks = isBlockVisible('tasks');
@@ -492,7 +489,7 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
                 iconColor="var(--accent)"
                 label="Việc cần làm"
                 expandedId="mobile-block-tasks"
-                {...taskSummary()}
+                count={taskCount()}
                 onClick={() => setMobileExpanded('tasks')}
               />
             ))}
@@ -508,7 +505,7 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
                 iconColor="var(--note-color)"
                 label="Ghi chú"
                 expandedId="mobile-block-notes"
-                {...noteSummary()}
+                count={noteCount()}
                 onClick={() => setMobileExpanded('notes')}
               />
             ))}
@@ -608,8 +605,10 @@ function SubColSplitterPortal({ targetEl, children }: { targetEl: HTMLElement; c
 
 /**
  * Thanh tóm tắt cho khối "Việc cần làm"/"Ghi chú" khi đang thu nhỏ (accordion mobile, xem
- * isMobileBlocksOnly trong AppLayout) — tiêu đề + số lượng + 1 dòng preview, bấm để mở rộng
- * khối này (đồng thời tự thu nhỏ khối đang mở kia, vì luôn chỉ đúng 1 khối mở tại 1 thời điểm).
+ * isMobileBlocksOnly trong AppLayout) — chỉ icon + tên + số lượng, bấm để mở rộng khối này
+ * (đồng thời tự thu nhỏ khối đang mở kia, vì luôn chỉ đúng 1 khối mở tại 1 thời điểm). Cố ý
+ * KHÔNG có dòng preview nội dung — quá tốn chiều cao so với giá trị mang lại (đã bỏ theo
+ * phản hồi thực tế khi test: thanh thu nhỏ chiếm diện tích quá lớn).
  */
 function MobileCollapsedSummary({
   icon: Icon,
@@ -617,7 +616,6 @@ function MobileCollapsedSummary({
   iconColor,
   label,
   count,
-  preview,
   expandedId,
   onClick,
 }: {
@@ -626,7 +624,6 @@ function MobileCollapsedSummary({
   iconColor: string;
   label: string;
   count: number;
-  preview: string;
   /** Id của khối SẼ mở khi bấm — dùng cho aria-controls (đây là accordion trigger). */
   expandedId: string;
   onClick: () => void;
@@ -637,20 +634,17 @@ function MobileCollapsedSummary({
       onClick={onClick}
       aria-expanded={false}
       aria-controls={expandedId}
-      className="flex h-16 flex-1 items-center gap-3 rounded-2xl border border-[color:var(--border-hairline)]
-        bg-[var(--raised)] px-3.5 text-left transition-[flex-grow,transform] duration-200 ease-out active:scale-[0.98]"
+      className="flex flex-1 items-center gap-2.5 rounded-xl border border-[color:var(--border-hairline)]
+        bg-[var(--raised)] px-3 py-2.5 text-left transition-[flex-grow,transform] duration-200 ease-out active:scale-[0.98]"
     >
-      <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full" style={{ background: iconBg }}>
-        <Icon className="icon h-[18px] w-[18px]" size={18} style={{ color: iconColor }} />
+      <span className="flex h-7 w-7 flex-none items-center justify-center rounded-full" style={{ background: iconBg }}>
+        <Icon className="icon h-[15px] w-[15px]" size={15} style={{ color: iconColor }} />
       </span>
-      <span className="flex min-w-0 flex-1 flex-col gap-px">
-        <span className="flex items-center gap-2">
-          <span className="text-[0.875rem] font-semibold text-[var(--text)]">{label}</span>
-          <span className="flex-none rounded-full bg-[var(--accent)] px-[7px] py-px text-[0.6875rem] font-bold text-white">
-            {count}
-          </span>
+      <span className="flex min-w-0 flex-1 items-center gap-2">
+        <span className="truncate text-[0.875rem] font-semibold text-[var(--text)]">{label}</span>
+        <span className="flex-none rounded-full bg-[var(--accent)] px-[7px] py-px text-[0.6875rem] font-bold text-white">
+          {count}
         </span>
-        <span className="truncate text-[0.75rem] text-[var(--text-dim)]">{preview}</span>
       </span>
       <ChevronUp className="icon h-4 w-4 flex-none text-[var(--text-dim)]" size={16} />
     </button>

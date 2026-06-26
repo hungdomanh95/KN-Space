@@ -104,6 +104,17 @@ export function scheduleSave(snapshot: SaveSnapshot, debounceMs = 600): void {
   }, debounceMs);
 }
 
+/**
+ * true nếu còn thay đổi cục bộ CHƯA lưu lên Supabase (đang trong 600ms debounce hoặc đang
+ * gửi). Dùng để bỏ qua sự kiện Realtime tới trong lúc này — nếu không, GET lại dữ liệu lúc
+ * này sẽ trả về bản CŨ hơn state cục bộ đang có (state cục bộ đã đổi tiếp sau lần lưu trước,
+ * chưa kịp lưu lần mới) và HYDRATE đè lên, làm thao tác vừa làm (kéo-thả sắp xếp lại, mở rộng
+ * note...) bị "rollback" ngược 1 nhịp — đúng hiện tượng đã gặp khi test thật.
+ */
+export function hasPendingSave(): boolean {
+  return pendingSnapshot !== null;
+}
+
 async function flushPendingSave(): Promise<void> {
   if (!pendingSnapshot) return;
   const snapshot = pendingSnapshot;

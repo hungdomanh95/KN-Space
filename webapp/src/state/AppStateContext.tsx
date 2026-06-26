@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useReducer, useRef } from 
 import type { AppState } from '../types';
 import {
   forceFlush,
+  hasPendingSave,
   loadAppState,
   scheduleSave,
   seedAndPersist,
@@ -88,6 +89,13 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const unsubscribe = subscribeStorageChanges(() => {
       if (!hydratedRef.current) return;
+      // Còn thay đổi cục bộ chưa lưu xong (đang debounce/đang gửi) — BỎ QUA sự kiện này.
+      // Nếu không, GET lại lúc này trả về bản trên server CŨ HƠN state cục bộ hiện tại
+      // (vì state cục bộ đã đổi tiếp sau lần lưu gần nhất), HYDRATE đè lên sẽ làm thao tác
+      // vừa làm (kéo-thả sắp xếp lại, mở rộng note...) bị "rollback" ngược 1 nhịp — đúng lỗi
+      // delay/rollback đã gặp khi test thật. Khi flush xong, nếu dữ liệu trên server còn khác
+      // (đổi từ máy khác) thì lần Realtime kế tiếp vẫn bắt được, không mất đồng bộ.
+      if (hasPendingSave()) return;
       void (async () => {
         const loaded = await loadAppState();
         if (!loaded) return;
