@@ -131,21 +131,26 @@ function Shell() {
   return (
     <>
       <AppBackground imageUrl={imageUrl} imageIndex={settings.homeBackground.index} />
-      {/* duration giảm 450ms -> 200ms + will-change: opacity — cardstyle desktop (.main-block/
-          .sub-block/DashboardCorner) dùng backdrop-filter blur, animate opacity của 1 container
-          fixed chứa hàng loạt layer blur này khá nặng cho trình duyệt vẽ lại mỗi frame, gây
-          giật/lag rõ khi bấm Esc đổi màn nhanh (đã gặp khi test). will-change báo trước cho
-          trình duyệt chuẩn bị compositing layer, 200ms thu ngắn khoảng thời gian phải vẽ lại. */}
+      {/* Giảm duration vẫn không hết giật — vì các card desktop (.main-block/.sub-block/
+          DashboardCorner) dùng backdrop-filter blur, ANIMATE OPACITY của khối chứa hàng loạt
+          layer blur này luôn nặng bất kể duration ngắn/dài (trình duyệt phải vẽ lại blur ở MỌI
+          frame trong suốt animation). Đổi chiến lược: bỏ animation hẳn ở chiều ẨN ĐI (Dashboard
+          biến mất NGAY, không có gì để vẽ lại) — chỉ còn fade-in ở chiều XUẤT HIỆN (Home không
+          có blur nên fade-in vẫn nhẹ, mượt). Bấm Esc giờ không phải vẽ lại blur lúc fade nữa. */}
       <div
-        className={`fixed inset-0 visible opacity-100 transition-[opacity,visibility] duration-200 ease-out [will-change:opacity] ${
-          currentScreen === 'dashboard' ? 'invisible opacity-0 pointer-events-none' : ''
+        className={`fixed inset-0 ${
+          currentScreen === 'home'
+            ? 'visible opacity-100 transition-opacity duration-200 ease-out [will-change:opacity]'
+            : 'invisible opacity-0 pointer-events-none transition-none'
         }`}
       >
         <HomeScreen onEnterDashboard={enterDashboard} />
       </div>
       <div
-        className={`fixed inset-0 flex min-h-0 flex-col visible opacity-100 transition-[opacity,visibility] duration-200 ease-out [will-change:opacity] ${
-          currentScreen === 'home' ? 'invisible opacity-0 pointer-events-none' : ''
+        className={`fixed inset-0 flex min-h-0 flex-col ${
+          currentScreen === 'dashboard'
+            ? 'visible opacity-100 transition-opacity duration-200 ease-out [will-change:opacity]'
+            : 'invisible opacity-0 pointer-events-none transition-none'
         }`}
       >
         {storageFallbackActive && (

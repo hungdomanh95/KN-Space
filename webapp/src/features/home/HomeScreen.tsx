@@ -50,11 +50,12 @@ export function HomeScreen({ onEnterDashboard }: HomeScreenProps) {
       role="region"
       aria-label="Màn hình Home"
     >
-      {/* Giảm gần nửa so với trước (0.30/0.14/0.46 -> 0.16/0.07/0.24) — bản cũ làm Home tối hơn
-          rõ rệt so với Dashboard (không có lớp phủ này), tạo cảm giác "sáng/tối" giật khi
-          chuyển màn. Vẫn giữ chữ text-shadow riêng (dòng dưới) để bù contrast. */}
+      {/* Giảm lần 1 (0.30/0.14/0.46 -> 0.16/0.07/0.24) vẫn còn thấy chênh sáng/tối rõ so với
+          Dashboard (không có lớp phủ này) — giảm tiếp gần như bỏ hẳn ở vùng trên/giữa, chỉ giữ
+          chút ở đáy (chỗ nút "Vào Dashboard" + nguồn quote cần contrast). text-shadow riêng
+          trên chữ (dòng dưới) đã đủ gánh phần contrast chính cho đồng hồ/quote. */}
       <div
-        className="absolute inset-0 z-[1] bg-[linear-gradient(180deg,rgba(0,0,0,.16)_0%,rgba(0,0,0,.07)_35%,rgba(0,0,0,.24)_100%)]"
+        className="absolute inset-0 z-[1] bg-[linear-gradient(180deg,rgba(0,0,0,.04)_0%,rgba(0,0,0,.02)_50%,rgba(0,0,0,.16)_100%)]"
         aria-hidden="true"
       />
       <div className="relative z-[2] flex flex-col items-center gap-1.5 px-6 text-center [text-shadow:0_2px_12px_rgba(0,0,0,.45),0_1px_2px_rgba(0,0,0,.4)]">
