@@ -21,11 +21,17 @@ export function MobileChatScreen() {
 
   // Lấy LIVE từ space.tasks (không lưu state riêng) — tự phản ánh đúng trạng thái done ngay
   // cả khi tick xong ở tab Chi tiết, không bị "đông cứng" theo lúc tạo.
+  //
+  // `order` việc MỚI tạo nhỏ hơn việc cũ (xem TASK_CREATE — để nổi lên ĐẦU danh sách trong
+  // khối Tasks/tab Chi tiết). Ở màn Chat thì NGƯỢC LẠI — phải hiện như chat thật, việc mới
+  // nhất nằm DƯỚI CÙNG gần ô nhập: sort tăng dần theo order (= mới->cũ), lấy 30 việc MỚI nhất
+  // (30 phần tử đầu), rồi đảo lại thành cũ->mới để mới nhất rơi xuống cuối mảng hiển thị.
   const taskBubbles = useMemo<ChatBubble[]>(
     () =>
       [...space.tasks]
         .sort((a, b) => a.order - b.order)
-        .slice(-30)
+        .slice(0, 30)
+        .reverse()
         .map((t) => ({ id: t.id, type: 'task' as const, title: t.title, done: t.done })),
     [space.tasks],
   );
