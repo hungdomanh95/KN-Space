@@ -634,8 +634,8 @@ function MobileCollapsedSummary({
       onClick={onClick}
       aria-expanded={false}
       aria-controls={expandedId}
-      className="flex flex-1 items-center gap-2.5 rounded-xl border border-[color:var(--border-hairline)]
-        bg-[var(--raised)] px-3 py-2.5 text-left transition-[flex-grow,transform] duration-200 ease-out active:scale-[0.98]"
+      className="flex flex-none items-center gap-2.5 rounded-xl border border-[color:var(--border-hairline)]
+        bg-[var(--raised)] px-3 py-2.5 text-left transition-transform duration-150 ease-out active:scale-[0.98]"
     >
       <span className="flex h-7 w-7 flex-none items-center justify-center rounded-full" style={{ background: iconBg }}>
         <Icon className="icon h-[15px] w-[15px]" size={15} style={{ color: iconColor }} />
