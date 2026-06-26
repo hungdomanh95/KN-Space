@@ -69,8 +69,11 @@ export function SpaceSwitcher() {
         </span>
         <ChevronDown className="icon h-3 w-3 text-[var(--text-dim)]" size={12} />
       </button>
+      {/* -42px mỗi bên để mở rộng dropdown khi parent là khung hẹp kẹp giữa nút Home/Settings
+          (bản desktop) — trên mobile (DashboardCorner compact) parent đã gần full-width, cộng
+          thêm -42px sẽ tràn ra ngoài viewport. max-md: reset về khớp đúng parent. */}
       {open && (
-        <div className="space-menu !left-[-42px] !right-[-42px] !min-w-[240px]">
+        <div className="space-menu !left-[-42px] !right-[-42px] !min-w-[240px] max-md:!inset-x-0 max-md:!min-w-0">
           {orderedSpaces.map((space, idx) => {
             const isFirst = idx === 0;
             const isLast = idx === orderedSpaces.length - 1;

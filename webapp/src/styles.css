@@ -87,8 +87,10 @@ input, textarea, select { font-family: inherit; }
      Safari/Chrome trên di động tự ZOOM vào trang khi focus (hành vi cố định của trình duyệt,
      không tắt được qua viewport meta mà không hỏng zoom thật của người dùng). Ép cố định 16px
      bằng px (không theo rem) CHỈ cho 3 loại field này để chặn auto-zoom, không ảnh hưởng cỡ chữ
-     phần còn lại của app. */
-  input, textarea, select { font-size: 16px; }
+     phần còn lại của app. Cần khai báo CẢ selector `.field input/...` (components.css) vì cùng
+     mức độ cụ thể (1 class + 1 thẻ) — chỉ `input{}` đơn thuần specificity thấp hơn, bị đè mất. */
+  input, textarea, select,
+  .field input, .field textarea, .field select { font-size: 16px !important; }
 }
 @media (max-width: 480px) {
   html { font-size: 13px; }
