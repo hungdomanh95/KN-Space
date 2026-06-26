@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useCurrentSpace } from '../state/AppStateContext';
 import { TasksBlock } from '../features/tasks/TasksBlock';
@@ -94,6 +94,21 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
   const [colSplitters, setColSplitters] = useState<ColSplitterGeom[]>([]);
   const [subColSplitters, setSubColSplitters] = useState<SubColSplitterGeom[]>([]);
 
+  // Dưới breakpoint `lg` (980px, xem tailwind.config.js + `max-lg:flex-col` ở #cols-wrap), các
+  // cột dồn xuống xếp dọc — splitter kéo đổi ĐỘ RỘNG giữa 2 cột không còn ý nghĩa gì (2 cột
+  // không còn nằm cạnh nhau), nhưng vẫn được đo/render đè dọc suốt chiều cao trang nếu không
+  // chặn riêng, gây ra 1 đường kẻ dọc vô nghĩa xuyên qua toàn bộ Dashboard (nặng hơn trên màn
+  // cảm ứng vì thiếu sự kiện mouseleave nên dễ dính trạng thái `:hover` làm đường kẻ luôn hiện).
+  const [isStackedLayout, setIsStackedLayout] = useState(() => window.matchMedia('(max-width: 979px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 979px)');
+    function handleChange(e: MediaQueryListEvent) {
+      setIsStackedLayout(e.matches);
+    }
+    mq.addEventListener('change', handleChange);
+    return () => mq.removeEventListener('change', handleChange);
+  }, []);
+
   function isBlockVisible(id: LayoutBlockKey): boolean {
     const key = ENABLED_BLOCKS_KEY[id];
     if (!key) return true; // reminders/settings luôn hiện, không theo Space
@@ -143,7 +158,7 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
           nextRow.push({ ci, si, origCi, origSiA: slotMap[ci][si], origSiB: slotMap[ci][si + 1], top });
         }
 
-        if (ci < visibleLayout.cols.length - 1) {
+        if (!isStackedLayout && ci < visibleLayout.cols.length - 1) {
           const nextColEl = colRefs.current.get(ci + 1);
           if (nextColEl) {
             const nextColRect = nextColEl.getBoundingClientRect();
@@ -179,7 +194,7 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
       ro.disconnect();
       window.removeEventListener('resize', measure);
     };
-  }, [visibleLayout, colMap, slotMap]);
+  }, [visibleLayout, colMap, slotMap, isStackedLayout]);
 
   function armBlock(id: LayoutBlockKey, e: React.MouseEvent) {
     const target = e.target as HTMLElement;
@@ -483,8 +498,9 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
           </div>
         ))}
 
-        {/* Splitter chiều rộng giữa cột — render ở #cols-wrap vì `left` tính tương đối theo wrapRect.left. */}
-        {colSplitters.map(({ ci, origCiA, origCiB, left }) => (
+        {/* Splitter chiều rộng giữa cột — render ở #cols-wrap vì `left` tính tương đối theo wrapRect.left.
+            Ẩn hẳn khi đang dồn cột (isStackedLayout) — xem giải thích ở khai báo isStackedLayout phía trên. */}
+        {!isStackedLayout && colSplitters.map(({ ci, origCiA, origCiB, left }) => (
           <Splitter
             key={`col-${ci}`}
             axis="col"
