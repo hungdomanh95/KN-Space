@@ -1,4 +1,8 @@
-# Phase 1 — Extension cá nhân (desktop) 🟡 CODE XONG — CHỜ VERIFY TRÊN CHROME THẬT
+# Phase 1 — Extension cá nhân (desktop) ✅ ĐÃ HOÀN THÀNH, ĐÃ THAY THẾ BỞI PHASE 2
+
+> **CẬP NHẬT:** Phase 1 (Chrome Extension MV3 + `chrome.storage`) đã hoàn thành toàn bộ phần code và được dùng làm bước đệm, nhưng đã **chính thức bị thay thế hoàn toàn** bởi Phase 2 (Web App + Supabase, xem [phase-2-pwa-supabase.md](phase-2-pwa-supabase.md)). Thư mục `extension/` đã bị **xoá khỏi repo**. Toàn bộ nội dung dưới đây được **giữ lại làm lịch sử** quyết định/triển khai, KHÔNG còn là nguồn sự thật cho kiến trúc hiện hành. Nếu cần biết nền tảng/storage/auth đang dùng thật, đọc `docs/requirements.md` và `phase-2-pwa-supabase.md`.
+
+---
 
 ## Mục tiêu
 Một bản KN-Space **dùng được ngay cho cá nhân trên desktop**: full dashboard 5 khối, dữ liệu lưu bền và đồng bộ giữa các máy đăng nhập cùng Chrome account. Không backend, không auth, không hosting.
@@ -196,4 +200,8 @@ extension/
   - `cd extension && npx tsc --noEmit -p tsconfig.json` — pass, 0 lỗi.
   - Script Node độc lập verify logic `isRecurringDueToday` cho case "mỗi 3 ngày" — đúng kỳ vọng (due vào ngày 0, 3, 6, 9...).
   - Đọc thủ công `dist/index.html`, `dist/manifest.json`, `dist/background.js` — xác nhận không có `default_popup`, không inline script, mọi asset path tương đối.
-- **Bước tiếp theo (cho chủ dự án):** mở `chrome://extensions`, bật "Developer mode", bấm "Load unpacked", chọn thư mục `extension/dist/` (không phải `extension/` gốc). Sau đó test theo checklist §12 còn lại. Nếu cần build lại sau khi sửa code: chạy lại `npm run build` trong `extension/`, rồi bấm icon "reload" của extension trong `chrome://extensions` (không cần load unpacked lại từ đầu).
+- **Bước tiếp theo (lúc đó):** mở `chrome://extensions`, bật "Developer mode", bấm "Load unpacked", chọn thư mục `extension/dist/` (không phải `extension/` gốc). Sau đó test theo checklist §12 còn lại. Nếu cần build lại sau khi sửa code: chạy lại `npm run build` trong `extension/`, rồi bấm icon "reload" của extension trong `chrome://extensions` (không cần load unpacked lại từ đầu).
+
+---
+
+**Diễn biến thực tế sau Phase 1:** Bản extension này đã được dùng một thời gian ngắn, nhưng do nhu cầu thật là dùng được trên điện thoại (note nhanh khi di chuyển) và đồng bộ không phụ thuộc riêng Chrome account, dự án quyết định nhảy thẳng sang Phase 2 (Web App + Supabase) và **xoá hẳn `extension/` khỏi repo** thay vì duy trì song song 2 codebase. Xem [phase-2-pwa-supabase.md](phase-2-pwa-supabase.md) cho nền tảng hiện hành.
