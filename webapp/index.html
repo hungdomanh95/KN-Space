@@ -4,6 +4,18 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>KN-Space</title>
+
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="icon" href="/icons/icon192.png" />
+<meta name="theme-color" content="#5457d6" />
+
+<!-- "Add to Home Screen" trên iOS Safari KHÔNG đọc manifest.webmanifest (chỉ Android/Chrome
+     đọc) — cần khai báo riêng các meta apple-* này để full-screen thật (ẩn thanh Safari) và có
+     icon đúng khi ghim vào màn hình chính. -->
+<link rel="apple-touch-icon" href="/icons/icon180.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="KN-Space" />
 </head>
 <body data-theme="light">
   <div id="root"></div>
