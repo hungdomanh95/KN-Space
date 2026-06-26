@@ -111,7 +111,9 @@
     @apply min-h-[90px] resize-y;
   }
   .field-row {
-    @apply flex gap-[10px];
+    /* Ngày/giờ cạnh nhau trên desktop — xếp dọc trên mobile (max-md), tránh chật 2 input cùng
+       dòng trên màn 360-390px (TaskFormModal.tsx). */
+    @apply flex gap-[10px] max-md:flex-col;
   }
   .field-row .field {
     @apply flex-1;

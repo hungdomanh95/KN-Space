@@ -99,4 +99,23 @@ input, textarea, select { font-family: inherit; }
      mức độ cụ thể (1 class + 1 thẻ) — chỉ `input{}` đơn thuần specificity thấp hơn, bị đè mất. */
   input, textarea, select,
   .field input, .field textarea, .field select { font-size: 16px !important; }
+
+  /* `.modal` (Modal.tsx) full-screen + overflow-y-auto trên mobile — `.modal-actions` (nút
+     Lưu/Hủy, dùng chung mọi form CRUD) cần LUÔN nổi trên bàn phím ảo thay vì cuộn lẫn cùng
+     content rồi bị che mất. position:sticky hoạt động được vì `.modal-actions` là 1 flex
+     item bên trong `.modal` đang overflow-y-auto — không cần đổi cấu trúc JSX của Modal.tsx
+     hay từng form (TaskFormModal/NoteFormModal/...). Margin âm = bù lại padding 22px của
+     `.modal` để thanh nút kéo sát hết viền ngang, có nền + viền riêng tách khỏi content. */
+  .modal-actions {
+    position: sticky;
+    bottom: 0;
+    margin: 12px -22px -22px -22px;
+    padding: 12px 22px calc(12px + env(safe-area-inset-bottom));
+    background: var(--modal-bg);
+    border-top: 1px solid var(--border-hairline);
+  }
+  .modal-actions button {
+    flex: 1;
+    min-height: 48px;
+  }
 }

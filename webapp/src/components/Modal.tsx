@@ -24,6 +24,14 @@ export function Modal({ onClose, className, children }: ModalProps) {
     >
       <div
         className={`modal max-h-[85vh] w-[440px] max-w-[90vw] overflow-y-auto rounded-2xl border border-[color:var(--border-hairline)] bg-[var(--modal-bg)] p-[22px] shadow-[0_20px_60px_rgba(0,0,0,.16)] animate-modalPopIn max-md:h-full max-md:max-h-full max-md:w-full max-md:max-w-full max-md:rounded-none ${className ?? ''}`.trim()}
+        onFocus={(e) => {
+          // Bàn phím ảo mobile có thể che field đang nhập (đặc biệt textarea dài) — cuộn nó
+          // vào giữa vùng nhìn thấy. Delay nhẹ để chờ bàn phím bắt đầu đẩy viewport trước.
+          const target = e.target;
+          if (target.matches('input, textarea, select')) {
+            setTimeout(() => target.scrollIntoView({ block: 'center', behavior: 'smooth' }), 80);
+          }
+        }}
       >
         {children}
       </div>
