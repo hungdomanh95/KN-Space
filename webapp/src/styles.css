@@ -83,6 +83,12 @@ input, textarea, select { font-family: inherit; }
 }
 @media (max-width: 640px) {
   html { font-size: 14px; }
+  /* input/textarea/select dùng cỡ chữ theo rem nên co theo html ở trên — nếu nhỏ hơn 16px,
+     Safari/Chrome trên di động tự ZOOM vào trang khi focus (hành vi cố định của trình duyệt,
+     không tắt được qua viewport meta mà không hỏng zoom thật của người dùng). Ép cố định 16px
+     bằng px (không theo rem) CHỈ cho 3 loại field này để chặn auto-zoom, không ảnh hưởng cỡ chữ
+     phần còn lại của app. */
+  input, textarea, select { font-size: 16px; }
 }
 @media (max-width: 480px) {
   html { font-size: 13px; }

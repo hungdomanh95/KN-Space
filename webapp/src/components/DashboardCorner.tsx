@@ -59,7 +59,7 @@ export function DashboardCorner({
         bg-[color-mix(in_srgb,var(--panel-bg)_88%,transparent)] [backdrop-filter:blur(14px)_saturate(1.15)]
         dark:bg-[color-mix(in_srgb,var(--panel-bg)_90%,transparent)] ${
           compact
-            ? 'w-full justify-center border-t px-3 py-2.5'
+            ? 'w-full justify-center border-b px-3 py-2.5'
             : 'justify-between rounded-xl border px-[9px] py-[7px] shadow-[0_4px_16px_rgba(10,12,40,.10),0_1px_4px_rgba(10,12,40,.08)]'
         } ${className ?? ''}`.trim()}
     >

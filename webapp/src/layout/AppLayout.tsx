@@ -447,18 +447,18 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
 
   // Mobile thật: KHÔNG dùng hệ thống cột tự do bên dưới (3 cột desktop chia đều 1/3 chiều cao
   // khi dồn dọc, kể cả cột chỉ chứa "settings" cao vài chục px — để lại khoảng trống lớn lộ
-  // background phía dưới, xem ảnh lỗi thực tế khi test). Dựng riêng 1 layout tĩnh: 2 khối
-  // Ghi chú/Việc cần làm lấp đầy chiều cao còn lại, thanh Space-switcher dính đáy màn hình.
+  // background phía dưới, xem ảnh lỗi thực tế khi test). Dựng riêng 1 layout tĩnh: thanh
+  // Space-switcher dính TRÊN cùng, 2 khối Ghi chú/Việc cần làm lấp đầy chiều cao còn lại.
   if (isMobileBlocksOnly) {
     const showNotes = isBlockVisible('notes');
     const showTasks = isBlockVisible('tasks');
     return (
       <div className="flex h-full min-h-0 flex-1 flex-col">
+        <DashboardCorner onGoHome={onGoHome} compact />
         <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2">
           {showNotes && <div className="flex min-h-0 flex-[3] flex-col">{renderBlock('notes', false)}</div>}
           {showTasks && <div className="flex min-h-0 flex-[2] flex-col">{renderBlock('tasks', false)}</div>}
         </div>
-        <DashboardCorner onGoHome={onGoHome} compact />
       </div>
     );
   }
