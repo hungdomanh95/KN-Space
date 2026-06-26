@@ -64,7 +64,8 @@ export function TodayBlock({
       onDragLeave={onDragLeave}
       onDrop={onDrop}
       style={style}
-      className={`relative z-[5] flex flex-none cursor-grab items-center gap-4 overflow-hidden rounded-xl
+      className={`relative z-[5] flex flex-none cursor-grab items-center gap-[clamp(8px,3cqw,16px)]
+        overflow-hidden rounded-xl [container-type:inline-size]
         border border-white/15 bg-white/5 px-4 py-3
         shadow-[0_4px_16px_rgba(10,12,40,.10),0_1px_4px_rgba(10,12,40,.08)] active:cursor-grabbing
         ${className ?? ''}`.trim()}
@@ -74,14 +75,18 @@ export function TodayBlock({
         aria-hidden="true"
       />
       <div className="relative z-[1] flex flex-none items-baseline gap-1 text-white [text-shadow:0_1px_3px_rgba(0,0,0,.4)]">
-        <span className="text-[clamp(40px,4.6vw,52px)] font-semibold leading-none tracking-[-.01em] [font-variant-numeric:tabular-nums]">
+        <span className="text-[clamp(24px,11cqw,52px)] font-semibold leading-none tracking-[-.01em] [font-variant-numeric:tabular-nums]">
           {clock.hh}:{clock.mm}
         </span>
       </div>
       <div className="relative z-[1] h-[60%] w-px flex-none bg-white/30" aria-hidden="true" />
       <div className="relative z-[1] min-w-0 flex-1 text-white [text-shadow:0_1px_3px_rgba(0,0,0,.4)]">
-        <div className="text-[20px] font-bold opacity-95">{formatHomeDateShort(now)}</div>
-        <div className="whitespace-normal text-[13.5px] italic leading-snug opacity-85">{quote}</div>
+        <div className="whitespace-nowrap text-[clamp(11px,5.2cqw,20px)] font-bold opacity-95">
+          {formatHomeDateShort(now)}
+        </div>
+        <div className="line-clamp-2 whitespace-normal text-[clamp(9px,3.6cqw,13.5px)] italic leading-snug opacity-85">
+          {quote}
+        </div>
       </div>
     </div>
   );
