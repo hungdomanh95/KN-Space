@@ -23,7 +23,7 @@ export function Modal({ onClose, className, children }: ModalProps) {
       }}
     >
       <div
-        className={`modal max-h-[85vh] w-[440px] max-w-[90vw] overflow-y-auto rounded-2xl border border-[color:var(--border-hairline)] bg-[var(--modal-bg)] p-[22px] shadow-[0_20px_60px_rgba(0,0,0,.16)] animate-modalPopIn ${className ?? ''}`.trim()}
+        className={`modal max-h-[85vh] w-[440px] max-w-[90vw] overflow-y-auto rounded-2xl border border-[color:var(--border-hairline)] bg-[var(--modal-bg)] p-[22px] shadow-[0_20px_60px_rgba(0,0,0,.16)] animate-modalPopIn max-md:h-full max-md:max-h-full max-md:w-full max-md:max-w-full max-md:rounded-none ${className ?? ''}`.trim()}
       >
         {children}
       </div>
