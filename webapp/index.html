@@ -6,7 +6,11 @@
 <title>KN-Space</title>
 
 <link rel="manifest" href="/manifest.webmanifest" />
-<link rel="icon" href="/icons/icon192.png" />
+<!-- Trình duyệt desktop (đặc biệt Chrome/Safari) ưu tiên icon nhỏ 16/32px cho tab — chỉ khai
+     báo icon192.png không đủ, nhiều trường hợp rơi về icon globe mặc định. Khai báo đủ size. -->
+<link rel="icon" type="image/png" sizes="16x16" href="/icons/icon16.png" />
+<link rel="icon" type="image/png" sizes="32x32" href="/icons/icon32.png" />
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon192.png" />
 <meta name="theme-color" content="#5457d6" />
 
 <!-- "Add to Home Screen" trên iOS Safari KHÔNG đọc manifest.webmanifest (chỉ Android/Chrome
