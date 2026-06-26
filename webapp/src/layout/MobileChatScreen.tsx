@@ -92,7 +92,7 @@ export function MobileChatScreen() {
             if (e.key === 'Enter') handleSubmit();
           }}
           placeholder='Gõ việc cần làm, hoặc "/note " để ghi chú nhanh'
-          className={`min-w-0 flex-1 rounded-full border bg-[var(--raised)] px-4 py-2.5 text-[0.875rem] text-[var(--text)]
+          className={`min-w-0 flex-1 rounded-full border bg-[var(--raised)] px-4 py-2.5 text-[16px] text-[var(--text)]
             transition-[border-color] duration-150 focus:outline-none ${
               isNoteMode
                 ? 'border-[var(--note-color)] focus:border-[var(--note-color)]'
