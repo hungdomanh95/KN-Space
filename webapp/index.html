@@ -2,7 +2,12 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<!-- maximum-scale=1, user-scalable=no — chặn HẲN zoom (pinch/double-tap/auto-zoom-khi-focus-
+     input) ở mức trình duyệt. Đã thử nhiều cách vá riêng từng nguyên nhân (font-size input,
+     double-tap, layout co theo bàn phím qua JS) nhưng không nhất quán trên thiết bị thật — khoá
+     thẳng ở đây là cách duy nhất chắc chắn, đánh đổi: người dùng không pinch-zoom được nữa (ổn
+     vì đây là app thao tác, không phải trang đọc nội dung cần phóng to chữ). -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <title>KN-Space</title>
 
 <link rel="manifest" href="/manifest.webmanifest" />
