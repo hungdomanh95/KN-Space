@@ -9,6 +9,7 @@ import {
   setFallbackListener,
   subscribeStorageChanges,
 } from '../storage/supabaseStore';
+import { writeLocalCurrentSpaceId } from '../storage/localCurrentSpace';
 import { buildUiInitialState } from '../storage/normalize';
 import { defaultSettings } from './seed';
 import type { AppAction } from './appReducer';
@@ -124,12 +125,23 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     return unsubscribe;
   }, []);
 
-  // Debounce save khi spaces/currentSpaceId/settings đổi (KHÔNG theo dõi state.ui).
+  // Debounce save khi spaces/settings đổi (KHÔNG theo dõi state.ui, KHÔNG theo dõi
+  // currentSpaceId — đổi Space không còn là dữ liệu cần lưu lên Supabase, xem effect riêng
+  // dưới + storage/localCurrentSpace.ts. Vẫn gửi currentSpaceId trong payload vì cột server
+  // NOT NULL cần 1 giá trị, nhưng việc đổi Space một mình không kích hoạt save nữa — tránh
+  // ghi network + bắn Realtime vô ích tới máy khác cho 1 thay đổi giờ chỉ còn ý nghĩa cục bộ).
   useEffect(() => {
     if (!hydratedRef.current || isLoading) return;
     scheduleSave({ spaces: state.spaces, currentSpaceId: state.currentSpaceId, settings: state.settings });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.spaces, state.currentSpaceId, state.settings]);
+  }, [state.spaces, state.settings]);
+
+  // Lưu "Space đang mở" riêng cho máy này (localStorage) ngay khi đổi — không đợi debounce
+  // Supabase (vốn giờ không còn lưu giá trị này có ý nghĩa gì nữa).
+  useEffect(() => {
+    if (!hydratedRef.current || isLoading) return;
+    writeLocalCurrentSpaceId(state.currentSpaceId);
+  }, [state.currentSpaceId, isLoading]);
 
   // Ghi lên Supabase qua network có độ trễ hơn chrome.storage cũ — nếu user đóng tab/chuyển
   // app đúng lúc debounce 600ms chưa bắn, bản ghi cuối có thể mất. Flush ngay khi tab ẩn đi.

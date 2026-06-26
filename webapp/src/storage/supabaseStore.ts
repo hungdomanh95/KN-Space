@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabaseClient';
 import type { Settings, Space } from '../types';
 import { createSeedSpaces, defaultSettings } from '../state/seed';
 import { findLegacyDashboardLayout, normalizeSettings, normalizeSpace } from './normalize';
+import { readLocalCurrentSpaceId, writeLocalCurrentSpaceId } from './localCurrentSpace';
 import type { LoadResult, SaveSnapshot } from './types';
 
 // ============================================================================
@@ -11,6 +12,11 @@ import type { LoadResult, SaveSnapshot } from './types';
 // hạn ~8KB/item của chrome.storage.sync, không tồn tại với Postgres jsonb (giới hạn
 // thực tế là kích thước row/toast, hàng GB) — gộp lại cho đơn giản, đúng quy mô 1-2
 // người dùng hiện tại. Xem schema.sql (RLS auth.uid() = user_id) để chạy trên Supabase.
+//
+// `current_space_id` vẫn còn TỒN TẠI trong bảng (NOT NULL) nhưng KHÔNG còn dùng để xác định
+// Space hiện tại nữa — đó là trạng thái riêng từng máy, đọc/ghi qua localCurrentSpace.ts
+// (localStorage). Cột này giờ chỉ là "giá trị cuối cùng máy nào đó từng ghi", không ai đọc lại
+// có ý nghĩa — giữ để khỏi phải sửa schema/cột NOT NULL, không cần migration.
 // ============================================================================
 
 const TABLE = 'kn_space_state';
@@ -50,7 +56,12 @@ export async function loadAppState(): Promise<LoadResult | null> {
   const rawSpaces = data.spaces;
   const spaces = rawSpaces.map((s) => normalizeSpace(s as Space));
   const settings = normalizeSettings(data.settings, undefined, findLegacyDashboardLayout(rawSpaces));
-  const currentSpaceId = spaces.some((s) => s.id === data.current_space_id) ? data.current_space_id : spaces[0].id;
+  // Space đang mở = trạng thái riêng MÁY NÀY (localStorage), không lấy từ server — xem comment
+  // đầu file. Máy lần đầu mở (chưa có gì trong localStorage) hoặc Space đã lưu bị xoá ở máy
+  // khác thì fallback Space đầu tiên.
+  const localId = readLocalCurrentSpaceId();
+  const currentSpaceId = localId && spaces.some((s) => s.id === localId) ? localId : spaces[0].id;
+  writeLocalCurrentSpaceId(currentSpaceId);
 
   return { spaces, currentSpaceId, settings, storageFallbackActive: false };
 }
@@ -79,6 +90,7 @@ export async function seedAndPersist(): Promise<LoadResult> {
   const spaces = createSeedSpaces();
   const settings = defaultSettings();
   const currentSpaceId = spaces[0].id;
+  writeLocalCurrentSpaceId(currentSpaceId);
   const { fellBack } = await flushSave({ spaces, currentSpaceId, settings });
   return { spaces, currentSpaceId, settings, storageFallbackActive: fellBack };
 }
