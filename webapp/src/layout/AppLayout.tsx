@@ -14,18 +14,17 @@ import { useDashboardLayout } from './useDashboardLayout';
 import { deriveVisibleLayout, getZone, isHeightLocked } from './dashboardLayoutUtils';
 import { Splitter } from './Splitter';
 import { useMediaQuery } from './useMediaQuery';
+import { useMobileLayout } from './useMobileLayout';
 import type { EnabledBlocks, LayoutBlockKey, LayoutSlot } from '../types';
 
-/** Dưới breakpoint này (kể cả desktop resize cửa sổ hẹp lại, không riêng điện thoại), chuyển
- * hẳn sang UI mobile (Chat-first + tab Chi tiết) — chỉ hiện 2 khối chính dùng để note nhanh/xem
- * việc cần làm. Hệ layout cột tự do của desktop (kéo-thả/resize/splitter) nhìn rất kỳ khi bị
- * bóp vào khung hẹp dưới 1000px (cột chồng lên nhau, splitter/drag-handle không còn hợp lý) —
- * dưới mốc này dùng hẳn UI mobile thay vì cố nhồi layout desktop vào khung hẹp. KHÔNG đụng tới
- * `space.enabledBlocks` (cài đặt ẩn/hiện khối của desktop, đồng bộ mọi máy) — đây là 1 lớp lọc
- * RENDER riêng, tách biệt hoàn toàn. */
+/** Dưới breakpoint useMobileLayout (kể cả desktop resize cửa sổ hẹp lại, không riêng điện
+ * thoại), chuyển hẳn sang UI mobile (Chat-first + tab Chi tiết) — chỉ hiện 2 khối chính dùng để
+ * note nhanh/xem việc cần làm. Hệ layout cột tự do của desktop (kéo-thả/resize/splitter) nhìn
+ * rất kỳ khi bị bóp vào khung hẹp dưới 1000px (cột chồng lên nhau, splitter/drag-handle không
+ * còn hợp lý) — dưới mốc này dùng hẳn UI mobile thay vì cố nhồi layout desktop vào khung hẹp.
+ * KHÔNG đụng tới `space.enabledBlocks` (cài đặt ẩn/hiện khối của desktop, đồng bộ mọi máy) —
+ * đây là 1 lớp lọc RENDER riêng, tách biệt hoàn toàn. */
 const MOBILE_VISIBLE_BLOCKS = new Set<LayoutBlockKey>(['tasks', 'notes']);
-/** Export để App.tsx dùng đúng breakpoint này quyết định bỏ màn Home trên mobile. */
-export const MOBILE_BREAKPOINT_QUERY = '(max-width: 999px)';
 
 interface AppLayoutProps {
   onGoHome: () => void;
@@ -114,8 +113,9 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
   // chặn riêng, gây ra 1 đường kẻ dọc vô nghĩa xuyên qua toàn bộ Dashboard (nặng hơn trên màn
   // cảm ứng vì thiếu sự kiện mouseleave nên dễ dính trạng thái `:hover` làm đường kẻ luôn hiện).
   const isStackedLayout = useMediaQuery('(max-width: 979px)');
-  // Mobile thật (≤639px) — thu hẹp số khối hiện ra, xem MOBILE_VISIBLE_BLOCKS phía trên.
-  const isMobileBlocksOnly = useMediaQuery(MOBILE_BREAKPOINT_QUERY);
+  // Dưới ~1000px (có hysteresis chống nhảy mốc, xem useMobileLayout.ts) — thu hẹp số khối hiện
+  // ra, xem MOBILE_VISIBLE_BLOCKS phía trên.
+  const isMobileBlocksOnly = useMobileLayout();
   // Accordion mobile: khối nào đang mở 80% (khối còn lại thu nhỏ 20%) — mặc định "Việc cần
   // làm" vì đây là khối hành động, ưu tiên kiểm tra trước khi ghi note (đã chốt với chủ dự án).
   const [mobileExpanded, setMobileExpanded] = useState<'tasks' | 'notes'>('tasks');
@@ -484,7 +484,13 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
     const notesExpanded = !bothVisible || mobileExpanded === 'notes';
 
     return (
-      <div className="flex h-full min-h-0 flex-1 flex-col">
+      // max-w-[560px] + mx-auto: UI mobile gốc thiết kế cho màn điện thoại hẹp (~375-414px) —
+      // khi hiện trên cửa sổ desktop bị resize hẹp (đúng vùng kích hoạt UI này, xem
+      // useMobileLayout.ts) thì full-width nhìn lạc lõng (bong bóng chat/accordion kéo giãn quá
+      // rộng, nhiều khoảng trắng 2 bên). max-width tự nhiên KHÔNG ảnh hưởng màn điện thoại thật
+      // (vốn đã hẹp hơn 560px, max-width không bị "chạm" tới) — không cần check thêm điều kiện
+      // theo JS, thuần CSS (theo khuyến nghị uiux: canh giữa nội dung, không giả khung điện thoại).
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-[560px] flex-1 flex-col">
         <DashboardCorner onGoHome={onGoHome} compact />
 
         {mobileTab === 'chat' ? (

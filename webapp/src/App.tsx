@@ -2,8 +2,8 @@ import { useEffect } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { AppStateProvider, useAppState } from './state/AppStateContext';
 import { ConfirmProvider } from './components/ConfirmContext';
-import { AppLayout, MOBILE_BREAKPOINT_QUERY } from './layout/AppLayout';
-import { useMediaQuery } from './layout/useMediaQuery';
+import { AppLayout } from './layout/AppLayout';
+import { useMobileLayout } from './layout/useMobileLayout';
 import { AppBackground } from './components/AppBackground';
 import { LoadingScreen } from './components/LoadingScreen';
 import { HomeScreen } from './features/home/HomeScreen';
@@ -28,7 +28,7 @@ function Shell() {
   const currentScreen = state.ui.currentScreen;
   // Mobile bỏ hẳn màn Home — Chat (trong AppLayout) là màn chính, không qua bước xem
   // đồng hồ/quote/ảnh nền trước nữa (đã chốt với chủ dự án).
-  const isMobile = useMediaQuery(MOBILE_BREAKPOINT_QUERY);
+  const isMobile = useMobileLayout();
 
   useEffect(() => {
     document.body.setAttribute('data-theme', settings.theme);
