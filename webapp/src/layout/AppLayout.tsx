@@ -1,6 +1,6 @@
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { BookOpen, CheckSquare, type LucideIcon } from 'lucide-react';
+import { BookOpen, CheckSquare, ChevronUp, type LucideIcon } from 'lucide-react';
 import { useCurrentSpace } from '../state/AppStateContext';
 import { TasksBlock } from '../features/tasks/TasksBlock';
 import { RemindersBlock } from '../features/reminders/RemindersBlock';
@@ -479,33 +479,45 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
     return (
       <div className="flex h-full min-h-0 flex-1 flex-col">
         <DashboardCorner onGoHome={onGoHome} compact />
-        <div className="flex min-h-0 flex-1 flex-col gap-2 p-2">
+        <div className="flex min-h-0 flex-1 flex-col gap-2 py-2">
           {showTasks &&
             (tasksExpanded ? (
-              <div className="flex min-h-0 flex-[4] flex-col transition-[flex-grow] duration-200 ease-out">
+              <div id="mobile-block-tasks" className="flex min-h-0 flex-[4] flex-col transition-[flex-grow] duration-200 ease-out">
                 {renderBlock('tasks', false)}
               </div>
             ) : (
               <MobileCollapsedSummary
                 icon={CheckSquare}
+                iconBg="rgba(var(--accent-rgb),.12)"
+                iconColor="var(--accent)"
                 label="Việc cần làm"
+                expandedId="mobile-block-tasks"
                 {...taskSummary()}
                 onClick={() => setMobileExpanded('tasks')}
               />
             ))}
           {showNotes &&
             (notesExpanded ? (
-              <div className="flex min-h-0 flex-[4] flex-col transition-[flex-grow] duration-200 ease-out">
+              <div id="mobile-block-notes" className="flex min-h-0 flex-[4] flex-col transition-[flex-grow] duration-200 ease-out">
                 {renderBlock('notes', false)}
               </div>
             ) : (
               <MobileCollapsedSummary
                 icon={BookOpen}
+                iconBg="rgba(139,92,246,.12)"
+                iconColor="var(--note-color)"
                 label="Ghi chú"
+                expandedId="mobile-block-notes"
                 {...noteSummary()}
                 onClick={() => setMobileExpanded('notes')}
               />
             ))}
+          {!showTasks && !showNotes && (
+            <div className="flex flex-1 flex-col items-center justify-center gap-1.5 px-4 text-center text-[0.8438rem] text-[var(--text-dim)]">
+              <span>Space này đã tắt cả 2 khối hiện trên mobile.</span>
+              <span>Vào Settings trên desktop để bật lại Việc cần làm hoặc Ghi chú.</span>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -601,30 +613,46 @@ function SubColSplitterPortal({ targetEl, children }: { targetEl: HTMLElement; c
  */
 function MobileCollapsedSummary({
   icon: Icon,
+  iconBg,
+  iconColor,
   label,
   count,
   preview,
+  expandedId,
   onClick,
 }: {
   icon: LucideIcon;
+  iconBg: string;
+  iconColor: string;
   label: string;
   count: number;
   preview: string;
+  /** Id của khối SẼ mở khi bấm — dùng cho aria-controls (đây là accordion trigger). */
+  expandedId: string;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex flex-1 items-center gap-2.5 rounded-xl border border-[color:var(--border-hairline)]
-        bg-[var(--panel-bg)] px-3.5 py-3 text-left transition-[flex-grow] duration-200 ease-out"
+      aria-expanded={false}
+      aria-controls={expandedId}
+      className="flex h-16 flex-1 items-center gap-3 rounded-2xl border border-[color:var(--border-hairline)]
+        bg-[var(--raised)] px-3.5 text-left transition-[flex-grow,transform] duration-200 ease-out active:scale-[0.98]"
     >
-      <Icon className="icon h-4 w-4 flex-none text-[var(--accent)]" size={16} />
-      <span className="flex-none text-[0.9rem] font-semibold text-[var(--text)]">{label}</span>
-      <span className="flex-none rounded-full bg-[var(--raised)] px-2 py-0.5 text-[0.7rem] font-medium text-[var(--text-dim)]">
-        {count}
+      <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full" style={{ background: iconBg }}>
+        <Icon className="icon h-[18px] w-[18px]" size={18} style={{ color: iconColor }} />
       </span>
-      <span className="min-w-0 flex-1 truncate text-[0.8125rem] text-[var(--text-dim)]">{preview}</span>
+      <span className="flex min-w-0 flex-1 flex-col gap-px">
+        <span className="flex items-center gap-2">
+          <span className="text-[0.875rem] font-semibold text-[var(--text)]">{label}</span>
+          <span className="flex-none rounded-full bg-[var(--accent)] px-[7px] py-px text-[0.6875rem] font-bold text-white">
+            {count}
+          </span>
+        </span>
+        <span className="truncate text-[0.75rem] text-[var(--text-dim)]">{preview}</span>
+      </span>
+      <ChevronUp className="icon h-4 w-4 flex-none text-[var(--text-dim)]" size={16} />
     </button>
   );
 }

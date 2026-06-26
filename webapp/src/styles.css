@@ -82,7 +82,15 @@ input, textarea, select { font-family: inherit; }
   html { font-size: 15px; }
 }
 @media (max-width: 640px) {
-  html { font-size: 14px; }
+  /* Mobile THẬT (≤639px qua isMobileBlocksOnly, breakpoint media này gần khớp) — KHÔNG áp dụng
+     cùng cơ chế "co dần theo độ hẹp" như desktop resize cửa sổ ở trên. Logic co-theo-width ở
+     trên sinh ra để xử lý desktop thu hẹp dần (980→640px), nhưng mobile luôn rơi vào mức nhỏ
+     nhất (14px/13px) bất kể kích thước máy thật — làm toàn UI mobile bị thu nhỏ kiểu
+     "desktop co lại" thay vì có scale chữ riêng phù hợp cỡ màn hình cầm tay (đọc gần, không
+     cần co theo logic "vừa khung" của desktop). Theo review uiux: cố định 16px, không co tiếp.
+     Quan trọng: phải ghi SAU rule 980px ở trên để thắng theo thứ tự nguồn (cùng độ cụ thể, độ
+     rộng viewport ≤640px luôn khớp CẢ 2 media query, rule sau thắng). */
+  html { font-size: 16px; }
   /* input/textarea/select dùng cỡ chữ theo rem nên co theo html ở trên — nếu nhỏ hơn 16px,
      Safari/Chrome trên di động tự ZOOM vào trang khi focus (hành vi cố định của trình duyệt,
      không tắt được qua viewport meta mà không hỏng zoom thật của người dùng). Ép cố định 16px
@@ -91,7 +99,4 @@ input, textarea, select { font-family: inherit; }
      mức độ cụ thể (1 class + 1 thẻ) — chỉ `input{}` đơn thuần specificity thấp hơn, bị đè mất. */
   input, textarea, select,
   .field input, .field textarea, .field select { font-size: 16px !important; }
-}
-@media (max-width: 480px) {
-  html { font-size: 13px; }
 }
