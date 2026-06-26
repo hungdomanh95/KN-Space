@@ -4,6 +4,7 @@ import { AppStateProvider, useAppState } from './state/AppStateContext';
 import { ConfirmProvider } from './components/ConfirmContext';
 import { AppLayout } from './layout/AppLayout';
 import { AppBackground } from './components/AppBackground';
+import { LoadingScreen } from './components/LoadingScreen';
 import { HomeScreen } from './features/home/HomeScreen';
 import { isMacPlatform } from './features/spaces/spaceShortcuts';
 import { AuthProvider, useAuth } from './auth/AuthContext';
@@ -122,11 +123,7 @@ function Shell() {
   }
 
   if (isLoading) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text-dim)' }}>
-        Đang tải dữ liệu...
-      </div>
-    );
+    return <LoadingScreen message="Đang tải dữ liệu..." />;
   }
 
   const imageUrl = settings.homeBackground.images[settings.homeBackground.index]?.value ?? '';
@@ -134,15 +131,20 @@ function Shell() {
   return (
     <>
       <AppBackground imageUrl={imageUrl} imageIndex={settings.homeBackground.index} />
+      {/* duration giảm 450ms -> 200ms + will-change: opacity — cardstyle desktop (.main-block/
+          .sub-block/DashboardCorner) dùng backdrop-filter blur, animate opacity của 1 container
+          fixed chứa hàng loạt layer blur này khá nặng cho trình duyệt vẽ lại mỗi frame, gây
+          giật/lag rõ khi bấm Esc đổi màn nhanh (đã gặp khi test). will-change báo trước cho
+          trình duyệt chuẩn bị compositing layer, 200ms thu ngắn khoảng thời gian phải vẽ lại. */}
       <div
-        className={`fixed inset-0 visible opacity-100 transition-[opacity,visibility] duration-[450ms] ease-linear ${
+        className={`fixed inset-0 visible opacity-100 transition-[opacity,visibility] duration-200 ease-out [will-change:opacity] ${
           currentScreen === 'dashboard' ? 'invisible opacity-0 pointer-events-none' : ''
         }`}
       >
         <HomeScreen onEnterDashboard={enterDashboard} />
       </div>
       <div
-        className={`fixed inset-0 flex min-h-0 flex-col visible opacity-100 transition-[opacity,visibility] duration-[450ms] ease-linear ${
+        className={`fixed inset-0 flex min-h-0 flex-col visible opacity-100 transition-[opacity,visibility] duration-200 ease-out [will-change:opacity] ${
           currentScreen === 'home' ? 'invisible opacity-0 pointer-events-none' : ''
         }`}
       >
@@ -165,11 +167,7 @@ function AuthGate() {
   const { session, isLoading } = useAuth();
 
   if (isLoading) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text-dim)' }}>
-        Đang kiểm tra đăng nhập...
-      </div>
-    );
+    return <LoadingScreen message="Đang kiểm tra đăng nhập..." />;
   }
 
   if (!session) {
