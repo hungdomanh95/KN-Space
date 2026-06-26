@@ -4,6 +4,7 @@ import { AppStateProvider, useAppState } from './state/AppStateContext';
 import { ConfirmProvider } from './components/ConfirmContext';
 import { AppLayout, MOBILE_BREAKPOINT_QUERY } from './layout/AppLayout';
 import { useMediaQuery } from './layout/useMediaQuery';
+import { useStableViewportHeight } from './layout/useStableViewportHeight';
 import { AppBackground } from './components/AppBackground';
 import { LoadingScreen } from './components/LoadingScreen';
 import { HomeScreen } from './features/home/HomeScreen';
@@ -29,6 +30,11 @@ function Shell() {
   // Mobile bỏ hẳn màn Home — Chat (trong AppLayout) là màn chính, không qua bước xem
   // đồng hồ/quote/ảnh nền trước nữa (đã chốt với chủ dự án).
   const isMobile = useMediaQuery(MOBILE_BREAKPOINT_QUERY);
+  // Xem useStableViewportHeight.ts — bấm vào input trên mobile mở bàn phím ảo, Safari iOS co
+  // visual viewport lại, khiến khung `fixed inset-0` chứa toàn bộ Chat/DashboardCorner cũng co
+  // theo, ép nội dung bị nén/cắt (Space-switcher + nội dung Chat "biến mất" khỏi màn hình thấy
+  // được — đã gặp khi test thật). Khoá theo `window.innerHeight` để bàn phím không ảnh hưởng.
+  const vh = useStableViewportHeight();
 
   useEffect(() => {
     document.body.setAttribute('data-theme', settings.theme);
@@ -146,21 +152,23 @@ function Shell() {
           có blur nên fade-in vẫn nhẹ, mượt). Bấm Esc giờ không phải vẽ lại blur lúc fade nữa. */}
       {!isMobile && (
         <div
-          className={`fixed inset-0 ${
+          className={`fixed left-0 right-0 top-0 ${
             currentScreen === 'home'
               ? 'visible opacity-100 transition-opacity duration-200 ease-out [will-change:opacity]'
               : 'invisible opacity-0 pointer-events-none transition-none'
           }`}
+          style={{ height: vh }}
         >
           <HomeScreen onEnterDashboard={enterDashboard} />
         </div>
       )}
       <div
-        className={`fixed inset-0 flex min-h-0 flex-col ${
+        className={`fixed left-0 right-0 top-0 flex min-h-0 flex-col ${
           isMobile || currentScreen === 'dashboard'
             ? 'visible opacity-100 transition-opacity duration-200 ease-out [will-change:opacity]'
             : 'invisible opacity-0 pointer-events-none transition-none'
         }`}
+        style={{ height: vh }}
       >
         {storageFallbackActive && (
           <div className="fixed bottom-[14px] right-[14px] z-[80] flex max-w-[360px] items-start gap-2 rounded-xl border border-[color:var(--reminder-color)] bg-[var(--modal-bg)] px-[14px] py-3 text-[0.8125rem] text-[var(--text)] shadow-[var(--shadow)]">

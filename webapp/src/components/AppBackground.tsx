@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { gradientForImageIndex } from '../features/home/homeContent';
+import { useStableViewportHeight } from '../layout/useStableViewportHeight';
 
 interface AppBackgroundProps {
   imageUrl: string;
@@ -26,6 +27,9 @@ export function AppBackground({ imageUrl, imageIndex }: AppBackgroundProps) {
   const [topLayer, setTopLayer] = useState<0 | 1>(0);
   const topLayerRef = useRef<0 | 1>(0);
   topLayerRef.current = topLayer;
+
+  // Xem useStableViewportHeight.ts — tránh ảnh nhìn như bị ZOOM khi bàn phím ảo mở trên iOS.
+  const vh = useStableViewportHeight();
 
   useEffect(() => {
     const nextIdx: 0 | 1 = topLayerRef.current === 0 ? 1 : 0;
@@ -64,7 +68,11 @@ export function AppBackground({ imageUrl, imageIndex }: AppBackgroundProps) {
   }, [imageUrl, gradient]);
 
   return (
-    <div className="fixed inset-0 z-[-2] pointer-events-none bg-cover bg-center" aria-hidden="true">
+    <div
+      className="fixed left-0 right-0 top-0 z-[-2] pointer-events-none bg-cover bg-center"
+      style={{ height: vh }}
+      aria-hidden="true"
+    >
       {layers.map((layer, i) => (
         <div
           key={i}
