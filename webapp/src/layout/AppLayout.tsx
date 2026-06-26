@@ -16,13 +16,16 @@ import { Splitter } from './Splitter';
 import { useMediaQuery } from './useMediaQuery';
 import type { EnabledBlocks, LayoutBlockKey, LayoutSlot } from '../types';
 
-/** Trên mobile (xem MOBILE_BREAKPOINT_QUERY), chỉ hiện 2 khối chính dùng để note nhanh/xem việc
- * cần làm — Nhắc việc/Thói quen/Thông báo/Hôm nay ẩn đi để đỡ rối trên màn hẹp. CHỈ áp dụng
- * trên mobile, KHÔNG đụng tới `space.enabledBlocks` (cài đặt ẩn/hiện khối của desktop, đồng bộ
- * mọi máy) — đây là 1 lớp lọc RENDER riêng, tách biệt hoàn toàn. */
+/** Dưới breakpoint này (kể cả desktop resize cửa sổ hẹp lại, không riêng điện thoại), chuyển
+ * hẳn sang UI mobile (Chat-first + tab Chi tiết) — chỉ hiện 2 khối chính dùng để note nhanh/xem
+ * việc cần làm. Hệ layout cột tự do của desktop (kéo-thả/resize/splitter) nhìn rất kỳ khi bị
+ * bóp vào khung hẹp dưới 1000px (cột chồng lên nhau, splitter/drag-handle không còn hợp lý) —
+ * dưới mốc này dùng hẳn UI mobile thay vì cố nhồi layout desktop vào khung hẹp. KHÔNG đụng tới
+ * `space.enabledBlocks` (cài đặt ẩn/hiện khối của desktop, đồng bộ mọi máy) — đây là 1 lớp lọc
+ * RENDER riêng, tách biệt hoàn toàn. */
 const MOBILE_VISIBLE_BLOCKS = new Set<LayoutBlockKey>(['tasks', 'notes']);
 /** Export để App.tsx dùng đúng breakpoint này quyết định bỏ màn Home trên mobile. */
-export const MOBILE_BREAKPOINT_QUERY = '(max-width: 639px)';
+export const MOBILE_BREAKPOINT_QUERY = '(max-width: 999px)';
 
 interface AppLayoutProps {
   onGoHome: () => void;
