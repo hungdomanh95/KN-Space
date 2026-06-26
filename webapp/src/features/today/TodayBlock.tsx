@@ -74,14 +74,13 @@ export function TodayBlock({
         aria-hidden="true"
       />
       <div className="relative z-[1] flex flex-none items-baseline gap-1 text-white [text-shadow:0_1px_3px_rgba(0,0,0,.4)]">
-        <span className="text-[clamp(26px,3vw,34px)] font-light leading-none tracking-[-.01em] [font-variant-numeric:tabular-nums]">
+        <span className="text-[clamp(34px,4vw,44px)] font-light leading-none tracking-[-.01em] [font-variant-numeric:tabular-nums]">
           {clock.hh}:{clock.mm}
         </span>
-        <span className="align-super text-[.5em] font-normal opacity-80">{clock.ss}</span>
       </div>
       <div className="relative z-[1] h-[60%] w-px flex-none bg-white/30" aria-hidden="true" />
       <div className="relative z-[1] min-w-0 flex-1 text-white [text-shadow:0_1px_3px_rgba(0,0,0,.4)]">
-        <div className="text-[14.5px] font-medium opacity-95">{formatHomeDateShort(now)}</div>
+        <div className="text-[18px] font-medium opacity-95">{formatHomeDateShort(now)}</div>
         <div className="whitespace-normal text-[13.5px] italic leading-snug opacity-85">{quote}</div>
       </div>
     </div>
