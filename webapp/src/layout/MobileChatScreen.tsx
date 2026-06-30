@@ -18,6 +18,7 @@ export function MobileChatScreen() {
   const [text, setText] = useState('');
   const [sessionBubbles, setSessionBubbles] = useState<ChatBubble[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Lấy LIVE từ space.tasks (không lưu state riêng) — tự phản ánh đúng trạng thái done ngay
   // cả khi tick xong ở tab Chi tiết, không bị "đông cứng" theo lúc tạo.
@@ -62,6 +63,7 @@ export function MobileChatScreen() {
       dispatch({ type: 'TASK_CREATE', payload: { title, content: '', date: '', time: '' } });
     }
     setText('');
+    requestAnimationFrame(() => inputRef.current?.focus());
   }
 
   return (
@@ -95,6 +97,7 @@ export function MobileChatScreen() {
       </div>
       <div className="flex flex-none items-center gap-2 border-t border-[color:var(--border-hairline)] px-3 py-2.5">
         <input
+          ref={inputRef}
           type="text"
           value={text}
           onChange={(e) => setText(e.target.value)}

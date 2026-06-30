@@ -50,12 +50,12 @@ export function NoteFormModal({ note, noteCount, onClose }: NoteFormModalProps) 
       <div className="field">
         <label>Nội dung</label>
         <textarea
-          className="note-content-field max-md:min-h-[220px]"
+          className="note-content-field max-md:min-h-[120px]"
           value={content}
           onChange={(e) => setContent(e.target.value)}
         />
       </div>
-      <div className="modal-actions">
+      <div className="modal-actions sticky bottom-0 bg-[var(--modal-bg)] pt-2">
         <button className="btn-ghost" onClick={onClose}>
           Hủy
         </button>

@@ -102,6 +102,7 @@ export async function seedAndPersist(): Promise<LoadResult> {
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let pendingSnapshot: SaveSnapshot | null = null;
+let isFlushInProgress = false;
 let onFallbackChange: ((active: boolean) => void) | null = null;
 
 export function setFallbackListener(listener: (active: boolean) => void): void {
@@ -124,15 +125,20 @@ export function scheduleSave(snapshot: SaveSnapshot, debounceMs = 600): void {
  * note...) bị "rollback" ngược 1 nhịp — đúng hiện tượng đã gặp khi test thật.
  */
 export function hasPendingSave(): boolean {
-  return pendingSnapshot !== null;
+  return pendingSnapshot !== null || isFlushInProgress;
 }
 
 async function flushPendingSave(): Promise<void> {
   if (!pendingSnapshot) return;
   const snapshot = pendingSnapshot;
   pendingSnapshot = null;
-  const { fellBack } = await flushSave(snapshot);
-  onFallbackChange?.(fellBack);
+  isFlushInProgress = true;
+  try {
+    const { fellBack } = await flushSave(snapshot);
+    onFallbackChange?.(fellBack);
+  } finally {
+    isFlushInProgress = false;
+  }
 }
 
 /** Đảm bảo lưu ngay, không đợi debounce — gọi trước khi rời trang (xem AppStateContext). */
