@@ -99,6 +99,7 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const mobileWrapRef = useRef<HTMLDivElement>(null);
+  const mobileTabBarRef = useRef<HTMLDivElement>(null);
   const colRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const slotRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const subRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -250,6 +251,9 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
       if (!el) return;
       const kh = Math.max(0, window.innerHeight - vv!.height);
       el.style.paddingBottom = kh > 0 ? `${kh}px` : '';
+      // Ẩn tab bar khi keyboard mở — tránh nó kẹp giữa input và keyboard
+      const tabEl = mobileTabBarRef.current;
+      if (tabEl) tabEl.style.display = kh > 0 ? 'none' : '';
     }
     adjust();
     vv.addEventListener('resize', adjust);
@@ -558,7 +562,7 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
           </div>
         )}
 
-        <MobileTabBar activeTab={mobileTab} onChange={setMobileTab} />
+        <MobileTabBar activeTab={mobileTab} onChange={setMobileTab} rootRef={mobileTabBarRef} />
       </div>
     );
   }
@@ -700,12 +704,15 @@ function MobileCollapsedSummary({
 function MobileTabBar({
   activeTab,
   onChange,
+  rootRef,
 }: {
   activeTab: 'chat' | 'details';
   onChange: (tab: 'chat' | 'details') => void;
+  rootRef?: React.Ref<HTMLDivElement>;
 }) {
   return (
     <div
+      ref={rootRef}
       role="tablist"
       aria-label="Chuyển màn Trò chuyện/Chi tiết"
       className="flex flex-none border-t border-[color:var(--border-hairline)]
