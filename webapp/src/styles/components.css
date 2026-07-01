@@ -58,10 +58,10 @@
   }
 
   .btn-primary {
-    @apply inline-flex items-center gap-1.5 rounded-[9px] bg-[var(--accent)] px-[14px] py-[7px] text-[0.9062rem] font-semibold text-white;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-[9px] bg-[var(--accent)] px-[14px] py-[7px] text-[0.9062rem] font-semibold text-white;
   }
   .btn-ghost {
-    @apply inline-flex items-center gap-1.5 rounded-[9px] border border-[color:var(--border)] bg-[var(--raised)] px-[13px] py-[7px]
+    @apply inline-flex items-center justify-center gap-1.5 rounded-[9px] border border-[color:var(--border)] bg-[var(--raised)] px-[13px] py-[7px]
       text-[0.9062rem] text-[var(--text)] transition-[border-color,color] duration-150;
   }
   .btn-ghost:hover {

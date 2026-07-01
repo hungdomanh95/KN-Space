@@ -83,7 +83,10 @@ export function SpaceSwitcher() {
             return (
               <div
                 key={space.id}
+                role="button"
+                tabIndex={0}
                 className={`space-menu-item group ${space.id === state.currentSpaceId ? 'active' : ''}`}
+                onTouchStart={() => {}}
                 onClick={() => {
                   dispatch({ type: 'SPACE_SWITCH', payload: { id: space.id } });
                   setOpen(false);

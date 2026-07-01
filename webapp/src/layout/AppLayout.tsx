@@ -690,14 +690,15 @@ function MobileTabBar({
       aria-label="Chuyển màn Trò chuyện/Chi tiết"
       className="flex flex-none border-t border-[color:var(--border-hairline)]
         bg-[color-mix(in_srgb,var(--panel-bg)_88%,transparent)] [backdrop-filter:blur(14px)_saturate(1.15)]
-        dark:bg-[color-mix(in_srgb,var(--panel-bg)_90%,transparent)]"
+        dark:bg-[color-mix(in_srgb,var(--panel-bg)_90%,transparent)]
+        [padding-bottom:env(safe-area-inset-bottom,0px)]"
     >
       <button
         type="button"
         role="tab"
         aria-selected={activeTab === 'chat'}
         onClick={() => onChange('chat')}
-        className={`flex flex-1 flex-col items-center gap-1 py-2 text-[0.6875rem] font-semibold ${
+        className={`flex flex-1 flex-col items-center gap-1 py-3.5 text-[0.6875rem] font-semibold ${
           activeTab === 'chat' ? 'text-[var(--accent)]' : 'text-[var(--text-dim)]'
         }`}
       >
@@ -709,7 +710,7 @@ function MobileTabBar({
         role="tab"
         aria-selected={activeTab === 'details'}
         onClick={() => onChange('details')}
-        className={`flex flex-1 flex-col items-center gap-1 py-2 text-[0.6875rem] font-semibold ${
+        className={`flex flex-1 flex-col items-center gap-1 py-3.5 text-[0.6875rem] font-semibold ${
           activeTab === 'details' ? 'text-[var(--accent)]' : 'text-[var(--text-dim)]'
         }`}
       >
