@@ -80,31 +80,33 @@ export function MobileChatScreen() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      {/* Zalo/Messenger style: spacer đẩy bubble xuống đáy; khi nhiều tin thì spacer co về 0 và scroll bình thường */}
       <div
         ref={scrollRef}
-        className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3 py-3"
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-3"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
+        <div className="flex-1" />
         {bubbles.length === 0 ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-1.5 px-6 text-center text-[0.8438rem] text-[var(--text-dim)]">
-            <span>Gõ 1 việc cần làm rồi Enter — hoặc gõ &quot;/note &quot; để ghi chú nhanh.</span>
+          <div className="py-2 text-center text-[0.8125rem] text-[var(--text-dim)] opacity-70">
+            Gõ 1 việc cần làm rồi Enter — hoặc &quot;/note &quot; để ghi chú nhanh.
           </div>
         ) : (
-          bubbles.map((b) => (
-            <div key={b.id} className="flex justify-end">
-              <div
-                className={`flex max-w-[85%] items-center gap-2 rounded-2xl px-3.5 py-2.5 text-[0.875rem] text-white ${
-                  b.type === 'note' ? 'bg-[var(--note-color)]' : 'bg-[var(--accent)]'
-                } ${b.type === 'task' && b.done ? 'opacity-60' : ''}`}
-              >
-                {b.type === 'note' && <BookOpen className="icon h-3.5 w-3.5 flex-none" size={14} />}
-                {/* Chỉ Task ĐÃ XONG mới có icon check — Task chưa xong không hiện icon gì, tránh
-                    nhìn như đã hoàn thành hết (đúng phản hồi thực tế khi test). */}
-                {b.type === 'task' && b.done && <Check className="icon h-3.5 w-3.5 flex-none" size={14} />}
-                <span className={b.type === 'task' && b.done ? 'line-through' : ''}>{b.title}</span>
+          <div className="flex flex-col gap-2">
+            {bubbles.map((b) => (
+              <div key={b.id} className="flex justify-end">
+                <div
+                  className={`flex max-w-[85%] items-center gap-2 rounded-2xl px-3.5 py-2.5 text-[0.875rem] text-white ${
+                    b.type === 'note' ? 'bg-[var(--note-color)]' : 'bg-[var(--accent)]'
+                  } ${b.type === 'task' && b.done ? 'opacity-60' : ''}`}
+                >
+                  {b.type === 'note' && <BookOpen className="icon h-3.5 w-3.5 flex-none" size={14} />}
+                  {b.type === 'task' && b.done && <Check className="icon h-3.5 w-3.5 flex-none" size={14} />}
+                  <span className={b.type === 'task' && b.done ? 'line-through' : ''}>{b.title}</span>
+                </div>
               </div>
-            </div>
-          ))
+            ))}
+          </div>
         )}
       </div>
       <div className="flex flex-none items-center gap-2 border-t border-[color:var(--border-hairline)] px-3 py-2.5">
