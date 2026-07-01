@@ -24,6 +24,23 @@ interface AppStateContextValue {
 
 const AppStateContext = createContext<AppStateContextValue | null>(null);
 
+/**
+ * JSON.stringify theo thứ tự key alphabet ở mọi cấp — cần thiết vì PostgreSQL JSONB
+ * không giữ thứ tự key khi đọc lại: cùng 1 object lưu vào JSONB, khi Realtime trả về
+ * payload.new, các key bị sắp xếp khác với thứ tự trong JavaScript local state.
+ * JSON.stringify bình thường sẽ cho string khác nhau dù data hoàn toàn giống nhau
+ * → HYDRATE kích hoạt vô cớ sau mỗi save, reset UI (search, sort, screen).
+ * Arrays KHÔNG sort (thứ tự phần tử có ý nghĩa).
+ */
+function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) return '[' + value.map(stableStringify).join(',') + ']';
+  if (value !== null && typeof value === 'object') {
+    const keys = Object.keys(value as object).sort();
+    return '{' + keys.map((k) => JSON.stringify(k) + ':' + stableStringify((value as Record<string, unknown>)[k])).join(',') + '}';
+  }
+  return JSON.stringify(value);
+}
+
 function emptyState(): AppState {
   const settings = defaultSettings();
   return {
@@ -104,12 +121,15 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       // kế tiếp vẫn bắt được — không mất đồng bộ.
       if (hasPendingSave()) return;
       // Callback đồng bộ hoàn toàn (không await) — không còn race condition.
-      const currentSnapshot = JSON.stringify({
+      // Dùng stableStringify (sort key) vì PostgreSQL JSONB không giữ thứ tự key:
+      // payload.new từ Realtime có thể có key theo alphabet, local state theo insertion order
+      // → JSON.stringify thông thường cho kết quả khác nhau dù data giống hệt → HYDRATE vô cớ.
+      const currentSnapshot = stableStringify({
         spaces: stateRef.current.spaces,
         currentSpaceId: stateRef.current.currentSpaceId,
         settings: stateRef.current.settings,
       });
-      const loadedSnapshot = JSON.stringify({
+      const loadedSnapshot = stableStringify({
         spaces: loaded.spaces,
         currentSpaceId: loaded.currentSpaceId,
         settings: loaded.settings,

@@ -140,6 +140,13 @@ async function flushPendingSave(): Promise<void> {
   isFlushInProgress = true;
   try {
     const { fellBack } = await flushSave(snapshot);
+    if (fellBack && pendingSnapshot === null) {
+      // Save thất bại và không có snapshot mới hơn nào được queue — khôi phục lại để:
+      // 1. hasPendingSave()=true ngăn Realtime callback HYDRATE đè bằng data cũ từ server
+      //    (server chưa có data mới vì save vừa thất bại → HYDRATE sẽ xoá note của user)
+      // 2. forceFlush() khi user đóng tab sẽ thử lại thay vì bỏ qua vì pendingSnapshot=null
+      pendingSnapshot = snapshot;
+    }
     onFallbackChange?.(fellBack);
   } finally {
     isFlushInProgress = false;
