@@ -46,6 +46,19 @@ export function MobileChatScreen() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [bubbles.length]);
 
+  // Khi keyboard iOS mở/đóng, visualViewport thu hẹp — scroll bubble list xuống bottom
+  // để nội dung cũ không bị che bởi keyboard.
+  useLayoutEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    function onViewportResize() {
+      const el = scrollRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    }
+    vv.addEventListener('resize', onViewportResize);
+    return () => vv.removeEventListener('resize', onViewportResize);
+  }, []);
+
   const isNoteMode = text.trimStart().startsWith('/note');
 
   function handleSubmit() {
@@ -63,7 +76,6 @@ export function MobileChatScreen() {
       dispatch({ type: 'TASK_CREATE', payload: { title, content: '', date: '', time: '' } });
     }
     setText('');
-    requestAnimationFrame(() => inputRef.current?.focus());
   }
 
   return (
@@ -114,6 +126,7 @@ export function MobileChatScreen() {
         />
         <button
           type="button"
+          onMouseDown={(e) => e.preventDefault()}
           onClick={handleSubmit}
           disabled={!text.trim()}
           title="Gửi"
