@@ -35,7 +35,7 @@ export function normalizeSpace(space: Space): Space {
           completedDates: Array.isArray(h.completedDates) ? h.completedDates : [],
         }))
       : [],
-    notes: Array.isArray(space.notes) ? space.notes.map((n) => ({ ...n, expanded: n.expanded ?? false })) : [],
+    notes: Array.isArray(space.notes) ? space.notes.map((n) => ({ ...n, expanded: n.expanded ?? false, hidden: n.hidden ?? false })) : [],
   };
 }
 
@@ -196,7 +196,6 @@ export function buildUiInitialState(lastScreen: UiState['currentScreen'] = 'home
     taskFilter: 'all',
     noteSearch: '',
     noteSortBy: 'order',
-    hiddenNoteContentIds: new Set(),
     currentScreen: lastScreen,
   };
 }

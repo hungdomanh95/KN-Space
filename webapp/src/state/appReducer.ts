@@ -26,7 +26,6 @@ export type AppAction =
   | { type: 'TASK_SET_FILTER'; payload: { filter: TaskFilter } }
   | { type: 'NOTE_SET_SEARCH'; payload: { search: string } }
   | { type: 'NOTE_SET_SORT'; payload: { sortBy: NoteSortBy } }
-  | { type: 'NOTE_TOGGLE_CONTENT_HIDDEN'; payload: { id: string } }
   | { type: 'SPACE_SWITCH'; payload: { id: string } }
   | { type: 'IMPORT_DATA'; payload: ExportPayload }
   | { type: 'SET_STORAGE_FALLBACK_ACTIVE'; payload: { active: boolean } }
@@ -50,6 +49,7 @@ const SPACE_DOMAIN_ACTION_TYPES = new Set([
   'NOTE_DELETE',
   'NOTE_REORDER',
   'NOTE_TOGGLE_EXPANDED',
+  'NOTE_TOGGLE_CONTENT_HIDDEN',
 ]);
 
 const SETTINGS_ACTION_TYPES = new Set([
@@ -132,6 +132,7 @@ function applySpaceDomainAction(spaces: Space[], currentSpaceId: string, action:
       case 'NOTE_DELETE':
       case 'NOTE_REORDER':
       case 'NOTE_TOGGLE_EXPANDED':
+      case 'NOTE_TOGGLE_CONTENT_HIDDEN':
         return notesReducer(space, action);
       default:
         return space;
@@ -169,7 +170,7 @@ function normalizeImportedSpace(raw: Partial<Space> & { id?: string }): Space {
           completedDates: Array.isArray(h.completedDates) ? h.completedDates : [],
         }))
       : [],
-    notes: Array.isArray(raw.notes) ? raw.notes.map((n) => ({ ...n, expanded: n.expanded ?? false })) : [],
+    notes: Array.isArray(raw.notes) ? raw.notes.map((n) => ({ ...n, expanded: n.expanded ?? false, hidden: n.hidden ?? false })) : [],
   };
 }
 
@@ -205,13 +206,6 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 
     case 'NOTE_SET_SORT':
       return { ...state, ui: { ...state.ui, noteSortBy: action.payload.sortBy } };
-
-    case 'NOTE_TOGGLE_CONTENT_HIDDEN': {
-      const nextHidden = new Set(state.ui.hiddenNoteContentIds);
-      if (nextHidden.has(action.payload.id)) nextHidden.delete(action.payload.id);
-      else nextHidden.add(action.payload.id);
-      return { ...state, ui: { ...state.ui, hiddenNoteContentIds: nextHidden } };
-    }
 
     case 'SPACE_SWITCH': {
       if (!state.spaces.some((s) => s.id === action.payload.id)) return state;

@@ -11,8 +11,8 @@ interface NoteViewModalProps {
 }
 
 export function NoteViewModal({ note, onClose, onEdit }: NoteViewModalProps) {
-  const { state, dispatch } = useAppState();
-  const isHidden = state.ui.hiddenNoteContentIds.has(note.id);
+  const { dispatch } = useAppState();
+  const isHidden = note.hidden;
 
   return (
     <Modal onClose={onClose} className="modal-note-view w-[720px] max-w-[92vw] max-h-[88vh] max-md:w-[94vw]">

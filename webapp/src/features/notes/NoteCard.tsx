@@ -32,11 +32,11 @@ export function NoteCard({
   onDragEndAll,
   draggedId,
 }: NoteCardProps) {
-  const { state, dispatch } = useAppState();
+  const { dispatch } = useAppState();
   const cardRef = useRef<HTMLDivElement>(null);
   const [dropHint, setDropHint] = useState<'before' | 'after' | null>(null);
 
-  const isHidden = state.ui.hiddenNoteContentIds.has(note.id);
+  const isHidden = note.hidden;
   const isExpanded = view === 'list' && note.expanded;
   const noteAlpha = document.body.getAttribute('data-theme') === 'dark' ? 0.24 : 0.1;
   const bgStyle = hexToRgba(note.color, noteAlpha);

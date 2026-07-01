@@ -53,6 +53,7 @@ export interface Note {
   updatedAt: number; // epoch ms
   order: number;
   expanded: boolean; // view list: show hết nội dung thay vì clamp 4 dòng
+  hidden: boolean;   // ẩn nội dung (note bảo mật) — persist để giữ trạng thái sau reload
 }
 
 export interface EnabledBlocks {
@@ -174,7 +175,6 @@ export interface UiState {
   taskFilter: TaskFilter;
   noteSearch: string;
   noteSortBy: NoteSortBy;
-  hiddenNoteContentIds: Set<string>;
   /** Màn hiện tại đang hiển thị — khởi tạo từ settings.lastScreen lúc HYDRATE, sau đó ephemeral. */
   currentScreen: Screen;
 }
