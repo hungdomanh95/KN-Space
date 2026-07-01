@@ -187,9 +187,8 @@ export function normalizeSettings(
 }
 
 /**
- * `currentScreen` ephemeral được khởi tạo từ `lastScreen` đã persist (chỉ lúc HYDRATE) —
- * sau đó user điều hướng Home/Dashboard trong phiên không ghi storage lại liên tục,
- * mà chỉ ghi khi `lastScreen` thực sự đổi (xem appReducer SCREEN_SET).
+ * `currentScreen` ephemeral được khởi tạo từ `lastScreen` (localStorage, per-machine) lúc HYDRATE —
+ * sau đó theo dõi qua SCREEN_NAVIGATE; mỗi lần đổi ghi lại vào localStorage (xem AppStateContext).
  */
 export function buildUiInitialState(lastScreen: UiState['currentScreen'] = 'home'): UiState {
   return {
