@@ -86,7 +86,13 @@ export function SpaceSwitcher() {
                 role="button"
                 tabIndex={0}
                 className={`space-menu-item group ${space.id === state.currentSpaceId ? 'active' : ''}`}
-                onTouchStart={() => {}}
+                onTouchEnd={(e) => {
+                  // Không can thiệp nếu tap vào nút con (move/edit/delete)
+                  if ((e.target as HTMLElement).closest('button')) return;
+                  e.preventDefault(); // chặn synthetic click delay của iOS
+                  dispatch({ type: 'SPACE_SWITCH', payload: { id: space.id } });
+                  setOpen(false);
+                }}
                 onClick={() => {
                   dispatch({ type: 'SPACE_SWITCH', payload: { id: space.id } });
                   setOpen(false);
