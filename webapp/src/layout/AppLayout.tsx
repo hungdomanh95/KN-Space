@@ -98,6 +98,7 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
   } = useDashboardLayout();
 
   const wrapRef = useRef<HTMLDivElement>(null);
+  const mobileWrapRef = useRef<HTMLDivElement>(null);
   const colRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const slotRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const subRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -235,6 +236,25 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
     document.addEventListener('mouseup', disarmAll);
     return () => document.removeEventListener('mouseup', disarmAll);
   }, []);
+
+  // Keyboard iOS: khi keyboard mở, layout viewport không co lại (fixed inset-0 vẫn full màn).
+  // Dùng visualViewport.height để tính keyboard height và áp padding-bottom cho mobile wrapper —
+  // flex children (DashboardCorner + chat + tabbar) chỉ chia nhau phần còn lại trên keyboard.
+  // Chỉ chạy trên mobile (isMobileBlocksOnly). Direct DOM style, không re-render.
+  useLayoutEffect(() => {
+    if (!isMobileBlocksOnly) return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+    function adjust() {
+      const el = mobileWrapRef.current;
+      if (!el) return;
+      const kh = Math.max(0, window.innerHeight - vv!.height);
+      el.style.paddingBottom = kh > 0 ? `${kh}px` : '';
+    }
+    adjust();
+    vv.addEventListener('resize', adjust);
+    return () => vv.removeEventListener('resize', adjust);
+  }, [isMobileBlocksOnly]);
 
   function dragHandlersFor(id: LayoutBlockKey, allowSide: boolean) {
     return {
@@ -490,7 +510,7 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
       // rộng, nhiều khoảng trắng 2 bên). max-width tự nhiên KHÔNG ảnh hưởng màn điện thoại thật
       // (vốn đã hẹp hơn 560px, max-width không bị "chạm" tới) — không cần check thêm điều kiện
       // theo JS, thuần CSS (theo khuyến nghị uiux: canh giữa nội dung, không giả khung điện thoại).
-      <div className="mx-auto flex h-full min-h-0 w-full max-w-[560px] flex-1 flex-col">
+      <div ref={mobileWrapRef} className="mx-auto flex h-full min-h-0 w-full max-w-[560px] flex-1 flex-col">
         <DashboardCorner onGoHome={onGoHome} compact />
 
         {mobileTab === 'chat' ? (
