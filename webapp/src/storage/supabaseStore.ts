@@ -155,10 +155,26 @@ export async function forceFlush(): Promise<void> {
 }
 
 /**
+ * Normalize raw Realtime payload.new (giống cấu trúc Row, đọc thẳng từ WAL) thành LoadResult.
+ * Logic giống loadAppState nhưng không cần network — tránh stale-read qua PostgREST.
+ */
+function normalizeRealtimeRow(row: Row): LoadResult {
+  const rawSpaces = row.spaces ?? [];
+  const spaces = rawSpaces.map((s) => normalizeSpace(s as Space));
+  const rawSettings = normalizeSettings(row.settings, undefined, findLegacyDashboardLayout(rawSpaces));
+  const localScreen = readLocalLastScreen();
+  const settings = localScreen ? { ...rawSettings, lastScreen: localScreen } : rawSettings;
+  const localId = readLocalCurrentSpaceId();
+  const currentSpaceId = localId && spaces.some((s) => s.id === localId) ? localId : (spaces[0]?.id ?? '');
+  return { spaces, currentSpaceId, settings, storageFallbackActive: false };
+}
+
+/**
  * Đăng ký lắng nghe thay đổi từ Supabase Realtime (đổi từ máy khác) để đồng bộ UI.
+ * Callback nhận LoadResult chuẩn hoá thẳng từ WAL payload — không SELECT lại, không stale-read.
  * Trả về hàm hủy đăng ký.
  */
-export function subscribeStorageChanges(callback: () => void): () => void {
+export function subscribeStorageChanges(callback: (loaded: LoadResult) => void): () => void {
   let channel: ReturnType<typeof supabase.channel> | null = null;
   let unsubscribed = false;
 
@@ -169,7 +185,11 @@ export function subscribeStorageChanges(callback: () => void): () => void {
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: TABLE, filter: `user_id=eq.${userId}` },
-        () => callback(),
+        (payload) => {
+          const row = payload.new as Partial<Row>;
+          if (!row || !Array.isArray(row.spaces) || row.spaces.length === 0) return;
+          callback(normalizeRealtimeRow(row as Row));
+        },
       )
       .subscribe();
   });

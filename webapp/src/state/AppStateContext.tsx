@@ -85,47 +85,39 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  // Đồng bộ UI giữa các máy: khi storage.onChanged bắn (đổi từ máy khác qua sync),
-  // reload lại toàn bộ state. So sánh JSON với state hiện tại để tránh re-hydrate
-  // vô nghĩa ngay sau khi chính tab này vừa tự ghi (areaName vẫn bắn dù do mình ghi).
+  // Đồng bộ UI giữa các máy: khi Supabase Realtime bắn UPDATE, nhận thẳng data từ WAL payload
+  // (không SELECT lại qua PostgREST) để tránh stale-read — Realtime event đến từ WAL ngay sau
+  // commit, nhưng PostgREST có thể query snapshot cũ hơn nếu connection pool chưa thấy commit.
+  // Đây là nguyên nhân gốc khiến note vừa thêm bị biến mất "sau một lúc": save commit → Realtime
+  // bắn → SELECT cũ (không có note) → HYDRATE đè → note mất.
   useEffect(() => {
-    const unsubscribe = subscribeStorageChanges(() => {
+    const unsubscribe = subscribeStorageChanges((loaded) => {
       if (!hydratedRef.current) return;
       // Còn thay đổi cục bộ chưa lưu xong (đang debounce/đang gửi) — BỎ QUA sự kiện này.
-      // Nếu không, GET lại lúc này trả về bản trên server CŨ HƠN state cục bộ hiện tại
-      // (vì state cục bộ đã đổi tiếp sau lần lưu gần nhất), HYDRATE đè lên sẽ làm thao tác
-      // vừa làm (kéo-thả sắp xếp lại, mở rộng note...) bị "rollback" ngược 1 nhịp — đúng lỗi
-      // delay/rollback đã gặp khi test thật. Khi flush xong, nếu dữ liệu trên server còn khác
-      // (đổi từ máy khác) thì lần Realtime kế tiếp vẫn bắt được, không mất đồng bộ.
+      // Khi flush xong, nếu dữ liệu trên server còn khác (đổi từ máy khác) thì lần Realtime
+      // kế tiếp vẫn bắt được — không mất đồng bộ.
       if (hasPendingSave()) return;
-      void (async () => {
-        const loaded = await loadAppState();
-        if (!loaded) return;
-        // Check lại sau khi load xong: trong thời gian await (~100–500ms) user có thể đã thao
-        // tác thêm → pendingSnapshot mới được set → nếu không check lại, HYDRATE đè lên state
-        // mới hơn đang có, gây rollback UI 1 nhịp (đúng lỗi đã gặp khi test thật).
-        if (hasPendingSave()) return;
-        const currentSnapshot = JSON.stringify({
-          spaces: stateRef.current.spaces,
-          currentSpaceId: stateRef.current.currentSpaceId,
-          settings: stateRef.current.settings,
-        });
-        const loadedSnapshot = JSON.stringify({
+      // Callback đồng bộ hoàn toàn (không await) — không còn race condition.
+      const currentSnapshot = JSON.stringify({
+        spaces: stateRef.current.spaces,
+        currentSpaceId: stateRef.current.currentSpaceId,
+        settings: stateRef.current.settings,
+      });
+      const loadedSnapshot = JSON.stringify({
+        spaces: loaded.spaces,
+        currentSpaceId: loaded.currentSpaceId,
+        settings: loaded.settings,
+      });
+      if (currentSnapshot === loadedSnapshot) return;
+      dispatch({
+        type: 'HYDRATE',
+        payload: {
           spaces: loaded.spaces,
           currentSpaceId: loaded.currentSpaceId,
           settings: loaded.settings,
-        });
-        if (currentSnapshot === loadedSnapshot) return;
-        dispatch({
-          type: 'HYDRATE',
-          payload: {
-            spaces: loaded.spaces,
-            currentSpaceId: loaded.currentSpaceId,
-            settings: loaded.settings,
-            storageFallbackActive: loaded.storageFallbackActive,
-          },
-        });
-      })();
+          storageFallbackActive: loaded.storageFallbackActive,
+        },
+      });
     });
     return unsubscribe;
   }, []);
