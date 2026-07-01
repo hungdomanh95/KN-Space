@@ -117,6 +117,7 @@ export function scheduleSave(snapshot: SaveSnapshot, debounceMs = 600): void {
   pendingSnapshot = snapshot;
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
+    saveTimer = null;
     void flushPendingSave();
   }, debounceMs);
 }

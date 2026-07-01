@@ -42,6 +42,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const hydratedRef = useRef(false);
   const stateRef = useRef(state);
   stateRef.current = state;
+  // Skip lần đầu save effect bắn sau initial HYDRATE: khi HYDRATE xong, state.spaces/settings
+  // đổi từ emptyState → data thật → save effect bắn và gọi scheduleSave ngay. Nếu trong 600ms
+  // đó có Realtime đến từ máy khác (vừa save dữ liệu mới hơn), hasPendingSave()=true sẽ bỏ qua
+  // Realtime đó. 600ms sau, ta upsert bản CŨ lên server → overwrite dữ liệu máy kia vừa save →
+  // máy kia nhận Realtime ngược → rollback state của nó. Fix: skip save lần đầu sau HYDRATE.
+  const skipInitialSaveRef = useRef(true);
 
   // Bootstrap: load từ storage hoặc seed nếu rỗng. Bắt lỗi rõ ràng (vd. chưa chạy schema.sql,
   // RLS từ chối...) — không để rơi vào "Đang tải dữ liệu..." treo vô thời hạn khi promise reject.
@@ -129,6 +135,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   // ghi network + bắn Realtime vô ích tới máy khác cho 1 thay đổi giờ chỉ còn ý nghĩa cục bộ).
   useEffect(() => {
     if (!hydratedRef.current || isLoading) return;
+    // Skip lần đầu — tránh upsert bản vừa load đè lên dữ liệu mới hơn từ máy khác (xem comment
+    // ở skipInitialSaveRef). Các lần sau (thao tác thật của user, Realtime HYDRATE) đều save bình thường.
+    if (skipInitialSaveRef.current) {
+      skipInitialSaveRef.current = false;
+      return;
+    }
     scheduleSave({ spaces: state.spaces, currentSpaceId: state.currentSpaceId, settings: state.settings });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.spaces, state.settings]);
