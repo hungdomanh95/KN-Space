@@ -3,6 +3,7 @@ import type { Settings, Space } from '../types';
 import { createSeedSpaces, defaultSettings } from '../state/seed';
 import { findLegacyDashboardLayout, normalizeSettings, normalizeSpace } from './normalize';
 import { readLocalCurrentSpaceId, writeLocalCurrentSpaceId } from './localCurrentSpace';
+import { readLocalLastScreen, writeLocalLastScreen } from './localLastScreen';
 import type { LoadResult, SaveSnapshot } from './types';
 
 // ============================================================================
@@ -55,10 +56,12 @@ export async function loadAppState(): Promise<LoadResult | null> {
 
   const rawSpaces = data.spaces;
   const spaces = rawSpaces.map((s) => normalizeSpace(s as Space));
-  const settings = normalizeSettings(data.settings, undefined, findLegacyDashboardLayout(rawSpaces));
-  // Space đang mở = trạng thái riêng MÁY NÀY (localStorage), không lấy từ server — xem comment
-  // đầu file. Máy lần đầu mở (chưa có gì trong localStorage) hoặc Space đã lưu bị xoá ở máy
-  // khác thì fallback Space đầu tiên.
+  // `lastScreen` và `currentSpaceId` là trạng thái điều hướng riêng từng máy (xem localLastScreen.ts,
+  // localCurrentSpace.ts) — đọc từ localStorage thay vì từ server để tránh HYDRATE từ Realtime của
+  // máy khác đè lên lựa chọn màn hình / Space của máy này.
+  const rawSettings = normalizeSettings(data.settings, undefined, findLegacyDashboardLayout(rawSpaces));
+  const localScreen = readLocalLastScreen();
+  const settings = localScreen ? { ...rawSettings, lastScreen: localScreen } : rawSettings;
   const localId = readLocalCurrentSpaceId();
   const currentSpaceId = localId && spaces.some((s) => s.id === localId) ? localId : spaces[0].id;
   writeLocalCurrentSpaceId(currentSpaceId);
@@ -91,6 +94,7 @@ export async function seedAndPersist(): Promise<LoadResult> {
   const settings = defaultSettings();
   const currentSpaceId = spaces[0].id;
   writeLocalCurrentSpaceId(currentSpaceId);
+  writeLocalLastScreen(settings.lastScreen);
   const { fellBack } = await flushSave({ spaces, currentSpaceId, settings });
   return { spaces, currentSpaceId, settings, storageFallbackActive: fellBack };
 }

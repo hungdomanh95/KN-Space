@@ -4,7 +4,6 @@ import type {
   HomeBgAutoRotateMs,
   NoteView,
   QuoteRotateMode,
-  Screen,
   Settings,
   ThemeMode,
 } from '../../types';
@@ -24,7 +23,6 @@ export type SettingsAction =
   | { type: 'SETTINGS_SET_HOME_QUOTE_INDEX'; payload: { index: number } }
   | { type: 'SETTINGS_SET_QUOTE_ROTATE_MODE'; payload: { mode: QuoteRotateMode } }
   | { type: 'SETTINGS_HOME_QUOTE_ROTATE_NEXT' }
-  | { type: 'SETTINGS_SET_LAST_SCREEN'; payload: { screen: Screen } }
   | { type: 'BLOCK_TOGGLE_COLLAPSED'; payload: { key: keyof CollapsedBlocks } }
   | { type: 'NOTE_SET_VIEW'; payload: { view: NoteView } }
   | { type: 'SETTINGS_SET_DASHBOARD_LAYOUT'; payload: { layout: DashboardLayout } }
@@ -87,8 +85,6 @@ export function settingsReducer(settings: Settings, action: SettingsAction): Set
       const total = settings.homeQuotes.texts.length;
       return { ...settings, homeQuotes: { ...settings.homeQuotes, index: (settings.homeQuotes.index + 1) % total } };
     }
-    case 'SETTINGS_SET_LAST_SCREEN':
-      return { ...settings, lastScreen: action.payload.screen };
     case 'BLOCK_TOGGLE_COLLAPSED':
       return {
         ...settings,

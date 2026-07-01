@@ -10,6 +10,7 @@ import {
   subscribeStorageChanges,
 } from '../storage/supabaseStore';
 import { writeLocalCurrentSpaceId } from '../storage/localCurrentSpace';
+import { writeLocalLastScreen } from '../storage/localLastScreen';
 import { buildUiInitialState } from '../storage/normalize';
 import { defaultSettings } from './seed';
 import type { AppAction } from './appReducer';
@@ -100,6 +101,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       void (async () => {
         const loaded = await loadAppState();
         if (!loaded) return;
+        // Check lại sau khi load xong: trong thời gian await (~100–500ms) user có thể đã thao
+        // tác thêm → pendingSnapshot mới được set → nếu không check lại, HYDRATE đè lên state
+        // mới hơn đang có, gây rollback UI 1 nhịp (đúng lỗi đã gặp khi test thật).
+        if (hasPendingSave()) return;
         const currentSnapshot = JSON.stringify({
           spaces: stateRef.current.spaces,
           currentSpaceId: stateRef.current.currentSpaceId,
@@ -136,12 +141,20 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.spaces, state.settings]);
 
-  // Lưu "Space đang mở" riêng cho máy này (localStorage) ngay khi đổi — không đợi debounce
-  // Supabase (vốn giờ không còn lưu giá trị này có ý nghĩa gì nữa).
+  // Lưu "Space đang mở" riêng cho máy này (localStorage) ngay khi đổi.
   useEffect(() => {
     if (!hydratedRef.current || isLoading) return;
     writeLocalCurrentSpaceId(state.currentSpaceId);
   }, [state.currentSpaceId, isLoading]);
+
+  // Lưu "màn đang mở" (home/dashboard) riêng cho máy này (localStorage). Không dùng Supabase
+  // vì đây là trạng thái điều hướng per-machine — đổi màn trên máy A không được HYDRATE đè màn
+  // hiện tại của máy B qua Realtime (xem loadAppState: lastScreen được lấy từ localStorage,
+  // không từ server).
+  useEffect(() => {
+    if (!hydratedRef.current || isLoading) return;
+    writeLocalLastScreen(state.settings.lastScreen);
+  }, [state.settings.lastScreen, isLoading]);
 
   // Ghi lên Supabase qua network có độ trễ hơn chrome.storage cũ — nếu user đóng tab/chuyển
   // app đúng lúc debounce 600ms chưa bắn, bản ghi cuối có thể mất. Flush ngay khi tab ẩn đi.

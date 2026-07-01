@@ -10,3 +10,6 @@ webapp/*.tsbuildinfo
 # Chứa Supabase URL/anon key của riêng máy — KHÔNG commit (xem webapp/.env.example).
 webapp/.env.local
 .playwright-mcp
+
+# Test files — không commit, chỉ dùng local
+webapp/src/__tests__/

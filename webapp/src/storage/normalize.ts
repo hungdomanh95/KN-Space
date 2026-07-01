@@ -20,8 +20,21 @@ export function normalizeSpace(space: Space): Space {
     tasks: Array.isArray(space.tasks)
       ? space.tasks.map((t, idx) => ({ ...t, content: t.content ?? '', order: t.order ?? idx }))
       : [],
-    reminders: Array.isArray(space.reminders) ? space.reminders : [],
-    habits: Array.isArray(space.habits) ? space.habits : [],
+    reminders: Array.isArray(space.reminders)
+      ? space.reminders.map((r) => {
+          if (r.type !== 'recurring') return r;
+          // `createdAt` bắt buộc theo type nhưng dữ liệu lưu trước khi field này ra đời không có
+          // — patch về ngày hiện tại thay vì crash khi tính isDueToday.
+          const raw = r as typeof r & { createdAt?: string };
+          return raw.createdAt ? r : { ...r, createdAt: new Date().toISOString().slice(0, 10) };
+        })
+      : [],
+    habits: Array.isArray(space.habits)
+      ? space.habits.map((h) => ({
+          ...h,
+          completedDates: Array.isArray(h.completedDates) ? h.completedDates : [],
+        }))
+      : [],
     notes: Array.isArray(space.notes) ? space.notes.map((n) => ({ ...n, expanded: n.expanded ?? false })) : [],
   };
 }

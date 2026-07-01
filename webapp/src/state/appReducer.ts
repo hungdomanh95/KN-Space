@@ -156,8 +156,19 @@ function normalizeImportedSpace(raw: Partial<Space> & { id?: string }): Space {
     tasks: Array.isArray(raw.tasks)
       ? raw.tasks.map((t, idx) => ({ ...t, content: t.content ?? '', order: t.order ?? idx }))
       : [],
-    reminders: Array.isArray(raw.reminders) ? raw.reminders : [],
-    habits: Array.isArray(raw.habits) ? raw.habits : [],
+    reminders: Array.isArray(raw.reminders)
+      ? raw.reminders.map((r) => {
+          if (r.type !== 'recurring') return r;
+          const rec = r as typeof r & { createdAt?: string };
+          return rec.createdAt ? r : { ...r, createdAt: new Date().toISOString().slice(0, 10) };
+        })
+      : [],
+    habits: Array.isArray(raw.habits)
+      ? raw.habits.map((h) => ({
+          ...h,
+          completedDates: Array.isArray(h.completedDates) ? h.completedDates : [],
+        }))
+      : [],
     notes: Array.isArray(raw.notes) ? raw.notes.map((n) => ({ ...n, expanded: n.expanded ?? false })) : [],
   };
 }
