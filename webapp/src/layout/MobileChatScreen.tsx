@@ -16,30 +16,25 @@ export function MobileChatScreen() {
   const { dispatch } = useAppState();
   const space = useCurrentSpace();
   const [text, setText] = useState('');
-  const [sessionBubbles, setSessionBubbles] = useState<ChatBubble[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Lấy LIVE từ space.tasks (không lưu state riêng) — tự phản ánh đúng trạng thái done ngay
-  // cả khi tick xong ở tab Chi tiết, không bị "đông cứng" theo lúc tạo.
-  //
-  // `order` việc MỚI tạo nhỏ hơn việc cũ (xem TASK_CREATE — để nổi lên ĐẦU danh sách trong
-  // khối Tasks/tab Chi tiết). Ở màn Chat thì NGƯỢC LẠI — phải hiện như chat thật, việc mới
-  // nhất nằm DƯỚI CÙNG gần ô nhập: sort tăng dần theo order (= mới->cũ), lấy 30 việc MỚI nhất
-  // (30 phần tử đầu), rồi đảo lại thành cũ->mới để mới nhất rơi xuống cuối mảng hiển thị.
-  const taskBubbles = useMemo<ChatBubble[]>(
-    () =>
-      [...space.tasks]
-        .sort((a, b) => a.order - b.order)
-        .slice(0, 30)
-        .reverse()
-        .map((t) => ({ id: t.id, type: 'task' as const, title: t.title, done: t.done })),
-    [space.tasks],
-  );
+  // Merge task + note từ space, sort theo order (lớn = cũ hơn → hiện cũ→mới, mới nhất dưới cùng).
+  // order nhỏ = item mới hơn (TASK_CREATE/NOTE_CREATE đều prepend với order nhỏ nhất).
+  const bubbles = useMemo<ChatBubble[]>(() => {
+    const all = [
+      ...space.tasks.slice(0, 30).map((t) => ({ ...t, _type: 'task' as const })),
+      ...space.notes.slice(0, 30).map((n) => ({ ...n, _type: 'note' as const })),
+    ]
+      .sort((a, b) => b.order - a.order)
+      .slice(0, 50);
 
-  // Note KHÔNG có chỗ hiển thị live nào trong màn này — chỉ track Note tạo trong PHIÊN hiện
-  // tại (sessionBubbles), Task thì để taskBubbles tự lo, tránh hiện trùng 2 lần.
-  const bubbles = [...taskBubbles, ...sessionBubbles];
+    return all.map((item) =>
+      item._type === 'task'
+        ? ({ id: item.id, type: 'task', title: item.title, done: (item as typeof space.tasks[0]).done } as ChatBubble)
+        : ({ id: item.id, type: 'note', title: item.title } as ChatBubble),
+    );
+  }, [space.tasks, space.notes]);
 
   useLayoutEffect(() => {
     const el = scrollRef.current;
@@ -69,10 +64,7 @@ export function MobileChatScreen() {
 
     if (isNote) {
       dispatch({ type: 'NOTE_CREATE', payload: { title, content: '', color: '' } });
-      setSessionBubbles((prev) => [...prev, { id: crypto.randomUUID(), type: 'note', title }]);
     } else {
-      // KHÔNG tự thêm bubble ở đây — taskBubbles (live từ space.tasks) sẽ tự hiện task này
-      // ngay khi reducer thêm xong, tránh hiện trùng 2 lần (1 từ đây + 1 từ taskBubbles).
       dispatch({ type: 'TASK_CREATE', payload: { title, content: '', date: '', time: '' } });
     }
     setText('');
