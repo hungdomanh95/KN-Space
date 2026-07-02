@@ -115,7 +115,7 @@ export function HabitsBlock({
                   >
                     <span
                       className={`mt-px flex h-[17px] w-[17px] flex-none cursor-pointer items-center justify-center
-                        rounded-[6px] border-[1.6px] border-[color:var(--border)] bg-[var(--raised)] transition-all
+                        rounded-[6px] border-[1.6px] border-[color:var(--border-control)] bg-[var(--raised)] transition-all
                         duration-150 [&_.icon]:opacity-0 [&_.icon]:transition-opacity [&_.icon]:duration-100
                         ${doneToday ? 'border-[color:var(--done)] bg-[var(--done)] [&_.icon]:opacity-100' : ''}`}
                     >
@@ -141,7 +141,7 @@ export function HabitsBlock({
                   {week.map((done, i) => (
                     <span
                       key={i}
-                      className={`h-[13px] w-[13px] flex-[0_0_13px] cursor-default rounded-full border-[1.5px] border-[color:var(--border)] bg-[var(--raised)] ${
+                      className={`h-[13px] w-[13px] flex-[0_0_13px] cursor-default rounded-full border-[1.5px] border-[color:var(--border-control)] bg-[var(--raised)] ${
                         done ? 'border-[color:var(--habit-color)] bg-[var(--habit-color)]' : ''
                       } ${i === todayIdx ? 'shadow-[0_0_0_3px_rgba(255,138,61,.25)]' : ''}`}
                       title={`${DAY_LABELS[i]}${i === todayIdx ? ' (hôm nay)' : ''}: ${done ? 'đã hoàn thành' : 'chưa hoàn thành'}`}
