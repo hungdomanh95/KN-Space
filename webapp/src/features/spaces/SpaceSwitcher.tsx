@@ -206,7 +206,8 @@ export function SpaceSwitcher() {
                     {shortcut}
                   </span>
                 )}
-                <span className="mr-0.5 flex flex-none flex-col gap-px">
+                {/* up/down ẩn trên mobile — kéo thả không khả thi trên touch */}
+                <span className="mr-0.5 flex flex-none flex-col gap-px max-md:hidden">
                   <button
                     className="icon-btn h-[13px] w-[18px] rounded-[5px] opacity-0 transition-opacity duration-150 group-hover:opacity-100 [&_.icon]:h-[11px] [&_.icon]:w-[11px]"
                     disabled={isFirst}
@@ -233,7 +234,7 @@ export function SpaceSwitcher() {
                   </button>
                 </span>
                 <button
-                  className="icon-btn opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+                  className="icon-btn opacity-0 transition-opacity duration-150 group-hover:opacity-100 max-md:opacity-100"
                   title="Đổi tên space"
                   aria-label="Đổi tên space"
                   onClick={(e) => {
@@ -246,7 +247,7 @@ export function SpaceSwitcher() {
                 </button>
                 {privateCount > 1 && (
                   <button
-                    className="icon-btn opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+                    className="icon-btn opacity-0 transition-opacity duration-150 group-hover:opacity-100 max-md:opacity-100"
                     title="Xoá space"
                     aria-label="Xoá space"
                     onClick={(e) => {
@@ -284,7 +285,7 @@ export function SpaceSwitcher() {
               const controls = (
                 <span className="flex flex-none items-center gap-[3px]">
                   <button
-                    className="icon-btn opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+                    className="icon-btn opacity-0 transition-opacity duration-150 group-hover:opacity-100 max-md:opacity-100"
                     title="Mời thành viên"
                     aria-label="Mời thành viên"
                     onClick={(e) => {
@@ -296,7 +297,7 @@ export function SpaceSwitcher() {
                     <UserPlus className="icon" size={13} />
                   </button>
                   <button
-                    className="icon-btn opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+                    className="icon-btn opacity-0 transition-opacity duration-150 group-hover:opacity-100 max-md:opacity-100"
                     title="Đổi tên space"
                     aria-label="Đổi tên space"
                     onClick={(e) => {
@@ -308,7 +309,7 @@ export function SpaceSwitcher() {
                     <Pencil className="icon" size={13} />
                   </button>
                   <button
-                    className="icon-btn opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+                    className="icon-btn opacity-0 transition-opacity duration-150 group-hover:opacity-100 max-md:opacity-100"
                     title="Xoá space"
                     aria-label="Xoá space"
                     onClick={(e) => {
