@@ -4,6 +4,9 @@ import { BlockShell } from '../../components/BlockShell';
 import { EmptyState } from '../../components/EmptyState';
 import { useAppState, useCurrentSpace } from '../../state/AppStateContext';
 import { useConfirm } from '../../components/ConfirmContext';
+import { useCurrentUserId } from '../../state/useCurrentUserId';
+import { useSpaceMembers } from '../../state/useSpaceMembers';
+import { getMemberColor, getMemberDisplayName } from '../../utils/memberColors';
 import { NoteCard } from './NoteCard';
 import { NoteFormModal } from './NoteFormModal';
 import { NoteViewModal } from './NoteViewModal';
@@ -43,6 +46,8 @@ export function NotesBlock({
   const { state, dispatch } = useAppState();
   const space = useCurrentSpace();
   const showConfirm = useConfirm();
+  const currentUserId = useCurrentUserId();
+  const members = useSpaceMembers(space.isShared ? space.sharedSpaceId : undefined);
   const [editingNote, setEditingNote] = useState<Note | null | 'new'>(null);
   const [viewingNoteId, setViewingNoteId] = useState<string | null>(null);
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
@@ -99,6 +104,14 @@ export function NotesBlock({
     onDragEndAll: () => setDraggedId(null),
     draggedId,
   };
+
+  function getNoteCreatorInfo(note: Note): { name: string; color: string } | undefined {
+    if (!space.isShared || !note.createdBy || note.createdBy === currentUserId) return undefined;
+    return {
+      name: getMemberDisplayName(note.createdBy, members),
+      color: getMemberColor(note.createdBy, members),
+    };
+  }
 
   return (
     <BlockShell
@@ -226,13 +239,13 @@ export function NotesBlock({
         ) : noteView === 'list' ? (
           <div className="notes-list">
             {list.map((note) => (
-              <NoteCard key={note.id} note={note} {...cardsProps} />
+              <NoteCard key={note.id} note={note} {...cardsProps} creatorInfo={getNoteCreatorInfo(note)} />
             ))}
           </div>
         ) : (
           <div className="notes-grid">
             {list.map((note) => (
-              <NoteCard key={note.id} note={note} {...cardsProps} />
+              <NoteCard key={note.id} note={note} {...cardsProps} creatorInfo={getNoteCreatorInfo(note)} />
             ))}
           </div>
         )}

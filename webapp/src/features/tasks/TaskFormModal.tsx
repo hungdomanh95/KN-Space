@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { useAppState } from '../../state/AppStateContext';
+import { useCurrentUserId } from '../../state/useCurrentUserId';
+import { useCurrentSpace } from '../../state/AppStateContext';
 import type { Task } from '../../types';
 
 interface TaskFormModalProps {
@@ -10,6 +12,8 @@ interface TaskFormModalProps {
 
 export function TaskFormModal({ task, onClose }: TaskFormModalProps) {
   const { dispatch } = useAppState();
+  const space = useCurrentSpace();
+  const currentUserId = useCurrentUserId();
   const [title, setTitle] = useState(task?.title ?? '');
   const [content, setContent] = useState(task?.content ?? '');
   const [date, setDate] = useState(task?.date ?? '');
@@ -19,7 +23,8 @@ export function TaskFormModal({ task, onClose }: TaskFormModalProps) {
     if (task) {
       dispatch({ type: 'TASK_UPDATE', payload: { id: task.id, title, content, date, time } });
     } else {
-      dispatch({ type: 'TASK_CREATE', payload: { title, content, date, time } });
+      const createdBy = space.isShared && currentUserId ? currentUserId : undefined;
+      dispatch({ type: 'TASK_CREATE', payload: { title, content, date, time, createdBy } });
     }
     onClose();
   }

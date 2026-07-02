@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Eye, EyeOff, GripVertical, Maximize2, Minimize2, Pencil, Trash2 } from 'lucide-react';
 import { useAppState } from '../../state/AppStateContext';
+import { MemberAvatar } from '../../components/MemberAvatar';
 import { formatNoteDate, hexToRgba, maskContent } from './noteUtils';
 import type { Note, NoteSortBy, NoteView } from '../../types';
 
@@ -14,6 +15,8 @@ interface NoteCardProps {
   onDragStart: (id: string) => void;
   onDragEndAll: () => void;
   draggedId: string | null;
+  /** Chỉ truyền khi shared space + note của người khác */
+  creatorInfo?: { name: string; color: string };
 }
 
 /**
@@ -31,6 +34,7 @@ export function NoteCard({
   onDragStart,
   onDragEndAll,
   draggedId,
+  creatorInfo,
 }: NoteCardProps) {
   const { dispatch } = useAppState();
   const cardRef = useRef<HTMLDivElement>(null);
@@ -148,6 +152,12 @@ export function NoteCard({
       <p className="nc-title">{note.title}</p>
       <p className="nc-content">{isHidden ? maskContent(note.content) : note.content}</p>
       {note.updatedAt > 0 && <span className="nc-date">{formatNoteDate(note.updatedAt)}</span>}
+      {creatorInfo && (
+        <div className="mt-1.5 flex items-center gap-1.5 border-t border-[color:var(--border)] pt-1.5" onClick={(e) => e.stopPropagation()}>
+          <MemberAvatar name={creatorInfo.name} color={creatorInfo.color} size={16} />
+          <span className="text-[0.6875rem] text-[var(--text-dim)]">{creatorInfo.name}</span>
+        </div>
+      )}
     </div>
   );
 }

@@ -7,7 +7,7 @@ export function defaultNoteColor(noteCount: number): string {
 }
 
 export type NoteAction =
-  | { type: 'NOTE_CREATE'; payload: { title: string; content: string; color: string } }
+  | { type: 'NOTE_CREATE'; payload: { title: string; content: string; color: string; createdBy?: string } }
   | { type: 'NOTE_UPDATE'; payload: { id: string; title: string; content: string; color: string } }
   | { type: 'NOTE_DELETE'; payload: { id: string } }
   | { type: 'NOTE_REORDER'; payload: { draggedId: string; targetId: string; insertAfter: boolean } }
@@ -27,6 +27,7 @@ export function notesReducer(space: Space, action: NoteAction): Space {
         order: maxOrder + 1,
         expanded: false,
         hidden: false,
+        ...(action.payload.createdBy ? { createdBy: action.payload.createdBy } : {}),
       };
       return { ...space, notes: [...space.notes, newNote] };
     }

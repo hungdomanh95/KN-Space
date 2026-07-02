@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Modal } from '../../components/Modal';
-import { useAppState } from '../../state/AppStateContext';
+import { useAppState, useCurrentSpace } from '../../state/AppStateContext';
+import { useCurrentUserId } from '../../state/useCurrentUserId';
 import { defaultNoteColor, NOTE_PALETTE } from '../../state/reducers/notes';
 import type { Note } from '../../types';
 
@@ -12,6 +13,8 @@ interface NoteFormModalProps {
 
 export function NoteFormModal({ note, noteCount, onClose }: NoteFormModalProps) {
   const { dispatch } = useAppState();
+  const space = useCurrentSpace();
+  const currentUserId = useCurrentUserId();
   const [title, setTitle] = useState(note?.title ?? '');
   const [content, setContent] = useState(note?.content ?? '');
   const [color, setColor] = useState(note?.color ?? defaultNoteColor(noteCount));
@@ -20,7 +23,8 @@ export function NoteFormModal({ note, noteCount, onClose }: NoteFormModalProps) 
     if (note) {
       dispatch({ type: 'NOTE_UPDATE', payload: { id: note.id, title, content, color } });
     } else {
-      dispatch({ type: 'NOTE_CREATE', payload: { title, content, color } });
+      const createdBy = space.isShared && currentUserId ? currentUserId : undefined;
+      dispatch({ type: 'NOTE_CREATE', payload: { title, content, color, createdBy } });
     }
     onClose();
   }

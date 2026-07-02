@@ -5,6 +5,9 @@ import { EmptyState } from '../../components/EmptyState';
 import { useAppState, useCurrentSpace } from '../../state/AppStateContext';
 import { useConfirm } from '../../components/ConfirmContext';
 import { TaskFormModal } from './TaskFormModal';
+import { useCurrentUserId } from '../../state/useCurrentUserId';
+import { useSpaceMembers } from '../../state/useSpaceMembers';
+import { getMemberColor, getMemberDisplayName } from '../../utils/memberColors';
 import type { Task, TaskFilter } from '../../types';
 
 interface TasksBlockProps {
@@ -42,10 +45,12 @@ interface TaskRowProps {
   onDragEndAll: () => void;
   onEdit: (task: Task) => void;
   onDelete: (task: Task) => void;
+  memberDotColor?: string; // màu dot nếu task của người khác trong shared space
+  memberDotName?: string;  // tên cho tooltip
 }
 
 /** 1 dòng task — kéo-thả qua icon grip, cùng kỹ thuật armDraggable/imperative ref như NoteCard. */
-function TaskRow({ task, draggedId, onDragStartId, onDragEndAll, onEdit, onDelete }: TaskRowProps) {
+function TaskRow({ task, draggedId, onDragStartId, onDragEndAll, onEdit, onDelete, memberDotColor, memberDotName }: TaskRowProps) {
   const { dispatch } = useAppState();
   const rowRef = useRef<HTMLDivElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -98,6 +103,15 @@ function TaskRow({ task, draggedId, onDragStartId, onDragEndAll, onEdit, onDelet
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
+      {/* Dot màu nếu task của thành viên khác trong shared space */}
+      {memberDotColor ? (
+        <span
+          title={memberDotName ? `Tạo bởi ${memberDotName}` : 'Thành viên khác'}
+          style={{ width: 6, height: 6, minWidth: 6, borderRadius: '50%', background: memberDotColor, marginTop: 9 }}
+        />
+      ) : (
+        <span style={{ width: 6, minWidth: 6 }} />
+      )}
       <span
         className="flex h-6 w-6 flex-none cursor-grab items-center justify-center text-[var(--text-dim)] active:cursor-grabbing"
         title="Kéo để đổi thứ tự"
@@ -174,6 +188,8 @@ export function TasksBlock({
   const { state, dispatch } = useAppState();
   const space = useCurrentSpace();
   const showConfirm = useConfirm();
+  const currentUserId = useCurrentUserId();
+  const members = useSpaceMembers(space.isShared ? space.sharedSpaceId : undefined);
   const [editingTask, setEditingTask] = useState<Task | null | 'new'>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
 
@@ -258,17 +274,22 @@ export function TasksBlock({
             hint='Bấm "+ Thêm" ở góc trên để tạo việc đầu tiên.'
           />
         ) : (
-          list.map((task) => (
-            <TaskRow
-              key={task.id}
-              task={task}
-              draggedId={draggedId}
-              onDragStartId={setDraggedId}
-              onDragEndAll={() => setDraggedId(null)}
-              onEdit={setEditingTask}
-              onDelete={handleDelete}
-            />
-          ))
+          list.map((task) => {
+            const isOther = space.isShared && task.createdBy && task.createdBy !== currentUserId;
+            return (
+              <TaskRow
+                key={task.id}
+                task={task}
+                draggedId={draggedId}
+                onDragStartId={setDraggedId}
+                onDragEndAll={() => setDraggedId(null)}
+                onEdit={setEditingTask}
+                onDelete={handleDelete}
+                memberDotColor={isOther ? getMemberColor(task.createdBy!, members) : undefined}
+                memberDotName={isOther ? getMemberDisplayName(task.createdBy!, members) : undefined}
+              />
+            );
+          })
         )}
       </div>
     </BlockShell>

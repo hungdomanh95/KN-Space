@@ -10,6 +10,7 @@ export interface Task {
   time: string; // HH:mm, '' nếu không đặt
   done: boolean;
   order: number; // thứ tự sắp xếp thủ công (kéo-thả qua icon grip)
+  createdBy?: string; // userId — chỉ set trong shared space
 }
 
 export type ReminderFreqUnit = 'hour' | 'day' | 'month';
@@ -54,6 +55,7 @@ export interface Note {
   order: number;
   expanded: boolean; // view list: show hết nội dung thay vì clamp 4 dòng
   hidden: boolean;   // ẩn nội dung (note bảo mật) — persist để giữ trạng thái sau reload
+  createdBy?: string; // userId — chỉ set trong shared space
 }
 
 export interface EnabledBlocks {
