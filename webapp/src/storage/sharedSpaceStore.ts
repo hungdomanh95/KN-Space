@@ -129,6 +129,25 @@ export async function loadSharedSpaces(): Promise<Space[]> {
 }
 
 /**
+ * Đọc version hiện tại của 1 shared space trên DB — dùng để resync sau khi
+ * saveSharedSpace() báo conflict (client khác vừa ghi đè), tránh mất thay đổi
+ * do bị drop im lặng.
+ */
+export async function getSharedSpaceVersion(sharedSpaceId: string): Promise<number | null> {
+  const { data, error } = await supabase
+    .from('kn_shared_spaces')
+    .select('version')
+    .eq('id', sharedSpaceId)
+    .maybeSingle<{ version: number }>();
+
+  if (error) {
+    console.warn('[KN-Space] getSharedSpaceVersion lỗi:', error.message);
+    throw error;
+  }
+  return data?.version ?? null;
+}
+
+/**
  * Save shared space với optimistic locking.
  *
  * UPDATE kn_shared_spaces SET tasks=..., notes=..., reminders=..., name=...

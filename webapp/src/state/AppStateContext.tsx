@@ -7,7 +7,7 @@ import {
   seedAndPersist,
   setFallbackListener,
 } from '../storage/supabaseStore';
-import { deleteSharedSpace, loadSharedSpaces, saveSharedSpace } from '../storage/sharedSpaceStore';
+import { deleteSharedSpace, getSharedSpaceVersion, loadSharedSpaces, saveSharedSpace } from '../storage/sharedSpaceStore';
 import { writeLocalCurrentSpaceId } from '../storage/localCurrentSpace';
 import { writeLocalLastScreen } from '../storage/localLastScreen';
 import { buildUiInitialState } from '../storage/normalize';
@@ -114,6 +114,41 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     tasks: Space['tasks']; notes: Space['notes']; reminders: Space['reminders']; name: string;
   }>>(new Map());
 
+  /**
+   * Thử lưu 1 shared space, tự resync + retry nếu bị conflict (version đã đổi trên DB
+   * do client khác — hoặc chính tab này — vừa ghi trước đó).
+   *
+   * Trước đây conflict bị drop im lặng (chỉ console.warn, không retry) khiến thay đổi
+   * (vd: xoá task) tưởng đã lưu ở UI nhưng thực ra KHÔNG BAO GIỜ tới được DB — client
+   * khác F5 vẫn thấy data cũ vì DB chưa từng đổi. Đây là nguyên nhân chính gây mất
+   * đồng bộ CRUD giữa các member của shared space.
+   */
+  async function attemptSaveShared(sid: string, retriesLeft = 3): Promise<void> {
+    const data = pendingSharedSavesRef.current.get(sid);
+    if (!data) return;
+    const version = sharedVersionsRef.current.get(sid) ?? 1;
+    try {
+      const result = await saveSharedSpace(sid, data, version);
+      if (result.ok) {
+        if (result.newVersion !== undefined) sharedVersionsRef.current.set(sid, result.newVersion);
+        // Chỉ xoá pending nếu không có thay đổi mới hơn ghi đè trong lúc đang save
+        if (pendingSharedSavesRef.current.get(sid) === data) {
+          pendingSharedSavesRef.current.delete(sid);
+        }
+        return;
+      }
+      if (result.conflict && retriesLeft > 0) {
+        const freshVersion = await getSharedSpaceVersion(sid);
+        if (freshVersion !== null) sharedVersionsRef.current.set(sid, freshVersion);
+        await attemptSaveShared(sid, retriesLeft - 1);
+        return;
+      }
+      console.warn('[KN-Space] saveSharedSpace conflict, hết lượt thử lại — thay đổi CHƯA được lưu:', sid);
+    } catch (err) {
+      console.warn('[KN-Space] saveSharedSpace thất bại:', err);
+    }
+  }
+
   // Debounce save shared spaces khi nội dung thay đổi.
   useEffect(() => {
     if (!hydratedRef.current || isLoading) return;
@@ -124,8 +159,16 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       if (!sharedVersionsRef.current.has(sid) && space._sharedVersion !== undefined) {
         sharedVersionsRef.current.set(sid, space._sharedVersion);
       }
-      // So sánh snapshot để tránh save khi không có thay đổi
       const snapshot = JSON.stringify({ tasks: space.tasks, notes: space.notes, reminders: space.reminders, name: space.name });
+      // Lần đầu thấy space này (vừa hydrate/load) → chỉ ghi nhận baseline, KHÔNG save.
+      // Trước đây thiếu bước này khiến lần render đầu tiên luôn bị coi là "có thay đổi"
+      // (Map rỗng nên snapshot cũ luôn undefined !== snapshot hiện tại) → tự bắn 1 save
+      // thừa ngay khi mở app, dễ đụng version với client khác đang mở cùng space → conflict.
+      if (!prevSharedRef.current.has(sid)) {
+        prevSharedRef.current.set(sid, snapshot);
+        return;
+      }
+      // So sánh snapshot để tránh save khi không có thay đổi
       if (prevSharedRef.current.get(sid) === snapshot) return;
       prevSharedRef.current.set(sid, snapshot);
       // Cập nhật pending data ngay — dùng để flush khi visibilitychange
@@ -135,26 +178,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       if (existing) clearTimeout(existing);
       const timer = setTimeout(() => {
         sharedSaveTimersRef.current.delete(sid);
-        const version = sharedVersionsRef.current.get(sid) ?? 1;
-        void saveSharedSpace(sid, { tasks: space.tasks, notes: space.notes, reminders: space.reminders, name: space.name }, version)
-          .then((result) => {
-            if (result.ok && result.newVersion !== undefined) {
-              sharedVersionsRef.current.set(sid, result.newVersion);
-            }
-            // Xoá khỏi pending sau khi đã save thành công
-            pendingSharedSavesRef.current.delete(sid);
-          })
-          .catch((err) => console.warn('[KN-Space] saveSharedSpace thất bại:', err));
+        void attemptSaveShared(sid);
       }, 800);
       sharedSaveTimersRef.current.set(sid, timer);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.spaces]);
-
-  // TODO Phase 3b-2: save shared spaces khi thay đổi — cần optimistic locking (version tracking per space).
-  // saveSharedSpace() từ sharedSpaceStore nhận expectedVersion — cần lưu version vào Space type hoặc
-  // dùng useRef<Map<string, number>> để track version hiện tại của từng shared space.
-  // Hiện tại skip để tránh overwrite data không kiểm soát được version conflict.
 
   // Lưu "Space đang mở" riêng cho máy này (localStorage).
   useEffect(() => {
@@ -175,16 +204,11 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         void forceFlush(); // private spaces
         // Flush shared spaces còn pending (F5/đóng tab trong cửa sổ 800ms debounce)
         if (pendingSharedSavesRef.current.size > 0) {
-          pendingSharedSavesRef.current.forEach((data, sid) => {
-            const version = sharedVersionsRef.current.get(sid) ?? 1;
-            void saveSharedSpace(sid, data, version).then((r) => {
-              if (r.ok && r.newVersion !== undefined) sharedVersionsRef.current.set(sid, r.newVersion);
-            });
-          });
+          const pendingIds = Array.from(pendingSharedSavesRef.current.keys());
+          pendingIds.forEach((sid) => void attemptSaveShared(sid));
           // Clear timers — đã flush rồi, không cần debounce nữa
           sharedSaveTimersRef.current.forEach((t) => clearTimeout(t));
           sharedSaveTimersRef.current.clear();
-          pendingSharedSavesRef.current.clear();
         }
       }
     }
