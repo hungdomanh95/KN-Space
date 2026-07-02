@@ -3,10 +3,10 @@ import { ChevronDown, ChevronUp, Pencil, Plus, Trash2, UserPlus, Users } from 'l
 import { useAppState } from '../../state/AppStateContext';
 import { useConfirm } from '../../components/ConfirmContext';
 import { SpaceFormModal } from './SpaceFormModal';
+import { SharedSpaceFormModal } from './SharedSpaceFormModal';
 import { SpaceInviteModal } from './SpaceInviteModal';
 import { NOTE_PALETTE } from '../../state/reducers/notes';
 import { spaceShortcutLabel } from './spaceShortcuts';
-import { createSharedSpace } from '../../storage/sharedSpaceStore';
 import type { Space } from '../../types';
 
 function todayStr(): string {
@@ -61,7 +61,7 @@ export function SpaceSwitcher() {
   const showConfirm = useConfirm();
   const [open, setOpen] = useState(false);
   const [formSpace, setFormSpace] = useState<Space | null | 'new'>(null);
-  const [isCreatingShared, setIsCreatingShared] = useState(false);
+  const [showSharedForm, setShowSharedForm] = useState(false);
   const [inviteModalSpaceId, setInviteModalSpaceId] = useState<string | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -101,20 +101,9 @@ export function SpaceSwitcher() {
     setFormSpace('new');
   }
 
-  async function handleCreateSharedSpace() {
-    const name = prompt('Tên Space chung:');
-    if (!name?.trim()) return;
-    setIsCreatingShared(true);
-    try {
-      const newSpace = await createSharedSpace(name.trim());
-      dispatch({ type: 'SPACE_ADD_SHARED', payload: { space: newSpace } });
-      setOpen(false);
-    } catch (err) {
-      console.error('[KN-Space] Tạo shared space lỗi:', err);
-      alert('Tạo Space chung thất bại. Kiểm tra kết nối và đăng nhập.');
-    } finally {
-      setIsCreatingShared(false);
-    }
+  function handleCreateSharedSpace() {
+    setOpen(false);
+    setShowSharedForm(true);
   }
 
   // Render 1 space item — dùng chung cho cả private lẫn shared
@@ -281,7 +270,7 @@ export function SpaceSwitcher() {
           <SectionHeader
             label="Space chung"
             onAdd={handleCreateSharedSpace}
-            addTitle={isCreatingShared ? 'Đang tạo...' : 'Tạo space chung'}
+            addTitle="Tạo space chung"
           />
 
           {orderedSharedSpaces.length === 0 ? (
@@ -343,6 +332,13 @@ export function SpaceSwitcher() {
 
       {formSpace && (
         <SpaceFormModal space={formSpace === 'new' ? null : formSpace} onClose={() => setFormSpace(null)} />
+      )}
+
+      {showSharedForm && (
+        <SharedSpaceFormModal
+          onClose={() => setShowSharedForm(false)}
+          onCreated={(space) => dispatch({ type: 'SPACE_ADD_SHARED', payload: { space } })}
+        />
       )}
 
       {inviteModalSpaceId && (() => {
