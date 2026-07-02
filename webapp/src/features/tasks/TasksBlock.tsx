@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { CheckSquare, FileText, GripVertical, Pencil, Plus, Trash2, Check } from 'lucide-react';
 import { BlockShell } from '../../components/BlockShell';
 import { EmptyState } from '../../components/EmptyState';
+import { MemberAvatar } from '../../components/MemberAvatar';
 import { useAppState, useCurrentSpace } from '../../state/AppStateContext';
 import { useConfirm } from '../../components/ConfirmContext';
 import { TaskFormModal } from './TaskFormModal';
@@ -45,8 +46,8 @@ interface TaskRowProps {
   onDragEndAll: () => void;
   onEdit: (task: Task) => void;
   onDelete: (task: Task) => void;
-  memberDotColor?: string; // màu dot nếu task của người khác trong shared space
-  memberDotName?: string;  // tên cho tooltip
+  memberDotColor?: string; // màu avatar nếu task của người khác trong shared space
+  memberDotName?: string;  // tên hiện trong avatar + chip bên dưới tiêu đề
 }
 
 /** 1 dòng task — kéo-thả qua icon grip, cùng kỹ thuật armDraggable/imperative ref như NoteCard. */
@@ -103,14 +104,14 @@ function TaskRow({ task, draggedId, onDragStartId, onDragEndAll, onEdit, onDelet
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {/* Dot màu nếu task của thành viên khác trong shared space */}
+      {/* Avatar nhỏ (chữ cái đầu tên) nếu task của thành viên khác trong shared space — trước là
+          chấm màu trơn, không đủ phân biệt member (chỉ biết màu, không biết ai) nếu không hover. */}
       {memberDotColor ? (
-        <span
-          title={memberDotName ? `Tạo bởi ${memberDotName}` : 'Thành viên khác'}
-          style={{ width: 6, height: 6, minWidth: 6, borderRadius: '50%', background: memberDotColor, marginTop: 9 }}
-        />
+        <span style={{ marginTop: 3, flex: 'none' }}>
+          <MemberAvatar name={memberDotName || 'Thành viên'} color={memberDotColor} size={16} />
+        </span>
       ) : (
-        <span style={{ width: 6, minWidth: 6 }} />
+        <span style={{ width: 16, minWidth: 16 }} />
       )}
       <span
         className="flex h-6 w-6 flex-none cursor-grab items-center justify-center text-[var(--text-dim)] active:cursor-grabbing"
@@ -153,11 +154,21 @@ function TaskRow({ task, draggedId, onDragStartId, onDragEndAll, onEdit, onDelet
             </span>
           )}
         </div>
-        {meta && (
-          <div className="mt-1 flex gap-1.5">
-            <span className="inline-flex items-center gap-1 rounded-md bg-[var(--raised)] px-[7px] py-0.5 text-[0.7188rem] font-semibold text-[var(--text-dim)]">
-              {meta}
-            </span>
+        {(meta || memberDotName) && (
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            {meta && (
+              <span className="inline-flex items-center gap-1 rounded-md bg-[var(--raised)] px-[7px] py-0.5 text-[0.7188rem] font-semibold text-[var(--text-dim)]">
+                {meta}
+              </span>
+            )}
+            {memberDotName && (
+              <span
+                className="inline-flex items-center gap-1 rounded-md px-[7px] py-0.5 text-[0.7188rem] font-semibold"
+                style={{ color: memberDotColor, background: `color-mix(in srgb, ${memberDotColor} 14%, var(--raised))` }}
+              >
+                {memberDotName}
+              </span>
+            )}
           </div>
         )}
       </div>
