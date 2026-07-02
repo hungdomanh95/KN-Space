@@ -110,11 +110,13 @@ function TaskRow({ task, draggedId, onDragStartId, onDragEndAll, onEdit, onDelet
         className={`mt-px flex h-[17px] w-[17px] flex-none cursor-pointer items-center justify-center rounded-[6px]
           border-[1.6px] border-[color:var(--border)] bg-[var(--raised)] transition-all duration-150
           [&_.icon]:opacity-0 [&_.icon]:transition-opacity [&_.icon]:duration-100
+          max-md:h-[26px] max-md:w-[26px] max-md:rounded-[8px]
           ${task.done ? 'border-[color:var(--done)] bg-[var(--done)] [&_.icon]:opacity-100' : ''}`}
         role="checkbox"
         aria-checked={task.done}
         tabIndex={0}
         title={task.done ? 'Đánh dấu chưa xong' : 'Đánh dấu đã xong'}
+        onTouchEnd={(e) => { e.preventDefault(); dispatch({ type: 'TASK_TOGGLE_DONE', payload: { id: task.id } }); }}
         onClick={() => dispatch({ type: 'TASK_TOGGLE_DONE', payload: { id: task.id } })}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
@@ -123,7 +125,7 @@ function TaskRow({ task, draggedId, onDragStartId, onDragEndAll, onEdit, onDelet
           }
         }}
       >
-        <Check className="icon text-white" size={11} strokeWidth={3} />
+        <Check className="icon text-white max-md:!h-[15px] max-md:!w-[15px]" size={11} strokeWidth={3} />
       </span>
       <div className="flex-1">
         <div className="row-title font-medium">
