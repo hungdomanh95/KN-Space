@@ -80,7 +80,7 @@ function SpaceMenuItem({
     <div
       role="button"
       tabIndex={0}
-      className={`space-menu-item group ${isActive ? 'active' : ''}`}
+      className={`space-menu-item group items-start ${isActive ? 'active' : ''}`}
       onTouchEnd={(e) => {
         if ((e.target as HTMLElement).closest('button')) return;
         e.preventDefault();
@@ -89,18 +89,18 @@ function SpaceMenuItem({
       onClick={onSelect}
     >
       {space.isShared ? (
-        <Share2 className="icon h-3 w-3 flex-none text-[var(--accent)]" size={12} />
+        <Share2 className="icon mt-[3px] h-3 w-3 flex-none text-[var(--accent)]" size={12} />
       ) : (
         <span
-          className="h-2 w-2 flex-none rounded-full"
+          className="mt-[7px] h-2 w-2 flex-none rounded-full"
           aria-hidden="true"
           style={{ background: spaceDotColor(globalIdx) }}
         />
       )}
-      <span className="flex min-w-0 flex-1 flex-col gap-px">
+      <span className="flex min-w-0 flex-1 flex-col gap-px py-px">
         <span className="overflow-hidden text-ellipsis whitespace-nowrap">{space.name}</span>
         {space.isShared ? (
-          <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[0.6875rem] font-medium text-[var(--text-dim)] opacity-[.85]">
+          <span className="text-[0.6875rem] font-medium leading-snug text-[var(--text-dim)] opacity-[.85]">
             {taskCount} việc hôm nay · {noteCount} note · {members.length} thành viên
           </span>
         ) : (
