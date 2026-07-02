@@ -87,7 +87,7 @@ export function MobileChatScreen() {
       >
         <div className="flex-1" />
         {bubbles.length === 0 ? (
-          <div className="py-2 text-center text-[0.8125rem] text-[var(--text-dim)] opacity-70">
+          <div className="py-2 text-center text-[0.875rem] text-[var(--text-dim)] opacity-70">
             Gõ 1 việc cần làm rồi Enter — hoặc &quot;/note &quot; để ghi chú nhanh.
           </div>
         ) : (
@@ -113,7 +113,7 @@ export function MobileChatScreen() {
                   <div className={`flex flex-col ${mine ? 'items-end' : 'items-start'} max-w-[80%]`}>
                     {/* Tên người gửi (chỉ bubble đầu trong cụm) */}
                     {!mine && !samePersonAsPrev && memberName && (
-                      <span className="mb-0.5 px-1 text-[0.6875rem] text-[var(--text-dim)]">{memberName}</span>
+                      <span className="mb-0.5 px-1 text-[0.75rem] text-[var(--text-dim)]">{memberName}</span>
                     )}
 
                     {/* Bubble content */}

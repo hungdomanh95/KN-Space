@@ -554,7 +554,7 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
                 />
               ))}
             {!showTasks && !showNotes && (
-              <div className="flex flex-1 flex-col items-center justify-center gap-1.5 px-4 text-center text-[0.8438rem] text-[var(--text-dim)]">
+              <div className="flex flex-1 flex-col items-center justify-center gap-1.5 px-4 text-center text-[0.875rem] text-[var(--text-dim)]">
                 <span>Space này đã tắt cả 2 khối hiện trên mobile.</span>
                 <span>Vào Settings trên desktop để bật lại Việc cần làm hoặc Ghi chú.</span>
               </div>
@@ -725,7 +725,7 @@ function MobileTabBar({
         role="tab"
         aria-selected={activeTab === 'chat'}
         onClick={() => onChange('chat')}
-        className={`flex flex-1 flex-col items-center gap-1 py-3.5 text-[0.6875rem] font-semibold ${
+        className={`flex flex-1 flex-col items-center gap-1 py-3.5 text-[0.75rem] font-semibold ${
           activeTab === 'chat' ? 'text-[var(--accent)]' : 'text-[var(--text-dim)]'
         }`}
       >
@@ -737,7 +737,7 @@ function MobileTabBar({
         role="tab"
         aria-selected={activeTab === 'details'}
         onClick={() => onChange('details')}
-        className={`flex flex-1 flex-col items-center gap-1 py-3.5 text-[0.6875rem] font-semibold ${
+        className={`flex flex-1 flex-col items-center gap-1 py-3.5 text-[0.75rem] font-semibold ${
           activeTab === 'details' ? 'text-[var(--accent)]' : 'text-[var(--text-dim)]'
         }`}
       >

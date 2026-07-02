@@ -127,3 +127,23 @@ input, textarea, select { font-family: inherit; }
     min-height: 48px;
   }
 }
+
+/* ===== Mobile touch improvements ===== */
+@media (max-width: 640px) {
+  /* Mở rộng hit area icon-btn lên 44px (iOS HIG) bằng pseudo-element —
+     giữ visual size 24×24px, chỉ mở rộng vùng bấm, không phá layout. */
+  .icon-btn {
+    position: relative;
+  }
+  .icon-btn::before {
+    content: '';
+    position: absolute;
+    inset: -10px;
+  }
+
+  /* Dropdown space-menu-item: tăng chiều cao dòng để đạt 44px tiêu chuẩn iOS */
+  .space-menu-item {
+    padding-top: 13px;
+    padding-bottom: 13px;
+  }
+}

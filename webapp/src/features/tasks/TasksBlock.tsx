@@ -93,7 +93,7 @@ function TaskRow({ task, draggedId, onDragStartId, onDragEndAll, onEdit, onDelet
   return (
     <div
       ref={rowRef}
-      className={`group flex items-start gap-2.5 border-b border-[color:var(--border)] py-[9px] text-[0.875rem]
+      className={`group flex items-start gap-2.5 border-b border-[color:var(--border)] py-[9px] max-md:py-[13px] text-[0.875rem]
         transition-opacity duration-150 [transition-timing-function:var(--ease-standard)] last:border-b-0
         ${task.done ? '[&_.row-title]:text-[var(--text-dim)] [&_.row-title]:line-through' : ''}
         ${isDragging ? 'opacity-40' : ''} ${isDropTarget ? 'shadow-[inset_0_2px_0_0_var(--accent)]' : ''}`.trim()}
@@ -124,7 +124,7 @@ function TaskRow({ task, draggedId, onDragStartId, onDragEndAll, onEdit, onDelet
         className={`mt-px flex h-[17px] w-[17px] flex-none cursor-pointer items-center justify-center rounded-[6px]
           border-[1.6px] transition-all duration-150
           [&_.icon]:opacity-0 [&_.icon]:transition-opacity [&_.icon]:duration-100
-          max-md:h-[26px] max-md:w-[26px] max-md:rounded-[8px]
+          max-md:h-[36px] max-md:w-[36px] max-md:rounded-[10px]
           ${task.done ? '[&_.icon]:opacity-100' : ''}`}
         style={task.done
           ? { background: 'var(--done)', borderColor: 'var(--done)' }
@@ -236,7 +236,7 @@ export function TasksBlock({
         <>
           <div className="flex gap-[3px] rounded-lg bg-[var(--bg)] p-[3px]">
             <button
-              className={`rounded-md px-[9px] py-1 text-[0.7812rem] font-semibold text-[var(--text-dim)] ${
+              className={`rounded-md px-[9px] py-1 max-md:py-[6px] text-[0.7812rem] max-md:text-[0.875rem] font-semibold text-[var(--text-dim)] ${
                 filter === 'all' ? 'bg-[rgba(var(--accent-rgb),.12)] text-[var(--accent)]' : 'bg-transparent'
               }`}
               onClick={() => setFilter('all')}
@@ -244,7 +244,7 @@ export function TasksBlock({
               Tất cả
             </button>
             <button
-              className={`rounded-md px-[9px] py-1 text-[0.7812rem] font-semibold text-[var(--text-dim)] ${
+              className={`rounded-md px-[9px] py-1 max-md:py-[6px] text-[0.7812rem] max-md:text-[0.875rem] font-semibold text-[var(--text-dim)] ${
                 filter === 'pending' ? 'bg-[rgba(var(--accent-rgb),.12)] text-[var(--accent)]' : 'bg-transparent'
               }`}
               onClick={() => setFilter('pending')}
@@ -252,7 +252,7 @@ export function TasksBlock({
               Chưa xong
             </button>
             <button
-              className={`rounded-md px-[9px] py-1 text-[0.7812rem] font-semibold text-[var(--text-dim)] ${
+              className={`rounded-md px-[9px] py-1 max-md:py-[6px] text-[0.7812rem] max-md:text-[0.875rem] font-semibold text-[var(--text-dim)] ${
                 filter === 'done' ? 'bg-[rgba(var(--accent-rgb),.12)] text-[var(--accent)]' : 'bg-transparent'
               }`}
               onClick={() => setFilter('done')}
