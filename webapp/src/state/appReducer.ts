@@ -233,6 +233,13 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, spaces: nextSpaces, currentSpaceId: created.id, ui: resetEphemeralUi(state.ui.currentScreen) };
     }
 
+    case 'SPACE_ADD_SHARED': {
+      // spacesReducer xử lý idempotency: bỏ qua nếu id đã tồn tại
+      const nextSpaces = spacesReducer(state.spaces, action);
+      const spaceId = action.payload.space.id;
+      return { ...state, spaces: nextSpaces, currentSpaceId: spaceId, ui: resetEphemeralUi(state.ui.currentScreen) };
+    }
+
     case 'IMPORT_DATA': {
       const rawSpaces = Array.isArray(action.payload.spaces) ? action.payload.spaces : [];
       const importedSpaces = rawSpaces.map(normalizeImportedSpace);

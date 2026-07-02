@@ -109,6 +109,27 @@ export interface DashboardLayout {
   cols: LayoutSlot[][];
 }
 
+export type SpaceMemberRole = 'owner' | 'member';
+
+export interface SharedSpaceMember {
+  userId: string;
+  email: string;
+  displayName?: string;
+  avatarUrl?: string;
+  role: SpaceMemberRole;
+  joinedAt: string; // ISO timestamp
+}
+
+export interface SpaceInvite {
+  id: string;
+  spaceId: string;
+  token: string;
+  expiresAt: string;
+  createdAt: string;
+  createdBy: string; // userId
+  acceptedAt?: string;
+}
+
 export interface Space {
   id: string;
   name: string;
@@ -118,6 +139,10 @@ export interface Space {
   reminders: ReminderDefinition[];
   habits: Habit[];
   notes: Note[];
+  /** true nếu là shared space (lưu trong kn_shared_spaces) */
+  isShared?: boolean;
+  /** uuid của hàng trong kn_shared_spaces (= id trong bảng đó) */
+  sharedSpaceId?: string;
 }
 
 export interface CollapsedBlocks {

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { AppStateProvider, useAppState } from './state/AppStateContext';
 import { ConfirmProvider } from './components/ConfirmContext';
@@ -10,6 +10,8 @@ import { HomeScreen } from './features/home/HomeScreen';
 import { isMacPlatform } from './features/spaces/spaceShortcuts';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { LoginScreen } from './auth/LoginScreen';
+import { JoinSpacePage, readInviteTokenFromUrl, PENDING_INVITE_KEY } from './pages/JoinSpacePage';
+import type { Space } from './types';
 
 /** true nếu đang có modal `.overlay` mở trên trang — dùng để không "nuốt" phím Enter/Space/Esc. */
 function isAnyModalOpen(): boolean {
@@ -183,24 +185,95 @@ function Shell() {
   );
 }
 
-function AuthGate() {
-  const { session, isLoading } = useAuth();
+// ---------------------------------------------------------------------------
+// JoinGate — xử lý /join?token= flow bọc ngoài AppStateProvider
+// ---------------------------------------------------------------------------
+// Lý do tách riêng thay vì gộp vào Shell: JoinSpacePage cần render TRƯỚC khi
+// AppStateProvider load dữ liệu (để tránh flash app chính), nhưng lại cần
+// dispatch sau khi join xong (nên vẫn phải nằm trong AppStateProvider).
+// Giải pháp: render JoinSpacePage cùng cấp AppStateProvider, chỉ mount
+// AppStateProvider 1 lần, nhưng render JoinSpacePage đè lên Shell.
 
-  if (isLoading) {
-    return <LoadingScreen message="Đang kiểm tra đăng nhập..." />;
+function AppWithJoin({ initialToken }: { initialToken: string | null }) {
+  const [joinToken, setJoinToken] = useState<string | null>(initialToken);
+  const [pendingSpace, setPendingSpace] = useState<Space | null>(null);
+
+  function handleJoined(space: Space) {
+    setPendingSpace(space);
+    setJoinToken(null); // ẩn JoinSpacePage, hiện Shell
   }
 
-  if (!session) {
-    return <LoginScreen />;
+  function handleCancelJoin() {
+    setJoinToken(null);
+    // Xoá token sessionStorage phòng case lỗi nhưng user bấm "Về trang chủ"
+    sessionStorage.removeItem(PENDING_INVITE_KEY);
+  }
+
+  if (joinToken) {
+    return (
+      <JoinSpacePage
+        token={joinToken}
+        onJoined={handleJoined}
+        onCancel={handleCancelJoin}
+      />
+    );
   }
 
   return (
     <AppStateProvider>
       <ConfirmProvider>
-        <Shell />
+        <ShellWithPendingSpace pendingSpace={pendingSpace} onPendingSpaceHandled={() => setPendingSpace(null)} />
       </ConfirmProvider>
     </AppStateProvider>
   );
+}
+
+/** Shell mở rộng: nhận pendingSpace từ join flow và dispatch SPACE_ADD_SHARED khi app đã hydrate. */
+function ShellWithPendingSpace({
+  pendingSpace,
+  onPendingSpaceHandled,
+}: {
+  pendingSpace: Space | null;
+  onPendingSpaceHandled: () => void;
+}) {
+  const { dispatch, isLoading } = useAppState();
+
+  useEffect(() => {
+    if (isLoading || !pendingSpace) return;
+    dispatch({ type: 'SPACE_ADD_SHARED', payload: { space: pendingSpace } });
+    dispatch({ type: 'SCREEN_NAVIGATE', payload: { screen: 'dashboard' } });
+    onPendingSpaceHandled();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, pendingSpace]);
+
+  return <Shell />;
+}
+
+function AuthGate() {
+  const { session, isLoading } = useAuth();
+
+  // Đọc token từ URL (lần đầu load) hoặc sessionStorage (sau khi Google OAuth redirect về).
+  // Đọc 1 lần ở đây — nếu đọc trong render sẽ re-evaluate mỗi render lần (không ổn).
+  const [initialToken] = useState<string | null>(() => {
+    // Ưu tiên token trên URL (link mời trực tiếp).
+    const urlToken = readInviteTokenFromUrl();
+    if (urlToken) return urlToken;
+    // Fallback: token đã lưu trong sessionStorage (sau Google OAuth redirect).
+    return sessionStorage.getItem(PENDING_INVITE_KEY);
+  });
+
+  if (isLoading) {
+    return <LoadingScreen message="Đang kiểm tra đăng nhập..." />;
+  }
+
+  // Chưa đăng nhập và không có token trên URL → màn login bình thường.
+  // (Nếu có token, JoinSpacePage sẽ tự redirect sang Google OAuth khi cần.)
+  if (!session && !initialToken) {
+    return <LoginScreen />;
+  }
+
+  // initialToken không null → luôn mount join flow; JoinSpacePage tự xử lý auth check bên trong.
+  return <AppWithJoin initialToken={initialToken} />;
 }
 
 export function App() {

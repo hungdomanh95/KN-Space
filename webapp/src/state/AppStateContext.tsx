@@ -7,6 +7,7 @@ import {
   seedAndPersist,
   setFallbackListener,
 } from '../storage/supabaseStore';
+import { loadSharedSpaces } from '../storage/sharedSpaceStore';
 import { writeLocalCurrentSpaceId } from '../storage/localCurrentSpace';
 import { writeLocalLastScreen } from '../storage/localLastScreen';
 import { buildUiInitialState } from '../storage/normalize';
@@ -47,10 +48,19 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         const loaded = await loadAppState();
         const result = loaded ?? (await seedAndPersist());
         if (cancelled) return;
+
+        // Load shared spaces — không block nếu lỗi (user chưa có shared space là chuyện bình thường).
+        let sharedSpaces: AppState['spaces'] = [];
+        try {
+          sharedSpaces = await loadSharedSpaces();
+        } catch (err) {
+          console.warn('[KN-Space] Không tải được shared spaces:', err);
+        }
+
         dispatch({
           type: 'HYDRATE',
           payload: {
-            spaces: result.spaces,
+            spaces: [...result.spaces, ...sharedSpaces],
             currentSpaceId: result.currentSpaceId,
             settings: result.settings,
             storageFallbackActive: result.storageFallbackActive,
@@ -79,11 +89,18 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
   // Debounce save khi spaces/settings đổi. Không theo dõi state.ui và currentSpaceId
   // (trạng thái per-machine, lưu riêng qua localStorage bên dưới).
+  // Chỉ save private spaces — shared spaces được quản lý qua sharedSpaceStore riêng.
   useEffect(() => {
     if (!hydratedRef.current || isLoading) return;
-    scheduleSave({ spaces: state.spaces, currentSpaceId: state.currentSpaceId, settings: state.settings });
+    const privateSpaces = state.spaces.filter((s) => !s.isShared);
+    scheduleSave({ spaces: privateSpaces, currentSpaceId: state.currentSpaceId, settings: state.settings });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.spaces, state.settings]);
+
+  // TODO Phase 3b-2: save shared spaces khi thay đổi — cần optimistic locking (version tracking per space).
+  // saveSharedSpace() từ sharedSpaceStore nhận expectedVersion — cần lưu version vào Space type hoặc
+  // dùng useRef<Map<string, number>> để track version hiện tại của từng shared space.
+  // Hiện tại skip để tránh overwrite data không kiểm soát được version conflict.
 
   // Lưu "Space đang mở" riêng cho máy này (localStorage).
   useEffect(() => {

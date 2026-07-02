@@ -40,6 +40,10 @@ export function HabitsBlock({
 
   const collapsed = state.settings.collapsedBlocks.habits;
 
+  // Habits không có ý nghĩa trong shared space (không thể track streak cá nhân
+  // khi nhiều người cùng sử dụng một space). Ẩn hoàn toàn, không render.
+  if (space.isShared) return null;
+
   function handleDelete(habit: Habit) {
     showConfirm('Xoá thói quen?', 'Xoá thói quen này? Hành động không thể hoàn tác.', () =>
       dispatch({ type: 'HABIT_DELETE', payload: { id: habit.id } }),

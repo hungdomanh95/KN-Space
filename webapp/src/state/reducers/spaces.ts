@@ -5,7 +5,8 @@ export type SpacesAction =
   | { type: 'SPACE_RENAME'; payload: { id: string; name: string } }
   | { type: 'SPACE_SET_ENABLED_BLOCKS'; payload: { id: string; enabledBlocks: EnabledBlocks } }
   | { type: 'SPACE_DELETE'; payload: { id: string } }
-  | { type: 'SPACE_MOVE'; payload: { id: string; direction: -1 | 1 } };
+  | { type: 'SPACE_MOVE'; payload: { id: string; direction: -1 | 1 } }
+  | { type: 'SPACE_ADD_SHARED'; payload: { space: Space } };
 
 /**
  * Khối Thông báo (`reminders`) không nằm trong cấu hình bật/tắt theo Space — luôn `true`
@@ -61,6 +62,12 @@ export function spacesReducer(spaces: Space[], action: SpacesAction): Space[] {
       if (targetIdx < 0 || targetIdx >= ordered.length) return spaces;
       [ordered[idx], ordered[targetIdx]] = [ordered[targetIdx], ordered[idx]];
       return ordered.map((s, i) => ({ ...s, order: i }));
+    }
+    case 'SPACE_ADD_SHARED': {
+      // Tránh thêm trùng (idempotent) — nếu đã có id này trong mảng thì bỏ qua
+      if (spaces.some((s) => s.id === action.payload.space.id)) return spaces;
+      const maxOrder = spaces.reduce((max, s) => Math.max(max, s.order), -1);
+      return [...spaces, { ...action.payload.space, order: maxOrder + 1 }];
     }
     default:
       return spaces;
