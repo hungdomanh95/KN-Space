@@ -7,7 +7,7 @@ import {
   seedAndPersist,
   setFallbackListener,
 } from '../storage/supabaseStore';
-import { deleteSharedSpace, loadSharedSpaces } from '../storage/sharedSpaceStore';
+import { deleteSharedSpace, loadSharedSpaces, saveSharedSpace } from '../storage/sharedSpaceStore';
 import { writeLocalCurrentSpaceId } from '../storage/localCurrentSpace';
 import { writeLocalLastScreen } from '../storage/localLastScreen';
 import { buildUiInitialState } from '../storage/normalize';
@@ -96,6 +96,44 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     scheduleSave({ spaces: privateSpaces, currentSpaceId: state.currentSpaceId, settings: state.settings });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.spaces, state.settings]);
+
+  // Theo dõi version của từng shared space — cập nhật sau mỗi lần save thành công.
+  const sharedVersionsRef = useRef<Map<string, number>>(new Map());
+  const sharedSaveTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const prevSharedRef = useRef<Map<string, string>>(new Map()); // spaceId → JSON snapshot
+
+  // Debounce save shared spaces khi nội dung thay đổi.
+  useEffect(() => {
+    if (!hydratedRef.current || isLoading) return;
+    const sharedSpaces = state.spaces.filter((s) => s.isShared && s.sharedSpaceId);
+    sharedSpaces.forEach((space) => {
+      const sid = space.sharedSpaceId!;
+      // Khởi tạo version lần đầu từ _sharedVersion trong Space
+      if (!sharedVersionsRef.current.has(sid) && space._sharedVersion !== undefined) {
+        sharedVersionsRef.current.set(sid, space._sharedVersion);
+      }
+      // So sánh snapshot để tránh save khi không có thay đổi
+      const snapshot = JSON.stringify({ tasks: space.tasks, notes: space.notes, reminders: space.reminders, name: space.name });
+      if (prevSharedRef.current.get(sid) === snapshot) return;
+      prevSharedRef.current.set(sid, snapshot);
+      // Debounce 800ms
+      const existing = sharedSaveTimersRef.current.get(sid);
+      if (existing) clearTimeout(existing);
+      const timer = setTimeout(() => {
+        sharedSaveTimersRef.current.delete(sid);
+        const version = sharedVersionsRef.current.get(sid) ?? 1;
+        void saveSharedSpace(sid, { tasks: space.tasks, notes: space.notes, reminders: space.reminders, name: space.name }, version)
+          .then((result) => {
+            if (result.ok && result.newVersion !== undefined) {
+              sharedVersionsRef.current.set(sid, result.newVersion);
+            }
+          })
+          .catch((err) => console.warn('[KN-Space] saveSharedSpace thất bại:', err));
+      }, 800);
+      sharedSaveTimersRef.current.set(sid, timer);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.spaces]);
 
   // TODO Phase 3b-2: save shared spaces khi thay đổi — cần optimistic locking (version tracking per space).
   // saveSharedSpace() từ sharedSpaceStore nhận expectedVersion — cần lưu version vào Space type hoặc

@@ -73,6 +73,7 @@ function rowToSpace(
     notes: Array.isArray(row.notes) ? (row.notes as Space['notes']) : [],
     isShared: true,
     sharedSpaceId: row.id,
+    _sharedVersion: row.version,
   };
   return normalizeSpace(raw);
 }

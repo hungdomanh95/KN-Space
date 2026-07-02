@@ -36,7 +36,7 @@ export function normalizeSpace(space: Space): Space {
         }))
       : [],
     notes: Array.isArray(space.notes) ? space.notes.map((n) => ({ ...n, expanded: n.expanded ?? false, hidden: n.hidden ?? false })) : [],
-    ...(space.isShared ? { isShared: true as const, sharedSpaceId: space.sharedSpaceId } : {}),
+    ...(space.isShared ? { isShared: true as const, sharedSpaceId: space.sharedSpaceId, _sharedVersion: space._sharedVersion } : {}),
   };
 }
 

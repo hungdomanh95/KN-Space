@@ -143,6 +143,8 @@ export interface Space {
   isShared?: boolean;
   /** uuid của hàng trong kn_shared_spaces (= id trong bảng đó) */
   sharedSpaceId?: string;
+  /** version optimistic lock từ kn_shared_spaces — dùng nội bộ để save, không hiển thị UI */
+  _sharedVersion?: number;
 }
 
 export interface CollapsedBlocks {
