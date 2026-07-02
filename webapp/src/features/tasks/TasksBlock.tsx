@@ -108,10 +108,13 @@ function TaskRow({ task, draggedId, onDragStartId, onDragEndAll, onEdit, onDelet
       </span>
       <span
         className={`mt-px flex h-[17px] w-[17px] flex-none cursor-pointer items-center justify-center rounded-[6px]
-          border-[1.6px] border-[color:var(--border-control)] bg-[var(--raised)] transition-all duration-150
+          border-[1.6px] transition-all duration-150
           [&_.icon]:opacity-0 [&_.icon]:transition-opacity [&_.icon]:duration-100
           max-md:h-[26px] max-md:w-[26px] max-md:rounded-[8px]
-          ${task.done ? 'border-[color:var(--done)] bg-[var(--done)] [&_.icon]:opacity-100' : ''}`}
+          ${task.done ? '[&_.icon]:opacity-100' : ''}`}
+        style={task.done
+          ? { background: 'var(--done)', borderColor: 'var(--done)' }
+          : { background: 'var(--raised)', borderColor: 'var(--border-control)' }}
         role="checkbox"
         aria-checked={task.done}
         tabIndex={0}

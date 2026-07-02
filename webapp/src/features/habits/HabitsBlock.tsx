@@ -115,9 +115,12 @@ export function HabitsBlock({
                   >
                     <span
                       className={`mt-px flex h-[17px] w-[17px] flex-none cursor-pointer items-center justify-center
-                        rounded-[6px] border-[1.6px] border-[color:var(--border-control)] bg-[var(--raised)] transition-all
+                        rounded-[6px] border-[1.6px] transition-all
                         duration-150 [&_.icon]:opacity-0 [&_.icon]:transition-opacity [&_.icon]:duration-100
-                        ${doneToday ? 'border-[color:var(--done)] bg-[var(--done)] [&_.icon]:opacity-100' : ''}`}
+                        ${doneToday ? '[&_.icon]:opacity-100' : ''}`}
+                      style={doneToday
+                        ? { background: 'var(--done)', borderColor: 'var(--done)' }
+                        : { background: 'var(--raised)', borderColor: 'var(--border-control)' }}
                     >
                       <Check className="icon h-[11px] w-[11px] text-white" size={11} strokeWidth={3} />
                     </span>
@@ -141,9 +144,12 @@ export function HabitsBlock({
                   {week.map((done, i) => (
                     <span
                       key={i}
-                      className={`h-[13px] w-[13px] flex-[0_0_13px] cursor-default rounded-full border-[1.5px] border-[color:var(--border-control)] bg-[var(--raised)] ${
-                        done ? 'border-[color:var(--habit-color)] bg-[var(--habit-color)]' : ''
-                      } ${i === todayIdx ? 'shadow-[0_0_0_3px_rgba(255,138,61,.25)]' : ''}`}
+                      className={`h-[13px] w-[13px] flex-[0_0_13px] cursor-default rounded-full border-[1.5px] ${
+                        i === todayIdx ? 'shadow-[0_0_0_3px_rgba(255,138,61,.25)]' : ''
+                      }`}
+                      style={done
+                        ? { background: 'var(--habit-color)', borderColor: 'var(--habit-color)' }
+                        : { background: 'var(--raised)', borderColor: 'var(--border-control)' }}
                       title={`${DAY_LABELS[i]}${i === todayIdx ? ' (hôm nay)' : ''}: ${done ? 'đã hoàn thành' : 'chưa hoàn thành'}`}
                     />
                   ))}
