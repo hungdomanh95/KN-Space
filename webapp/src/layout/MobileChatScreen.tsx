@@ -129,9 +129,16 @@ export function MobileChatScreen() {
                       </div>
                     ) : (
                       <div
-                        className={`flex items-center gap-2 rounded-2xl border border-[color:var(--border)] bg-[var(--raised)] px-3.5 py-2.5 text-[0.875rem] text-[var(--text)] ${
+                        className={`flex items-center gap-2 rounded-2xl border bg-[var(--raised)] px-3.5 py-2.5 text-[0.875rem] text-[var(--text)] ${
                           b.type === 'task' && b.done ? 'opacity-60' : ''
                         }`}
+                        style={memberColor ? {
+                          borderColor: memberColor,
+                          borderLeftWidth: 3,
+                          borderTopWidth: 1,
+                          borderRightWidth: 1,
+                          borderBottomWidth: 1,
+                        } : undefined}
                       >
                         {b.type === 'note' && (
                           <BookOpen className="icon h-3.5 w-3.5 flex-none text-[var(--text-dim)]" size={14} />

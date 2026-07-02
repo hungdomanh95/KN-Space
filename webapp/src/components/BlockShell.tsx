@@ -86,7 +86,7 @@ export function BlockShell({
       onDrop={onDrop}
     >
       <div className="block-head max-sm:flex-wrap max-sm:px-2.5 max-sm:py-2.5" ref={headRef} onMouseDown={onHeadMouseDown}>
-        <h2 className="m-0 flex items-center gap-[9px] text-[0.9062rem] font-bold tracking-[-.01em]">
+        <h2 className="m-0 flex shrink-0 items-center gap-[9px] text-[0.9062rem] font-bold tracking-[-.01em]">
           {showGripHandle && (
             <span className="flex flex-none items-center text-[var(--text-dim)] opacity-45" aria-hidden="true">
               <GripVertical className="icon h-[13px] w-[13px]" size={13} />

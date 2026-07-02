@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useReducer, useRef } from 'react';
-import type { AppState } from '../types';
+import type { AppState, Space } from '../types';
 import {
   forceFlush,
   loadAppState,
@@ -108,6 +108,11 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const sharedVersionsRef = useRef<Map<string, number>>(new Map());
   const sharedSaveTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const prevSharedRef = useRef<Map<string, string>>(new Map()); // spaceId → JSON snapshot
+  // Track data pending flush — cập nhật NGAY khi có thay đổi, trước debounce timer
+  // Dùng để flush ngay khi tab ẩn (F5/đóng tab) tránh mất data trong cửa sổ debounce 800ms
+  const pendingSharedSavesRef = useRef<Map<string, {
+    tasks: Space['tasks']; notes: Space['notes']; reminders: Space['reminders']; name: string;
+  }>>(new Map());
 
   // Debounce save shared spaces khi nội dung thay đổi.
   useEffect(() => {
@@ -123,6 +128,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       const snapshot = JSON.stringify({ tasks: space.tasks, notes: space.notes, reminders: space.reminders, name: space.name });
       if (prevSharedRef.current.get(sid) === snapshot) return;
       prevSharedRef.current.set(sid, snapshot);
+      // Cập nhật pending data ngay — dùng để flush khi visibilitychange
+      pendingSharedSavesRef.current.set(sid, { tasks: space.tasks, notes: space.notes, reminders: space.reminders, name: space.name });
       // Debounce 800ms
       const existing = sharedSaveTimersRef.current.get(sid);
       if (existing) clearTimeout(existing);
@@ -134,6 +141,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
             if (result.ok && result.newVersion !== undefined) {
               sharedVersionsRef.current.set(sid, result.newVersion);
             }
+            // Xoá khỏi pending sau khi đã save thành công
+            pendingSharedSavesRef.current.delete(sid);
           })
           .catch((err) => console.warn('[KN-Space] saveSharedSpace thất bại:', err));
       }, 800);
@@ -162,7 +171,22 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   // Flush ngay khi tab ẩn đi — tránh mất thay đổi cuối nếu đóng tab trong 600ms debounce.
   useEffect(() => {
     function handleVisibilityChange() {
-      if (document.visibilityState === 'hidden') void forceFlush();
+      if (document.visibilityState === 'hidden') {
+        void forceFlush(); // private spaces
+        // Flush shared spaces còn pending (F5/đóng tab trong cửa sổ 800ms debounce)
+        if (pendingSharedSavesRef.current.size > 0) {
+          pendingSharedSavesRef.current.forEach((data, sid) => {
+            const version = sharedVersionsRef.current.get(sid) ?? 1;
+            void saveSharedSpace(sid, data, version).then((r) => {
+              if (r.ok && r.newVersion !== undefined) sharedVersionsRef.current.set(sid, r.newVersion);
+            });
+          });
+          // Clear timers — đã flush rồi, không cần debounce nữa
+          sharedSaveTimersRef.current.forEach((t) => clearTimeout(t));
+          sharedSaveTimersRef.current.clear();
+          pendingSharedSavesRef.current.clear();
+        }
+      }
     }
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);

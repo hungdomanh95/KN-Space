@@ -124,7 +124,7 @@ function TaskRow({ task, draggedId, onDragStartId, onDragEndAll, onEdit, onDelet
         className={`mt-px flex h-[17px] w-[17px] flex-none cursor-pointer items-center justify-center rounded-[6px]
           border-[1.6px] transition-all duration-150
           [&_.icon]:opacity-0 [&_.icon]:transition-opacity [&_.icon]:duration-100
-          max-md:h-[36px] max-md:w-[36px] max-md:rounded-[10px]
+          max-md:h-[24px] max-md:w-[24px] max-md:rounded-[8px]
           ${task.done ? '[&_.icon]:opacity-100' : ''}`}
         style={task.done
           ? { background: 'var(--done)', borderColor: 'var(--done)' }
