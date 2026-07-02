@@ -27,6 +27,7 @@ export function notesReducer(space: Space, action: NoteAction): Space {
         order: maxOrder + 1,
         expanded: false,
         hidden: false,
+        createdAt: new Date().toISOString(),
         ...(action.payload.createdBy ? { createdBy: action.payload.createdBy } : {}),
       };
       return { ...space, notes: [...space.notes, newNote] };

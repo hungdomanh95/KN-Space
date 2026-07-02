@@ -7,8 +7,20 @@ import { getMemberColor, getMemberDisplayName } from '../utils/memberColors';
 import { MemberAvatar } from '../components/MemberAvatar';
 
 type ChatBubble =
-  | { id: string; type: 'task'; title: string; done: boolean; createdBy?: string }
-  | { id: string; type: 'note'; title: string; createdBy?: string };
+  | { id: string; type: 'task'; title: string; done: boolean; createdBy?: string; createdAt?: string }
+  | { id: string; type: 'note'; title: string; createdBy?: string; createdAt?: string };
+
+/** Hiện "HH:mm" nếu cùng ngày hôm nay, "dd/MM HH:mm" nếu khác ngày. Trả '' nếu thiếu dữ liệu (item cũ trước khi có createdAt). */
+function formatBubbleTime(iso: string | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const now = new Date();
+  const hhmm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const sameDay = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+  if (sameDay) return hhmm;
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} ${hhmm}`;
+}
 
 export function MobileChatScreen() {
   const { dispatch } = useAppState();
@@ -30,8 +42,8 @@ export function MobileChatScreen() {
 
     return all.map((item) =>
       item._type === 'task'
-        ? ({ id: item.id, type: 'task', title: item.title, done: (item as typeof space.tasks[0]).done, createdBy: item.createdBy } as ChatBubble)
-        : ({ id: item.id, type: 'note', title: item.title, createdBy: item.createdBy } as ChatBubble),
+        ? ({ id: item.id, type: 'task', title: item.title, done: (item as typeof space.tasks[0]).done, createdBy: item.createdBy, createdAt: item.createdAt } as ChatBubble)
+        : ({ id: item.id, type: 'note', title: item.title, createdBy: item.createdBy, createdAt: item.createdAt } as ChatBubble),
     );
   }, [space.tasks, space.notes]);
 
@@ -150,6 +162,13 @@ export function MobileChatScreen() {
                           {b.title}
                         </span>
                       </div>
+                    )}
+
+                    {/* Giờ gửi — bỏ qua nếu item cũ chưa có createdAt (data trước khi có field này) */}
+                    {formatBubbleTime(b.createdAt) && (
+                      <span className="mt-0.5 px-1 text-[0.6875rem] text-[var(--text-dim)] opacity-70">
+                        {formatBubbleTime(b.createdAt)}
+                      </span>
                     )}
                   </div>
                 </div>

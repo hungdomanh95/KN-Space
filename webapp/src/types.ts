@@ -11,6 +11,7 @@ export interface Task {
   done: boolean;
   order: number; // thứ tự sắp xếp thủ công (kéo-thả qua icon grip)
   createdBy?: string; // userId — chỉ set trong shared space
+  createdAt?: string; // ISO timestamp lúc tạo — dùng hiện giờ gửi trong MobileChatScreen
 }
 
 export type ReminderFreqUnit = 'hour' | 'day' | 'month';
@@ -56,6 +57,7 @@ export interface Note {
   expanded: boolean; // view list: show hết nội dung thay vì clamp 4 dòng
   hidden: boolean;   // ẩn nội dung (note bảo mật) — persist để giữ trạng thái sau reload
   createdBy?: string; // userId — chỉ set trong shared space
+  createdAt?: string; // ISO timestamp lúc tạo — dùng hiện giờ gửi trong MobileChatScreen (khác updatedAt vì đó là lần sửa cuối)
 }
 
 export interface EnabledBlocks {

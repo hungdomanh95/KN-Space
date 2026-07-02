@@ -23,6 +23,7 @@ export function tasksReducer(space: Space, action: TaskAction): Space {
         time: action.payload.time,
         done: false,
         order: minOrder - 1,
+        createdAt: new Date().toISOString(),
         ...(action.payload.createdBy ? { createdBy: action.payload.createdBy } : {}),
       };
       return { ...space, tasks: [...space.tasks, newTask] };
