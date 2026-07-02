@@ -108,7 +108,8 @@ export function MobileChatScreen() {
               const mine = isMine(b);
               const prevBubble = bubbles[idx - 1];
               const samePersonAsPrev = prevBubble && !isMine(prevBubble) && !mine && prevBubble.createdBy === b.createdBy;
-              const memberName = (!mine && b.createdBy) ? getMemberDisplayName(b.createdBy, members) : '';
+              // maxLen lớn — dòng tên nằm riêng, có nhiều chỗ hơn khung 15 ký tự mặc định (dành cho chỗ chật như dot tooltip/meta note)
+              const memberName = (!mine && b.createdBy) ? getMemberDisplayName(b.createdBy, members, 40) : '';
               const memberColor = (!mine && b.createdBy) ? getMemberColor(b.createdBy, members) : '';
 
               return (
@@ -123,12 +124,22 @@ export function MobileChatScreen() {
                   )}
 
                   <div className={`flex flex-col ${mine ? 'items-end' : 'items-start'} max-w-[80%]`}>
-                    {/* Tên người gửi (chỉ bubble đầu trong cụm) */}
+                    {/* Tên người gửi (chỉ bubble đầu trong cụm) — chip nền ĐẶC nhỏ (không xuyên
+                        thấu ảnh) để luôn đọc được, dù span này nằm ngoài bubble chính. */}
                     {!mine && !samePersonAsPrev && memberName && (
-                      <span className="mb-0.5 px-1 text-[0.75rem] text-[var(--text-dim)]">{memberName}</span>
+                      <span
+                        className="mb-0.5 rounded px-1.5 py-0.5 text-[0.75rem] font-semibold"
+                        style={{
+                          color: memberColor || 'var(--text-dim)',
+                          background: `color-mix(in srgb, ${memberColor || 'var(--text-dim)'} 14%, var(--raised))`,
+                        }}
+                      >
+                        {memberName}
+                      </span>
                     )}
 
-                    {/* Bubble content */}
+                    {/* Bubble content — nền ĐẶC (không blur/xuyên thấu), pastel theo màu member,
+                        giống chuẩn Messenger/Zalo: ảnh nền chỉ lộ ra ở khoảng trống giữa các bubble. */}
                     {mine ? (
                       <div
                         className={`flex items-center gap-2 rounded-2xl px-3.5 py-2.5 text-[0.875rem] text-white ${
@@ -141,16 +152,13 @@ export function MobileChatScreen() {
                       </div>
                     ) : (
                       <div
-                        className={`flex items-center gap-2 rounded-2xl border bg-[var(--raised)] px-3.5 py-2.5 text-[0.875rem] text-[var(--text)] ${
+                        className={`flex items-center gap-2 rounded-2xl border px-3.5 py-2.5 text-[0.875rem] text-[var(--text)] ${
                           b.type === 'task' && b.done ? 'opacity-60' : ''
                         }`}
-                        style={memberColor ? {
-                          borderColor: memberColor,
-                          borderLeftWidth: 3,
-                          borderTopWidth: 1,
-                          borderRightWidth: 1,
-                          borderBottomWidth: 1,
-                        } : undefined}
+                        style={{
+                          borderColor: memberColor || 'var(--border)',
+                          background: `color-mix(in srgb, ${memberColor || 'var(--text-dim)'} 20%, var(--raised))`,
+                        }}
                       >
                         {b.type === 'note' && (
                           <BookOpen className="icon h-3.5 w-3.5 flex-none text-[var(--text-dim)]" size={14} />
@@ -164,9 +172,15 @@ export function MobileChatScreen() {
                       </div>
                     )}
 
-                    {/* Giờ gửi — bỏ qua nếu item cũ chưa có createdAt (data trước khi có field này) */}
+                    {/* Giờ gửi — chip nền ĐẶC nhỏ như tên, bỏ qua nếu item cũ chưa có createdAt */}
                     {formatBubbleTime(b.createdAt) && (
-                      <span className="mt-0.5 px-1 text-[0.6875rem] text-[var(--text-dim)] opacity-70">
+                      <span
+                        className="mt-0.5 rounded px-1.5 py-0.5 text-[0.6875rem] font-medium"
+                        style={{
+                          color: !mine && memberColor ? memberColor : 'var(--text-dim)',
+                          background: 'color-mix(in srgb, var(--raised) 92%, transparent)',
+                        }}
+                      >
                         {formatBubbleTime(b.createdAt)}
                       </span>
                     )}

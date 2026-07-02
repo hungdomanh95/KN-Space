@@ -12,9 +12,14 @@ export function getMemberColor(userId: string, members: SharedSpaceMember[]): st
   return MEMBER_COLORS[Math.abs(hash) % MEMBER_COLORS.length];
 }
 
-export function getMemberDisplayName(userId: string, members: SharedSpaceMember[]): string {
+/**
+ * `maxLen` mặc định 15 — phù hợp chỗ hiển thị chật (dot tooltip, meta note nhỏ). Chỗ có nhiều
+ * chỗ hơn (tên người gửi trên dòng riêng trong MobileChatScreen) truyền `maxLen` lớn hơn hẳn
+ * hoặc `Infinity` để không cắt tên.
+ */
+export function getMemberDisplayName(userId: string, members: SharedSpaceMember[], maxLen = 15): string {
   const member = members.find((m) => m.userId === userId);
   if (!member) return 'Thành viên';
   const name = member.displayName || member.email.split('@')[0];
-  return name.length > 15 ? `${name.slice(0, 15)}…` : name;
+  return name.length > maxLen ? `${name.slice(0, maxLen)}…` : name;
 }
