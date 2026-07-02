@@ -56,8 +56,9 @@ export async function loadAppState(): Promise<LoadResult | null> {
   const localScreen = readLocalLastScreen();
   const settings = localScreen ? { ...rawSettings, lastScreen: localScreen } : rawSettings;
   const localId = readLocalCurrentSpaceId();
-  const currentSpaceId = localId && spaces.some((s) => s.id === localId) ? localId : spaces[0].id;
-  writeLocalCurrentSpaceId(currentSpaceId);
+  // Không validate localId chỉ trong private spaces — có thể là shared space chưa load.
+  // AppStateContext sẽ validate lại sau khi merge private + shared spaces.
+  const currentSpaceId = localId || spaces[0].id;
 
   return { spaces, currentSpaceId, settings, storageFallbackActive: false };
 }

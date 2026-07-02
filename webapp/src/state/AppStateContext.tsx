@@ -57,11 +57,18 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           console.warn('[KN-Space] Không tải được shared spaces:', err);
         }
 
+        const allSpaces = [...result.spaces, ...sharedSpaces];
+        // Validate sau khi có đủ cả private + shared — localId có thể là shared space
+        const validCurrentSpaceId = allSpaces.some((s) => s.id === result.currentSpaceId)
+          ? result.currentSpaceId
+          : allSpaces[0]?.id ?? result.currentSpaceId;
+        writeLocalCurrentSpaceId(validCurrentSpaceId);
+
         dispatch({
           type: 'HYDRATE',
           payload: {
-            spaces: [...result.spaces, ...sharedSpaces],
-            currentSpaceId: result.currentSpaceId,
+            spaces: allSpaces,
+            currentSpaceId: validCurrentSpaceId,
             settings: result.settings,
             storageFallbackActive: result.storageFallbackActive,
           },
