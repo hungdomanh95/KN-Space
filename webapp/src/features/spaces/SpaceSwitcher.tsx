@@ -7,6 +7,7 @@ import { SharedSpaceFormModal } from './SharedSpaceFormModal';
 import { SpaceInviteModal } from './SpaceInviteModal';
 import { NOTE_PALETTE } from '../../state/reducers/notes';
 import { spaceShortcutLabel } from './spaceShortcuts';
+import { useSpaceMembers } from '../../state/useSpaceMembers';
 import type { Space } from '../../types';
 
 function todayStr(): string {
@@ -49,6 +50,66 @@ function SectionHeader({
       >
         <Plus className="icon" size={13} />
       </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SpaceMenuItem — 1 dòng space trong dropdown (private hoặc shared)
+// ---------------------------------------------------------------------------
+function SpaceMenuItem({
+  space,
+  globalIdx,
+  isActive,
+  today,
+  extraControls,
+  onSelect,
+}: {
+  space: Space;
+  globalIdx: number;
+  isActive: boolean;
+  today: string;
+  extraControls?: React.ReactNode;
+  onSelect: () => void;
+}) {
+  const members = useSpaceMembers(space.isShared ? space.sharedSpaceId : undefined);
+  const taskCount = space.tasks.filter((t) => t.date === today && !t.done).length;
+  const noteCount = space.notes.length;
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      className={`space-menu-item group ${isActive ? 'active' : ''}`}
+      onTouchEnd={(e) => {
+        if ((e.target as HTMLElement).closest('button')) return;
+        e.preventDefault();
+        onSelect();
+      }}
+      onClick={onSelect}
+    >
+      {space.isShared ? (
+        <Share2 className="icon h-3 w-3 flex-none text-[var(--accent)]" size={12} />
+      ) : (
+        <span
+          className="h-2 w-2 flex-none rounded-full"
+          aria-hidden="true"
+          style={{ background: spaceDotColor(globalIdx) }}
+        />
+      )}
+      <span className="flex min-w-0 flex-1 flex-col gap-px">
+        <span className="overflow-hidden text-ellipsis whitespace-nowrap">{space.name}</span>
+        {space.isShared ? (
+          <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[0.6875rem] font-medium text-[var(--text-dim)] opacity-[.85]">
+            {taskCount} việc hôm nay · {noteCount} note · {members.length} thành viên
+          </span>
+        ) : (
+          <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[0.6875rem] font-medium text-[var(--text-dim)] opacity-[.85]">
+            {taskCount} việc hôm nay · {noteCount} note
+          </span>
+        )}
+      </span>
+      {extraControls}
     </div>
   );
 }
@@ -108,49 +169,19 @@ export function SpaceSwitcher() {
 
   // Render 1 space item — dùng chung cho cả private lẫn shared
   function renderSpaceItem(space: Space, globalIdx: number, extraControls?: React.ReactNode) {
-    const taskCount = space.tasks.filter((t) => t.date === today && !t.done).length;
-    const noteCount = space.notes.length;
-
     return (
-      <div
+      <SpaceMenuItem
         key={space.id}
-        role="button"
-        tabIndex={0}
-        className={`space-menu-item group ${space.id === state.currentSpaceId ? 'active' : ''}`}
-        onTouchEnd={(e) => {
-          if ((e.target as HTMLElement).closest('button')) return;
-          e.preventDefault();
+        space={space}
+        globalIdx={globalIdx}
+        isActive={space.id === state.currentSpaceId}
+        today={today}
+        extraControls={extraControls}
+        onSelect={() => {
           dispatch({ type: 'SPACE_SWITCH', payload: { id: space.id } });
           setOpen(false);
         }}
-        onClick={() => {
-          dispatch({ type: 'SPACE_SWITCH', payload: { id: space.id } });
-          setOpen(false);
-        }}
-      >
-        {space.isShared ? (
-          <Share2 className="icon h-3 w-3 flex-none text-[var(--accent)]" size={12} />
-        ) : (
-          <span
-            className="h-2 w-2 flex-none rounded-full"
-            aria-hidden="true"
-            style={{ background: spaceDotColor(globalIdx) }}
-          />
-        )}
-        <span className="flex min-w-0 flex-1 flex-col gap-px">
-          <span className="overflow-hidden text-ellipsis whitespace-nowrap">{space.name}</span>
-          {space.isShared ? (
-            <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[0.6875rem] font-medium text-[var(--text-dim)] opacity-[.85]">
-              {noteCount} note
-            </span>
-          ) : (
-            <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[0.6875rem] font-medium text-[var(--text-dim)] opacity-[.85]">
-              {taskCount} việc hôm nay · {noteCount} note
-            </span>
-          )}
-        </span>
-        {extraControls}
-      </div>
+      />
     );
   }
 
