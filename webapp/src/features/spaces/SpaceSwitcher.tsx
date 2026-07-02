@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp, Pencil, Plus, Trash2, UserPlus, Users } from 'lucide-react';
+import { ChevronDown, ChevronUp, Pencil, Plus, Share2, Trash2, UserPlus } from 'lucide-react';
 import { useAppState } from '../../state/AppStateContext';
 import { useConfirm } from '../../components/ConfirmContext';
 import { SpaceFormModal } from './SpaceFormModal';
@@ -129,7 +129,7 @@ export function SpaceSwitcher() {
         }}
       >
         {space.isShared ? (
-          <Users className="icon h-3 w-3 flex-none text-[var(--text-dim)]" size={12} />
+          <Share2 className="icon h-3 w-3 flex-none text-[var(--accent)]" size={12} />
         ) : (
           <span
             className="h-2 w-2 flex-none rounded-full"
@@ -166,7 +166,7 @@ export function SpaceSwitcher() {
         aria-label="Đổi space hiện tại"
       >
         {currentSpace?.isShared ? (
-          <Users className="icon h-3 w-3 flex-none text-[var(--text-dim)]" size={12} aria-hidden="true" />
+          <Share2 className="icon h-3 w-3 flex-none text-[var(--accent)]" size={12} aria-hidden="true" />
         ) : (
           <span
             className="h-2 w-2 flex-none rounded-full"
@@ -337,7 +337,11 @@ export function SpaceSwitcher() {
       {showSharedForm && (
         <SharedSpaceFormModal
           onClose={() => setShowSharedForm(false)}
-          onCreated={(space) => dispatch({ type: 'SPACE_ADD_SHARED', payload: { space } })}
+          onCreated={(space) => {
+            dispatch({ type: 'SPACE_ADD_SHARED', payload: { space } });
+            setShowSharedForm(false);
+            setInviteModalSpaceId(space.id);
+          }}
         />
       )}
 

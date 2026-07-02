@@ -7,7 +7,7 @@ import {
   seedAndPersist,
   setFallbackListener,
 } from '../storage/supabaseStore';
-import { loadSharedSpaces } from '../storage/sharedSpaceStore';
+import { deleteSharedSpace, loadSharedSpaces } from '../storage/sharedSpaceStore';
 import { writeLocalCurrentSpaceId } from '../storage/localCurrentSpace';
 import { writeLocalLastScreen } from '../storage/localLastScreen';
 import { buildUiInitialState } from '../storage/normalize';
@@ -133,8 +133,22 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     );
   }
 
+  // Wrap dispatch để intercept SPACE_DELETE cho shared space:
+  // reducer xoá khỏi local state ngay, đồng thời gọi Supabase xoá trên DB.
+  const smartDispatch = React.useCallback((action: AppAction) => {
+    if (action.type === 'SPACE_DELETE') {
+      const space = state.spaces.find((s) => s.id === action.payload.id);
+      if (space?.isShared && space.sharedSpaceId) {
+        void deleteSharedSpace(space.sharedSpaceId).catch((err) =>
+          console.warn('[KN-Space] Xoá shared space trên DB thất bại:', err),
+        );
+      }
+    }
+    dispatch(action);
+  }, [state.spaces]);
+
   return (
-    <AppStateContext.Provider value={{ state, dispatch, isLoading }}>
+    <AppStateContext.Provider value={{ state, dispatch: smartDispatch, isLoading }}>
       {children}
     </AppStateContext.Provider>
   );

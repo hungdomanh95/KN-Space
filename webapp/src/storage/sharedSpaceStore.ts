@@ -247,10 +247,7 @@ export async function acceptInvite(
  */
 export async function listMembers(sharedSpaceId: string): Promise<SharedSpaceMember[]> {
   const { data, error } = await supabase
-    .from('kn_space_members')
-    .select('user_id, role, joined_at')
-    .eq('space_id', sharedSpaceId)
-    .order('joined_at', { ascending: true });
+    .rpc('get_space_members_with_email', { p_space_id: sharedSpaceId });
 
   if (error) {
     console.warn('[KN-Space] listMembers lỗi:', error.message);
@@ -258,13 +255,13 @@ export async function listMembers(sharedSpaceId: string): Promise<SharedSpaceMem
   }
   if (!data) return [];
 
-  return data.map((row) => ({
-    userId: row.user_id as string,
-    email: '',           // không có auth.users access từ client
-    displayName: undefined,
+  return (data as { user_id: string; role: string; joined_at: string; email: string; full_name: string }[]).map((row) => ({
+    userId: row.user_id,
+    email: row.email ?? '',
+    displayName: row.full_name || undefined,
     avatarUrl: undefined,
     role: row.role as SharedSpaceMember['role'],
-    joinedAt: row.joined_at as string,
+    joinedAt: row.joined_at,
   }));
 }
 
@@ -290,6 +287,19 @@ export async function kickMember(sharedSpaceId: string, userId: string): Promise
  * Owner muốn giải tán space phải xoá toàn bộ space (DELETE kn_shared_spaces).
  * RLS policy "space_members_delete_for_owner_or_self" enforce role='member' tại DB.
  */
+/** Xoá shared space (chỉ owner). ON DELETE CASCADE tự dọn kn_space_members + kn_space_invites. */
+export async function deleteSharedSpace(sharedSpaceId: string): Promise<void> {
+  const { error } = await supabase
+    .from('kn_shared_spaces')
+    .delete()
+    .eq('id', sharedSpaceId);
+
+  if (error) {
+    console.warn('[KN-Space] deleteSharedSpace lỗi:', error.message);
+    throw error;
+  }
+}
+
 export async function leaveSpace(sharedSpaceId: string): Promise<void> {
   const userId = await getCurrentUserId();
 
