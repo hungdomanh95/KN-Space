@@ -76,13 +76,31 @@ function SpaceMenuItem({
   const taskCount = space.tasks.filter((t) => t.date === today && !t.done).length;
   const noteCount = space.notes.length;
 
+  // Toạ độ lúc touchstart — dùng để phân biệt "chạm để chọn" với "vuốt để scroll" list. Trước đây
+  // onTouchEnd chọn space bất kể ngón tay đã di chuyển bao xa, nên vuốt scroll qua item nào cũng
+  // vô tình chọn luôn space đó, rất khó cuộn danh sách trên mobile.
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const TAP_MOVE_THRESHOLD = 10; // px
+
   return (
     <div
       role="button"
       tabIndex={0}
       className={`space-menu-item group items-start ${isActive ? 'active' : ''}`}
+      onTouchStart={(e) => {
+        const t = e.touches[0];
+        touchStartRef.current = t ? { x: t.clientX, y: t.clientY } : null;
+      }}
       onTouchEnd={(e) => {
         if ((e.target as HTMLElement).closest('button')) return;
+        const start = touchStartRef.current;
+        const end = e.changedTouches[0];
+        touchStartRef.current = null;
+        if (start && end) {
+          const dx = Math.abs(end.clientX - start.x);
+          const dy = Math.abs(end.clientY - start.y);
+          if (dx > TAP_MOVE_THRESHOLD || dy > TAP_MOVE_THRESHOLD) return; // vừa vuốt/scroll, không phải tap
+        }
         e.preventDefault();
         onSelect();
       }}

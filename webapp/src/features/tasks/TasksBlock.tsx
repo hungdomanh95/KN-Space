@@ -297,7 +297,8 @@ export function TasksBlock({
                 onEdit={setEditingTask}
                 onDelete={handleDelete}
                 memberDotColor={isOther ? getMemberColor(task.createdBy!, members) : undefined}
-                memberDotName={isOther ? getMemberDisplayName(task.createdBy!, members) : undefined}
+                // maxLen lớn — chip tên nằm riêng dòng dưới tiêu đề, đủ chỗ hơn hẳn khung 15 ký tự mặc định (dành cho chỗ chật như tooltip)
+                memberDotName={isOther ? getMemberDisplayName(task.createdBy!, members, 40) : undefined}
               />
             );
           })
