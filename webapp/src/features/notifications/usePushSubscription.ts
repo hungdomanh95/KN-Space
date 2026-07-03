@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../auth/AuthContext';
+import { getDeferredInstallEvent, promptInstall as promptInstallEvent, subscribeInstallPrompt } from './installPromptStore';
 
 /**
- * Push Notification — Phần 2 (VAPID + Subscription).
- * Xem docs/features/push-notification.md mục 9.2 và
- * docs/features/push-notification-progress.md (Phần 2) cho bối cảnh/quyết định kỹ thuật.
- *
- * Hook này CHƯA gắn vào UI Settings thật (đó là Phần 4) — chỉ là logic thuần,
- * nhưng là code production-ready (không phải code test tạm).
+ * Push Notification — Phần 2 (VAPID + Subscription) + Phần 4 (Settings UI, thêm
+ * `isStandalone`/`canInstall`/`promptInstall`).
+ * Xem docs/features/push-notification.md mục 9.2/5 và
+ * docs/features/push-notification-progress.md (Phần 2/4) cho bối cảnh/quyết định kỹ thuật.
  */
 
 export type PushSupportState = 'unsupported' | 'default' | 'denied' | 'granted';
@@ -30,6 +29,12 @@ export interface UsePushSubscriptionResult {
   unsubscribe: () => Promise<void>;
   /** Đọc lại `Notification.permission` + trạng thái subscription (gọi khi mở lại tab Settings). */
   refresh: () => Promise<void>;
+  /** App đang chạy ở chế độ PWA standalone (đã cài) hay không — bắt buộc trước khi bật thông báo (mục 3.1). */
+  isStandalone: boolean;
+  /** Trình duyệt vừa bắn sự kiện `beforeinstallprompt` (Android/Chrome) — có thể gọi `promptInstall()` để cài 1 chạm. */
+  canInstall: boolean;
+  /** Gọi `prompt()` của sự kiện `beforeinstallprompt` đã bắt được (no-op nếu `canInstall` false, ví dụ iOS Safari). */
+  promptInstall: () => Promise<void>;
 }
 
 function isPushSupported(): boolean {
@@ -39,6 +44,18 @@ function isPushSupported(): boolean {
     'PushManager' in window &&
     'Notification' in window
   );
+}
+
+/**
+ * Phát hiện app đang chạy standalone (đã "Add to Home Screen"/cài PWA) hay chưa.
+ * `display-mode: standalone` là chuẩn chung (Android/desktop); `navigator.standalone`
+ * là API riêng của iOS Safari (không nằm trong `matchMedia`) — cần check cả 2.
+ */
+function detectStandalone(): boolean {
+  if (typeof window === 'undefined') return false;
+  const mediaStandalone = window.matchMedia?.('(display-mode: standalone)').matches ?? false;
+  const iosStandalone = (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+  return mediaStandalone || iosStandalone;
 }
 
 /**
@@ -78,8 +95,22 @@ export function usePushSubscription(): UsePushSubscriptionResult {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isStandalone, setIsStandalone] = useState(() => detectStandalone());
+  const [canInstall, setCanInstall] = useState(() => getDeferredInstallEvent() !== null);
+
+  // `beforeinstallprompt` có thể bắn ra bất cứ lúc nào (kể cả trước khi Settings mở) — lắng nghe
+  // qua store dùng chung ở module-level (đăng ký listener ngay từ lúc app load, xem
+  // installPromptStore.ts) thay vì tự attach listener ở đây (sẽ lỡ mất sự kiện nếu bắn sớm).
+  useEffect(() => {
+    return subscribeInstallPrompt(() => {
+      setCanInstall(getDeferredInstallEvent() !== null);
+      // Cài xong app tự chuyển sang standalone — đọc lại ngay để UI cập nhật không cần user thao tác gì thêm.
+      setIsStandalone(detectStandalone());
+    });
+  }, []);
 
   const refresh = useCallback(async () => {
+    setIsStandalone(detectStandalone());
     if (!supported) {
       setPermission('unsupported');
       setIsSubscribed(false);
@@ -185,6 +216,15 @@ export function usePushSubscription(): UsePushSubscriptionResult {
     }
   }, [supported]);
 
+  const promptInstall = useCallback(async () => {
+    const outcome = await promptInstallEvent();
+    setCanInstall(getDeferredInstallEvent() !== null);
+    if (outcome === 'accepted') {
+      // `appinstalled` cũng sẽ bắn qua installPromptStore, nhưng cập nhật ngay ở đây cho mượt UI.
+      setIsStandalone(detectStandalone());
+    }
+  }, []);
+
   return {
     isSupported: supported,
     permission,
@@ -194,5 +234,8 @@ export function usePushSubscription(): UsePushSubscriptionResult {
     subscribe,
     unsubscribe,
     refresh,
+    isStandalone,
+    canInstall,
+    promptInstall,
   };
 }

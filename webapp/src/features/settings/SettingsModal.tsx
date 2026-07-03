@@ -20,6 +20,7 @@ import { useConfirm } from '../../components/ConfirmContext';
 import { buildExportPayload, downloadExportFile, parseImportFile } from './exportImport';
 import { HomeBackgroundSettings } from './HomeBackgroundSettings';
 import { HomeQuoteSettings } from './HomeQuoteSettings';
+import { PushNotificationSettings } from './PushNotificationSettings';
 import type { ThemeMode } from '../../types';
 
 interface SettingsModalProps {
@@ -229,6 +230,8 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
               <Repeat className="icon h-3.5 w-3.5" size={14} /> Khôi phục bố cục mặc định
             </button>
           </div>
+
+          <PushNotificationSettings />
         </div>
       )}
 

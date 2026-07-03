@@ -179,10 +179,56 @@ Không còn phần nào của `freqUnit: 'hour'` cần chủ dự án quyết đ
 - Q-A (từ `push-notification.md`): `pg_cron` nội bộ có giữ Supabase Free project khỏi auto-pause sau 1 tuần không traffic hay không — vẫn chưa verify được (chỉ verify được sau khi cron chạy thật một thời gian).
 
 ## Phần 4 — Settings UI
-Trạng thái: ⬜ Chưa làm (phụ thuộc Phần 1+2 xong, không phụ thuộc Phần 3)
+Trạng thái: ✅ Xong (2026-07-03) — **toàn bộ tính năng Push Notification giờ đã sẵn sàng test end-to-end qua UI thật, không cần code test tạm/DevTools nữa.**
 
-- [ ] Thêm khối "Thông báo đẩy" vào tab "Chung" trong `features/settings/` (toggle + trạng thái rõ bằng chữ theo mục 5.1 trong `push-notification.md`).
-- [ ] Xử lý luồng bắt buộc cài PWA trước khi xin quyền (đặc biệt iOS Safari) theo mục 3.1.
+- [x] Thêm khối "Thông báo đẩy" vào tab "Chung" trong `features/settings/` (toggle + trạng thái rõ bằng chữ theo mục 5.1 trong `push-notification.md`).
+- [x] Xử lý luồng bắt buộc cài PWA trước khi xin quyền (đặc biệt iOS Safari) theo mục 3.1.
+- [x] `refresh()` gọi lại khi mở tab Settings (mục 3.3).
+- [~] Đọc `?open=task:<id>`/`?open=reminder:<id>` để tự chuyển Space/cuộn tới item khi bấm vào notification — **KHÔNG làm, để out-of-scope** (xem lý do bên dưới), `sw.ts` (Phần 1) vẫn điều hướng đúng URL, chỉ chưa có app-side logic đọc query này.
+
+**File mới:**
+- `webapp/src/features/notifications/installPromptStore.ts` — bắt sự kiện `beforeinstallprompt` ở module-level (side effect lúc import, không chờ component mount) + expose `getDeferredInstallEvent()`/`subscribeInstallPrompt()`/`promptInstall()`. Lý do bắt ở module-level: sự kiện có thể bắn rất sớm (trước khi Settings mount) và chỉ bắn 1 lần/lần load trang — nếu attach listener trong hook/component sẽ có rủi ro lỡ mất.
+- `webapp/src/features/settings/PushNotificationSettings.tsx` — component UI khối "Thông báo đẩy", dùng `usePushSubscription()`.
+
+**Sửa file có sẵn:**
+- `webapp/src/features/notifications/usePushSubscription.ts` — thêm `isStandalone` (check `matchMedia('(display-mode: standalone)')` + `navigator.standalone` cho iOS), `canInstall`, `promptInstall()` (đọc từ `installPromptStore.ts`). Các field cũ (`isSupported`, `permission`, `isSubscribed`, `isBusy`, `error`, `subscribe`, `unsubscribe`, `refresh`) giữ nguyên hành vi Phần 2.
+- `webapp/src/features/settings/SettingsModal.tsx` — chèn `<PushNotificationSettings />` vào cuối tab "Chung" (`span-2`, sau khối "Bố cục Dashboard").
+
+**Quyết định kỹ thuật (2026-07-03):**
+
+- **4 trạng thái text đúng mục 5.1**, tính theo thứ tự ưu tiên: `!isSupported` → "Trình duyệt/thiết bị không hỗ trợ." → `!isStandalone` → "Chưa cài ứng dụng." → `permission === 'denied'` → "Đã cài, quyền thông báo đã bị từ chối." (tách riêng khỏi case "chưa cấp quyền" nói chung để khớp mục 3.3 — denied cần text + hành vi khác `default`) → `permission !== 'granted'` → "Đã cài, chưa cấp quyền." → còn lại: "Đã bật."/"Đã cấp quyền, chưa bật." (phân biệt theo `isSubscribed`, dù mục 5.1 gốc không liệt kê riêng case cuối này — thêm vì hợp lý: user có thể đã cấp quyền trình duyệt nhưng chưa từng bấm nút Bật, ví dụ do lỗi tạm thời ở lần bấm trước).
+- **Toggle** `role="switch"` + `aria-checked={isSubscribed && permission === 'granted'}` (không chỉ dựa `isSubscribed` — tránh hiện "on" giả nếu quyền bị thu hồi ở hệ điều hành nhưng subscription cũ trong `pushManager` chưa kịp invalidate). Disabled khi `isBusy`, hoặc khi đang tắt (`!checked`) mà chưa đủ điều kiện bật (`canToggleOn = isSupported && isStandalone && permission !== 'denied'`) — luôn cho phép bấm tắt (unsubscribe) bất kể điều kiện gì, chỉ chặn chiều bật.
+- **Luồng cài PWA bắt buộc trước khi bật (mục 3.1):** khi `isSupported && !isStandalone`, ẩn hẳn nút "Bật thông báo" dạng trực tiếp (toggle bị disable ở chiều bật) và hiện khối hướng dẫn cài thay thế:
+  - `canInstall` true (Android/Chrome đã bắn `beforeinstallprompt`) → nút "Cài ứng dụng" gọi `promptInstall()` (browser tự hiện popup cài 1 chạm).
+  - `canInstall` false + phát hiện iOS (`isIOSDevice()`: check `/iPad|iPhone|iPod/` UA hoặc iPadOS 13+ báo UA giống macOS nhưng có `maxTouchPoints > 1`) → text hướng dẫn thủ công "Nhấn icon Chia sẻ → Thêm vào Màn hình chính".
+  - `canInstall` false + không phải iOS (ví dụ Firefox desktop/Android không hỗ trợ `beforeinstallprompt`, hoặc Chrome nhưng sự kiện chưa bắn kịp) → text hướng dẫn chung chung qua menu trình duyệt.
+- **`isStandalone` tự cập nhật khi cài xong** — không cần user tự bấm refresh: `installPromptStore.ts` bắn `appinstalled` → hook nhận qua `subscribeInstallPrompt` → gọi lại `detectStandalone()`.
+- **`permission === 'denied'`:** không cho bấm bật lại (đúng mục 3.3, trình duyệt cũng tự chặn re-prompt), chỉ hiện text hướng dẫn tự bật lại trong Cài đặt hệ thống/trình duyệt.
+- **Vị trí trong Settings:** đặt cuối tab "Chung" (`span-2 col-span-2`, full-width giống khối "Bố cục Dashboard" ngay phía trên) — không chiếm chỗ 2 khối 1-cột (Giao diện/Màu chủ đạo/Dữ liệu/Tài khoản) đã có sẵn, không phá layout cũ.
+- **Không thêm CSS mới vào `components.css`** — toggle switch dựng hoàn toàn bằng Tailwind utility inline (theo đúng convention hiện có của `SettingsModal.tsx`, các class `.setting-block`/`.hint`/`.btn-ghost` cũng không có style riêng ngoài Tailwind áp trực tiếp trong JSX, trừ vài class dùng `@apply` cho pattern lặp ≥3 nơi — toggle này chỉ dùng 1 nơi nên không đủ điều kiện tách `@apply`).
+
+**Quyết định để `?open=task:<id>`/`?open=reminder:<id>` (đọc trong `notificationclick` để chuyển Space + cuộn tới item) ra ngoài phạm vi Phần 4 (out-of-scope, 2026-07-03):**
+
+Đã đọc code thật trước khi quyết định (không đoán):
+- State "Space đang active"/"tab mobile đang mở" nằm ở 2 tầng khác nhau: `currentSpaceId` trong global store (`AppStateContext`, dispatch được), nhưng `mobileTab` (`'chat' | 'blocks'`) và `mobileExpanded` (`'tasks' | 'notes'`) trên mobile là **local state riêng trong `webapp/src/layout/AppLayout.tsx`** — không có global action nào điều khiển được từ ngoài component này.
+- Trên mobile, khối **"Nhắc việc" không tồn tại** trong layout (mobile chỉ có 2 khối cố định: Việc cần làm + Ghi chú, theo đúng phạm vi dài hạn đã chốt) — nghĩa là nếu người dùng bấm vào notification của 1 Reminder trên điện thoại, không có nơi nào để "cuộn tới" cả, chỉ có thể chuyển Space (không có gì để highlight).
+- Phải viết logic tìm item theo id **xuyên suốt mọi Space** (cá nhân + mọi shared space đã join) trước khi biết Space nào cần chuyển tới — chưa có sẵn hàm tiện ích nào làm việc này trong codebase hiện tại (`state.spaces` là mảng phẳng, phải tự duyệt `tasks`/`reminders` từng space).
+- Kết luận: làm đúng/đủ việc này (tìm item xuyên Space + đồng bộ 2 tầng state global/local + xử lý khác biệt desktop/mobile + xử lý item không tồn tại nữa/đã bị xoá) là 1 khối việc riêng, đủ lớn để tự thành 1 phần nhỏ độc lập nếu làm — không phù hợp nhét thêm vào Phần 4 (vốn đã đủ trọn vẹn với khối Settings UI). `sw.ts` (Phần 1) vẫn mở đúng URL `/?open=task:<id>` hoặc `/?open=reminder:<id>` khi bấm — chỉ chưa có gì phía app đọc query đó, app sẽ mở đúng Dashboard/Space đang active hiện tại (không lỗi, chỉ chưa auto-chuyển đúng item).
+- Nếu chủ dự án muốn làm tiếp việc này sau: đề xuất tách thành 1 phần mới (ví dụ "Phần 5 — Deep-link mở đúng item"), không gộp ngược vào Phần 4 đã đóng.
+
+**Cách test (2026-07-03) — qua UI thật, không cần Console:**
+
+1. `npm run build && npm run preview` (hoặc bản đã deploy Vercel thật).
+2. Trên **desktop** (chưa cài PWA): mở Settings → tab "Chung" → cuộn xuống khối "Thông báo đẩy" → xác nhận thấy đúng text "Chưa cài ứng dụng.", toggle ở trạng thái tắt và không bấm bật được (disabled), có khối hướng dẫn cài bên dưới (nút "Cài ứng dụng" nếu Chrome bắt được `beforeinstallprompt`, hoặc text hướng dẫn chung nếu trình duyệt không hỗ trợ).
+3. Trên **điện thoại** (Android Chrome hoặc iOS Safari):
+   - Cài PWA (Android: bấm nút "Cài ứng dụng" trong Settings, hoặc menu trình duyệt "Cài đặt ứng dụng"; iOS: Chia sẻ → Thêm vào Màn hình chính).
+   - Mở lại KN-Space từ icon vừa cài (không phải từ tab Safari/Chrome thường) → vào Settings → tab "Chung" → xác nhận text đổi thành "Đã cấp quyền, chưa bật." hoặc "Đã cài, chưa cấp quyền." (tuỳ đã từng cấp quyền chưa).
+   - Bấm toggle "Bật thông báo" → trình duyệt hiện popup xin quyền thật → bấm Allow → toggle chuyển sang "on", text đổi thành "Đã bật."
+   - Vào Supabase Dashboard → Table Editor → `kn_push_subscriptions` → xác nhận có dòng mới ứng với thiết bị vừa bật.
+4. **Test end-to-end nhận push thật:** tạo 1 Reminder hoặc Task có `date` = hôm nay, `time` = khoảng 2-3 phút sau hiện tại → đóng hẳn app trên điện thoại (không chỉ về màn hình chính, đóng hẳn khỏi danh sách app đang chạy) → đợi 2-3 phút → xác nhận có notification hệ thống hiện ra (tiêu đề dạng "Nhắc việc: ..."/"Việc cần làm: ...") kể cả khi app đã đóng hẳn.
+5. Bấm vào notification → xác nhận mở app KN-Space đúng (URL có `?open=...`, chưa tự cuộn tới item — đã biết, xem mục out-of-scope ở trên).
+6. Test tắt: bấm toggle lần nữa → xác nhận dòng trong `kn_push_subscriptions` biến mất, text quay lại "Đã cấp quyền, chưa bật."
+7. Test quyền bị từ chối: vào Cài đặt hệ thống/trình duyệt chặn quyền Notification cho KN-Space → mở lại Settings trong app (không cần action gì thêm, `refresh()` tự chạy khi mount) → xác nhận text đổi thành "Đã cài, quyền thông báo đã bị từ chối.", toggle bị khoá không bấm bật lại được, có text hướng dẫn tự bật lại trong Cài đặt hệ thống.
 
 ## Ghi chú chung
 - Mỗi phần xong: chạy `npx tsc --noEmit` + `npm run build` trong `webapp/` trước khi đánh dấu ✅.
