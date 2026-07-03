@@ -195,14 +195,16 @@ Khi 2+ người cùng sửa cùng lúc:
 
 **Hành vi khi bị ghi đè:**
 - Không có notification "dữ liệu của bạn đã bị ghi đè".
-- Người dùng tự nhận ra qua Supabase Realtime cập nhật UI.
+- Người dùng tự nhận ra khi tự mở lại/reload app và thấy dữ liệu đổi khác (không có push tức thì — xem mục 6.3).
 - Chấp nhận mất thay đổi trong các tình huống edit đồng thời — đây là hành vi đã biết, không phải bug.
 
-### 6.3 Realtime sync
+### 6.3 Đồng bộ giữa các thành viên (KHÔNG phải Realtime)
 
-- Dùng Supabase Realtime (đã có từ Phase 2) để push thay đổi cho mọi thành viên đang online.
-- Thành viên offline không nhận được thay đổi realtime → thấy dữ liệu cũ cho đến khi mở lại app / refresh.
+> **Cập nhật 2026-07-03:** mục này ban đầu viết theo giả định dùng Supabase Realtime, nhưng Realtime đã bị **chủ động bỏ khỏi toàn bộ dự án** ở commit `aa00fae` (2026-07-01, tức 1 ngày trước khi tài liệu này được chốt) vì gây 5 bug mất dữ liệu — xem `docs/requirements.md` mục 2.1/10. Không có `.channel()`/`subscribe()` nào trong code, kể cả cho Shared Space. Nội dung dưới đây đã viết lại theo đúng thực tế.
+
+- **Không có push realtime.** Thành viên khác chỉ thấy thay đổi của bạn sau khi họ **tự mở lại/reload app** — kể cả khi đang online cùng lúc.
 - Không có offline queue — giữ nguyên hành vi Phase 2 (banner lỗi nếu save thất bại do mất kết nối).
+- Vì không có cơ chế "đẩy" thay đổi, rủi ro conflict LWW (mục 6.2) thực tế cao hơn giả định ban đầu ("đang online cùng lúc" không giúp giảm xung đột) — nếu cần giảm rủi ro mất dữ liệu khi nhiều người cùng sửa gần như đồng thời, cần bàn lại với `ba`/`dev` một giải pháp khác (không phải khôi phục Realtime, đã có quyết định bỏ hẳn).
 
 ---
 
@@ -215,7 +217,7 @@ Khi 2+ người cùng sửa cùng lúc:
 - **Giới hạn số member** — không có quota.
 - **Audit log / lịch sử thay đổi** — không tracking ai sửa gì.
 - **Mention / comment / reaction** trên task/note.
-- **Notification push** khi có thành viên thay đổi dữ liệu (chỉ có Realtime UI update, không có in-app notification riêng cho Shared Space).
+- **Notification push** khi có thành viên thay đổi dữ liệu — không có cơ chế nào báo cho thành viên khác biết có thay đổi mới (không Realtime, không in-app notification riêng cho Shared Space); phải tự reload mới thấy (xem mục 6.3).
 - **Revoke link đã `used`** — chỉ thu hồi được link `pending`.
 - **Gia hạn link hết hạn** — khi link expired, Owner tạo link mới.
 - **Multiple invite link dùng được nhiều lần** — mỗi link chỉ dùng 1 lần (1 link = 1 người).

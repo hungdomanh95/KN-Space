@@ -11,7 +11,7 @@ const BLOCK_DEFS: { key: keyof EnabledBlocks; label: string }[] = [
   { key: 'reminder', label: 'Nhắc việc' },
   { key: 'habits', label: 'Thói quen' },
   { key: 'notes', label: 'Ghi chú' },
-  { key: 'today', label: 'Today' },
+  { key: 'today', label: 'Hôm nay' },
 ];
 
 interface SpaceFormModalProps {

@@ -18,9 +18,11 @@ interface TodayBlockProps {
 
 /**
  * Widget hiển thị thuần (giờ + ngày ngắn + quote 1 dòng) — không CRUD, không block-head
- * (giống DashboardCorner). Tham gia kéo-thả tự do như mọi khối khác nhưng chiều cao LUÔN
- * cố định ('today' nằm trong HEIGHT_LOCKED_IDS, xem dashboardLayoutUtils.ts). Luôn hiện ở
- * mọi Space, không thuộc EnabledBlocks (xem AppLayout ENABLED_BLOCKS_KEY).
+ * (giống DashboardCorner). Tham gia kéo-thả tự do như mọi khối khác, chiều cao resize được
+ * bình thường (KHÔNG nằm trong HEIGHT_LOCKED_IDS, xem dashboardLayoutUtils.ts). Có thể
+ * tắt/bật riêng theo từng Space qua EnabledBlocks.today (xem AppLayout ENABLED_BLOCKS_KEY),
+ * giống 4 khối dữ liệu khác — khác Thông báo/Widget điều hướng (2 phần tử luôn hiện, không
+ * thuộc EnabledBlocks).
  *
  * Style "trong suốt hơn" để lộ ảnh nền chung Home/Dashboard — khác hẳn .main-block/.sub-block:
  * nền alpha thấp (~40%) + blur nhẹ (~7px) + overlay gradient tối cố định (không đổi theo

@@ -212,7 +212,7 @@ export function HomeBackgroundSettings() {
       </div>
       <p className="hint">
         Click vào ảnh để áp dụng ngay. Sửa link rồi nhấn Enter/click ra ngoài để áp dụng — link lỗi sẽ không được lưu.
-        Upload ảnh từ máy sẽ tự resize/nén trước khi lưu, và chỉ hiển thị đúng trên máy đã upload (không đồng bộ).
+        Upload ảnh từ máy sẽ tự resize/nén trước khi lưu, đồng bộ qua mọi thiết bị đã đăng nhập.
       </p>
       {uploadError && (
         <p className="hint" style={{ color: 'var(--reminder-color)' }}>

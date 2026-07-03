@@ -6,14 +6,16 @@
 Toàn bộ UX sản phẩm (5 khối, đa Space, masonry, streak, modal tuỳ biến, icon SVG…) đã chốt ở [requirements.md](../requirements.md). Các phase chỉ đổi **nền tảng / khả năng**, không đổi bản chất sản phẩm.
 
 > Cập nhật quan trọng: **Phase 1 (Chrome Extension) đã bị thay thế hoàn toàn bởi Phase 2 (Web App)**. Thư mục `extension/` đã bị xoá khỏi repo. Lý do/diễn biến xem [phase-1-extension.md](phase-1-extension.md) (giữ lại làm lịch sử) và [phase-2-pwa-supabase.md](phase-2-pwa-supabase.md) (nền tảng hiện hành).
+>
+> Cập nhật (2026-07-03): **Phase 3 (Shared space) không còn ở trạng thái "hoãn"** — đang được code tích cực song song với việc hoàn thiện Phase 2 (invite link, Owner/Member, chat mobile theo Space chung, xem [../features/shared-space.md](../features/shared-space.md) và `webapp/CLAUDE.md`). Nếu tài liệu này và code thật lệch nhau, ưu tiên tin code (`webapp/src/storage/sharedSpaceStore.ts`, `webapp/src/features/spaces/`).
 
 ## Roadmap
 
 | Phase | Mục tiêu | Nền tảng | Trạng thái |
 |---|---|---|---|
 | 1 — Extension cá nhân | Full dashboard 5 khối dùng được trên desktop | Chrome Extension MV3 + React + TypeScript + Vite + `chrome.storage` | ✅ **Đã thay thế bởi Phase 2** (không còn duy trì, code đã xoá khỏi repo) |
-| **2 — Web App + Supabase** | Đưa lên web, chạy được cả desktop/mobile, sync cloud (vẫn cá nhân) | React + TypeScript + Vite + Tailwind, Supabase (Postgres + Auth + Realtime), Google OAuth, Vercel, PWA manifest | 🚧 **Đang làm** (Bước 1 + phần lớn Bước 2 đã build và chạy thật) |
-| 3 — Shared space | Mời người khác cùng dùng chung 1 space | Supabase `space_members` + RLS membership | ⏸ Hoãn |
+| **2 — Web App + Supabase** | Đưa lên web, chạy được cả desktop/mobile, sync cloud (vẫn cá nhân) | React + TypeScript + Vite + Tailwind, Supabase (Postgres + Auth), Google OAuth, Vercel, PWA manifest | 🚧 **Đang làm** (Bước 1 + phần lớn Bước 2 đã build và chạy thật; Realtime từng có nhưng đã chủ động bỏ 2026-07-01 vì gây bug mất dữ liệu — giờ chỉ sync qua load-on-open) |
+| **3 — Shared space** | Mời người khác cùng dùng chung 1 space | Supabase `space_members` + `space_invites`, RLS membership, item-level LWW | 🚧 **Đang làm** (song song Phase 2 — invite link, role Owner/Member, mobile chat đã build; xem [shared-space.md](../features/shared-space.md)) |
 | 4 — Thương mại | Tạo doanh thu | Free/Pro tier + Stripe/Paddle | ⏸ Hoãn |
 
 ## Nguyên tắc
