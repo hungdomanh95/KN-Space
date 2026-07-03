@@ -3,6 +3,7 @@ import type { AppState, Space } from '../types';
 import {
   forceFlush,
   loadAppState,
+  saveSnapshotNow,
   scheduleSave,
   seedAndPersist,
   setFallbackListener,
@@ -19,6 +20,16 @@ interface AppStateContextValue {
   state: AppState;
   dispatch: React.Dispatch<AppAction>;
   isLoading: boolean;
+  /**
+   * Dispatch action + lưu ngay lập tức lên Supabase, ĐỢI kết quả thật (không debounce).
+   * Dùng cho nút "Lưu" trong modal Thêm/Sửa (Task/Note/Reminder/Habit) — nơi user cần biết
+   * chắc chắn dữ liệu đã lên server trước khi đóng modal (tránh mất task khi đóng app ngay
+   * sau khi thêm, lúc debounce 600ms nền còn đang chờ).
+   *
+   * KHÔNG dùng cho các thao tác nhỏ (tick checkbox, kéo-thả, đổi theme...) — những chỗ đó
+   * vẫn dùng `dispatch` thường + debounce nền như cũ để giữ cảm giác mượt.
+   */
+  saveNow: (action: AppAction) => Promise<{ ok: boolean; error?: string }>;
 }
 
 const AppStateContext = createContext<AppStateContextValue | null>(null);
@@ -123,9 +134,9 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
    * khác F5 vẫn thấy data cũ vì DB chưa từng đổi. Đây là nguyên nhân chính gây mất
    * đồng bộ CRUD giữa các member của shared space.
    */
-  async function attemptSaveShared(sid: string, retriesLeft = 3): Promise<void> {
+  async function attemptSaveShared(sid: string, retriesLeft = 3): Promise<boolean> {
     const data = pendingSharedSavesRef.current.get(sid);
-    if (!data) return;
+    if (!data) return true; // không có gì pending — coi như đã lưu xong
     const version = sharedVersionsRef.current.get(sid) ?? 1;
     try {
       const result = await saveSharedSpace(sid, data, version);
@@ -135,17 +146,18 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         if (pendingSharedSavesRef.current.get(sid) === data) {
           pendingSharedSavesRef.current.delete(sid);
         }
-        return;
+        return true;
       }
       if (result.conflict && retriesLeft > 0) {
         const freshVersion = await getSharedSpaceVersion(sid);
         if (freshVersion !== null) sharedVersionsRef.current.set(sid, freshVersion);
-        await attemptSaveShared(sid, retriesLeft - 1);
-        return;
+        return attemptSaveShared(sid, retriesLeft - 1);
       }
       console.warn('[KN-Space] saveSharedSpace conflict, hết lượt thử lại — thay đổi CHƯA được lưu:', sid);
+      return false;
     } catch (err) {
       console.warn('[KN-Space] saveSharedSpace thất bại:', err);
+      return false;
     }
   }
 
@@ -240,8 +252,58 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     dispatch(action);
   }, [state.spaces]);
 
+  /**
+   * Dispatch + lưu ngay lập tức, đợi kết quả thật — xem giải thích ở khai báo type phía trên.
+   *
+   * Tính `nextState` bằng chính `appReducer` (pure function) thay vì đọc `state.spaces` sau
+   * `dispatch()`, vì `dispatch()` chỉ enqueue update — state React chưa cập nhật đồng bộ ngay
+   * trong cùng lượt gọi này. Nhờ vậy không phải chờ effect debounce (vốn chỉ chạy sau khi
+   * React commit re-render) mới biết chính xác dữ liệu cần lưu là gì.
+   */
+  const saveNow = React.useCallback(async (action: AppAction): Promise<{ ok: boolean; error?: string }> => {
+    const nextState = appReducer(state, action);
+    dispatch(action);
+
+    const targetSpace = nextState.spaces.find((s) => s.id === nextState.currentSpaceId);
+
+    if (targetSpace?.isShared && targetSpace.sharedSpaceId) {
+      const sid = targetSpace.sharedSpaceId;
+      const data = { tasks: targetSpace.tasks, notes: targetSpace.notes, reminders: targetSpace.reminders, name: targetSpace.name };
+
+      // Huỷ debounce timer đang chờ của space này — data mới nhất được gửi thẳng ngay bây giờ,
+      // đồng thời cập nhật baseline để effect debounce không tưởng nhầm là "còn thay đổi mới"
+      // rồi bắn thêm 1 lần save trùng lặp ngay sau đó.
+      const existingTimer = sharedSaveTimersRef.current.get(sid);
+      if (existingTimer) {
+        clearTimeout(existingTimer);
+        sharedSaveTimersRef.current.delete(sid);
+      }
+      pendingSharedSavesRef.current.set(sid, data);
+      prevSharedRef.current.set(sid, JSON.stringify(data));
+      if (!sharedVersionsRef.current.has(sid) && targetSpace._sharedVersion !== undefined) {
+        sharedVersionsRef.current.set(sid, targetSpace._sharedVersion);
+      }
+
+      const ok = await attemptSaveShared(sid);
+      return ok
+        ? { ok: true }
+        : { ok: false, error: 'Không lưu được lên Space chung — kiểm tra kết nối mạng và thử lại.' };
+    }
+
+    const privateSpaces = nextState.spaces.filter((s) => !s.isShared);
+    const result = await saveSnapshotNow({
+      spaces: privateSpaces,
+      currentSpaceId: nextState.currentSpaceId,
+      settings: nextState.settings,
+    });
+    return result.ok
+      ? { ok: true }
+      : { ok: false, error: result.error ?? 'Không lưu được dữ liệu — kiểm tra kết nối mạng và thử lại.' };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
+
   return (
-    <AppStateContext.Provider value={{ state, dispatch: smartDispatch, isLoading }}>
+    <AppStateContext.Provider value={{ state, dispatch: smartDispatch, isLoading, saveNow }}>
       {children}
     </AppStateContext.Provider>
   );

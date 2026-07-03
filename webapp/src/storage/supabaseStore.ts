@@ -64,7 +64,7 @@ export async function loadAppState(): Promise<LoadResult | null> {
 }
 
 /** Ghi snapshot lên Supabase (upsert 1 hàng theo user_id). */
-export async function flushSave(snapshot: SaveSnapshot): Promise<{ fellBack: boolean }> {
+export async function flushSave(snapshot: SaveSnapshot): Promise<{ fellBack: boolean; error?: string }> {
   try {
     const userId = await getUserId();
     const { error } = await supabase.from(TABLE).upsert({
@@ -77,8 +77,9 @@ export async function flushSave(snapshot: SaveSnapshot): Promise<{ fellBack: boo
     if (error) throw error;
     return { fellBack: false };
   } catch (err) {
-    console.warn('[KN-Space] Lưu dữ liệu lên Supabase lỗi:', err instanceof Error ? err.message : err);
-    return { fellBack: true };
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn('[KN-Space] Lưu dữ liệu lên Supabase lỗi:', message);
+    return { fellBack: true, error: message };
   }
 }
 
@@ -133,4 +134,25 @@ export async function forceFlush(): Promise<void> {
     saveTimer = null;
   }
   await flushPendingSave();
+}
+
+/**
+ * Lưu ngay lập tức và ĐỢI kết quả thật (không debounce, không nuốt lỗi) — dùng cho các
+ * modal Thêm/Sửa (Task/Note/Reminder/Habit) khi bấm nút "Lưu": nút cần biết chính xác
+ * lưu server thành công hay chưa để quyết định đóng modal hay hiện lỗi cho user thử lại.
+ *
+ * Khác với `scheduleSave` (chỉ ghi ngầm nền, debounce 600ms, lỗi chỉ hiện qua banner
+ * `storageFallbackActive` — phù hợp cho các thao tác nhỏ như tick checkbox/kéo-thả).
+ *
+ * Huỷ mọi debounce timer/pending snapshot đang chờ của private spaces — snapshot truyền
+ * vào đây đã là bản mới nhất (đã gồm thay đổi vừa dispatch), không cần chờ lượt debounce đó nữa.
+ */
+export async function saveSnapshotNow(snapshot: SaveSnapshot): Promise<{ ok: boolean; error?: string }> {
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  pendingSnapshot = null;
+  const { fellBack, error } = await flushSave(snapshot);
+  return { ok: !fellBack, error };
 }
