@@ -46,8 +46,8 @@ function buildReminder(payload: ReminderFormPayload, id: string, createdAt: stri
 export function remindersReducer(space: Space, action: ReminderAction): Space {
   switch (action.type) {
     case 'REMINDER_CREATE': {
-      const todayStr = new Date().toISOString().slice(0, 10);
-      const newReminder = buildReminder(action.payload, crypto.randomUUID(), todayStr);
+      const nowIso = new Date().toISOString();
+      const newReminder = buildReminder(action.payload, crypto.randomUUID(), nowIso);
       // RemindersBlock hiện thị thẳng theo thứ tự mảng (không sort) — thêm vào ĐẦU để nhắc việc
       // mới luôn nổi lên trên cùng, thấy ngay không cần cuộn xuống cuối danh sách.
       return { ...space, reminders: [newReminder, ...space.reminders] };
@@ -57,7 +57,7 @@ export function remindersReducer(space: Space, action: ReminderAction): Space {
         ...space,
         reminders: space.reminders.map((r) => {
           if (r.id !== action.payload.id) return r;
-          const createdAt = r.type === 'recurring' ? r.createdAt : new Date().toISOString().slice(0, 10);
+          const createdAt = r.type === 'recurring' ? r.createdAt : new Date().toISOString();
           return buildReminder(action.payload, r.id, createdAt);
         }),
       };

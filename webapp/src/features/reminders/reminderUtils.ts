@@ -29,7 +29,13 @@ export function isRecurringDueToday(r: ReminderDefinition & { type: 'recurring' 
     return r.dayOfMonth === dayOfMonth;
   }
   // freqUnit === 'day'
-  const created = new Date(r.createdAt);
+  // `createdAt` có thể là ISO đầy đủ (có giờ:phút, dữ liệu mới) hoặc chỉ `yyyy-mm-dd` (dữ liệu
+  // cũ trước khi sửa để lưu giờ tạo thật cho freqUnit 'hour'). Diff ngày ở đây CHỈ nên tính theo
+  // NGÀY lịch, không phụ thuộc giờ:phút — nếu dùng `new Date(r.createdAt)` nguyên bản (có giờ)
+  // so với `new Date(todayStr)` (luôn là 00:00), chênh lệch giờ trong ngày sẽ làm
+  // `Math.round(diffMs / dayMs)` lệch đi 1 ngày tuỳ thời điểm tạo, sai chu kỳ lặp. Cắt về đúng
+  // phần ngày (10 ký tự đầu) trước khi parse để tương thích cả 2 dạng dữ liệu.
+  const created = new Date(r.createdAt.slice(0, 10));
   const today = new Date(todayStr);
   const diffDays = Math.round((today.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
   if (diffDays < 0) return false;

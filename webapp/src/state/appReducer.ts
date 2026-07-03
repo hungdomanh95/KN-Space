@@ -161,7 +161,7 @@ function normalizeImportedSpace(raw: Partial<Space> & { id?: string }): Space {
       ? raw.reminders.map((r) => {
           if (r.type !== 'recurring') return r;
           const rec = r as typeof r & { createdAt?: string };
-          return rec.createdAt ? r : { ...r, createdAt: new Date().toISOString().slice(0, 10) };
+          return rec.createdAt ? r : { ...r, createdAt: new Date().toISOString() };
         })
       : [],
     habits: Array.isArray(raw.habits)

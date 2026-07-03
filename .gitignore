@@ -11,5 +11,8 @@ webapp/*.tsbuildinfo
 webapp/.env.local
 .playwright-mcp
 
+# Cache cục bộ của Supabase CLI (project ref đã link, không phải code) — không commit.
+webapp/supabase/.temp/
+
 # Test files — không commit, chỉ dùng local
 webapp/src/__tests__/

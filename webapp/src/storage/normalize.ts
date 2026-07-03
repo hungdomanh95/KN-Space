@@ -26,7 +26,7 @@ export function normalizeSpace(space: Space): Space {
           // `createdAt` bắt buộc theo type nhưng dữ liệu lưu trước khi field này ra đời không có
           // — patch về ngày hiện tại thay vì crash khi tính isDueToday.
           const raw = r as typeof r & { createdAt?: string };
-          return raw.createdAt ? r : { ...r, createdAt: new Date().toISOString().slice(0, 10) };
+          return raw.createdAt ? r : { ...r, createdAt: new Date().toISOString() };
         })
       : [],
     habits: Array.isArray(space.habits)
