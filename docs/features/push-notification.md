@@ -72,7 +72,9 @@ Reminder được ưu tiên cao nhất vì đã có "giờ hẹn" tường minh 
 
 ## 4. Permission
 
-Không có phân quyền theo role (Owner/Member) riêng cho tính năng này. Trong Shared Space, thông báo gửi cho **tất cả Member** (kể cả người tạo item) — khớp mô hình ngang quyền hiện tại của Shared Space, **không** thêm khái niệm "assignee" mới.
+Không có phân quyền theo role (Owner/Member) riêng cho tính năng này. Trong Shared Space, thông báo **đến hạn** (Reminder/Task deadline — nội dung tài liệu này) gửi cho **tất cả Member** (kể cả người tạo item), không phân biệt assignee.
+
+> **Cập nhật 2026-07-06:** khái niệm "assignee" + thông báo theo *sự kiện* (task tạo mới có giao việc / task hoàn thành) đã được lên kế hoạch — xem `docs/features/shared-space-task-assign-notify.md`. Đây là **cơ chế khác** (event-driven, không qua cron) và **không thay đổi** hành vi thông báo đến hạn mô tả trong tài liệu này.
 
 ---
 
@@ -123,7 +125,7 @@ Vẫn hiện cùng UI này trong Settings trên desktop (không ẩn riêng theo
 - Digest tổng hợp theo ngày.
 - "Giờ yên tĩnh" (do not disturb).
 - Trigger từ Thói quen (Habit chưa tick cuối ngày) — hoãn sang bản sau.
-- Khái niệm "assignee" trong Shared Space (ai được gán mới nhận thông báo) — bản đầu gửi cho toàn bộ Member.
+- ~~Khái niệm "assignee" trong Shared Space~~ — **đã lên kế hoạch**, xem `docs/features/shared-space-task-assign-notify.md` (không còn out-of-scope, nhưng là tài liệu/cơ chế riêng).
 
 ---
 

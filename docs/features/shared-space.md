@@ -217,7 +217,7 @@ Khi 2+ người cùng sửa cùng lúc:
 - **Giới hạn số member** — không có quota.
 - **Audit log / lịch sử thay đổi** — không tracking ai sửa gì.
 - **Mention / comment / reaction** trên task/note.
-- **Notification push** khi có thành viên thay đổi dữ liệu — không có cơ chế nào báo cho thành viên khác biết có thay đổi mới (không Realtime, không in-app notification riêng cho Shared Space); phải tự reload mới thấy (xem mục 6.3).
+- ~~Notification push khi có thành viên thay đổi dữ liệu~~ — **đã lên kế hoạch cho 2 sự kiện cụ thể** (task tạo mới có giao việc / task hoàn thành), xem `docs/features/shared-space-task-assign-notify.md`. Mọi thay đổi khác (note, sửa nội dung task, xoá...) **vẫn** không có cơ chế báo — vẫn phải tự reload mới thấy (xem mục 6.3).
 - **Revoke link đã `used`** — chỉ thu hồi được link `pending`.
 - **Gia hạn link hết hạn** — khi link expired, Owner tạo link mới.
 - **Multiple invite link dùng được nhiều lần** — mỗi link chỉ dùng 1 lần (1 link = 1 người).

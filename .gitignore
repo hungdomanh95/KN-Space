@@ -16,3 +16,7 @@ webapp/supabase/.temp/
 
 # Test files — không commit, chỉ dùng local
 webapp/src/__tests__/
+
+# Scratch working memory của Subagent-Driven Development (task brief/report/diff/ledger)
+# — không phải code/tài liệu chính thức, không commit.
+.superpowers/
