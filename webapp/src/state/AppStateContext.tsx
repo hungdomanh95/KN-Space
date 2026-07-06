@@ -266,6 +266,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
+    let actionToDispatch = action;
     const currentUserId = session?.user?.id;
     const currentSpace = state.spaces.find((s) => s.id === state.currentSpaceId);
 
@@ -273,9 +274,13 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       const sharedSpaceId = currentSpace.sharedSpaceId;
 
       if (action.type === 'TASK_CREATE') {
-        // Task chưa có id thật ở payload (reducer tự sinh crypto.randomUUID()) — tính trước
-        // bằng chính tasksReducer (pure) rồi diff với tasks cũ để tìm đúng task vừa tạo.
-        const nextTasks = tasksReducer(currentSpace, action).tasks;
+        // tasksReducer tự sinh id bằng crypto.randomUUID() bên trong — gọi 2 lần cho cùng 1 lượt
+        // tạo (1 lần "dự đoán" ở đây để lấy assigneeIds/title thật, 1 lần thật qua dispatch() cuối
+        // hàm) sẽ ra 2 id NGẪU NHIÊN KHÁC NHAU nếu không cố định trước. Sinh sẵn id ở đây, gắn vào
+        // action, dùng chung cho cả 2 lượt gọi để id gửi trong notify khớp đúng id task thật.
+        const actionWithId: typeof action = { ...action, payload: { ...action.payload, id: crypto.randomUUID() } };
+        actionToDispatch = actionWithId;
+        const nextTasks = tasksReducer(currentSpace, actionWithId).tasks;
         const prevIds = new Set(currentSpace.tasks.map((t) => t.id));
         const created = nextTasks.find((t) => !prevIds.has(t.id));
         if (created) {
@@ -305,7 +310,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    dispatch(action);
+    dispatch(actionToDispatch);
   }, [state.spaces, state.currentSpaceId, session?.user?.id]);
 
   /**

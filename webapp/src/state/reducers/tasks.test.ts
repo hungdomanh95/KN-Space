@@ -43,4 +43,12 @@ describe('tasksReducer — assigneeIds', () => {
     });
     expect(updated.tasks[0].assigneeIds).toEqual(['u2', 'u3']);
   });
+
+  it('TASK_CREATE dùng đúng id được truyền vào (không tự sinh id mới)', () => {
+    const next = tasksReducer(emptySpace(), {
+      type: 'TASK_CREATE',
+      payload: { title: 'A', content: '', date: '', time: '', id: 'fixed-id-123' },
+    });
+    expect(next.tasks[0].id).toBe('fixed-id-123');
+  });
 });

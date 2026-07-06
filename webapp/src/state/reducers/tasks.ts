@@ -2,7 +2,7 @@ import type { Space, Task } from '../../types';
 
 /** Actions tác động lên dữ liệu Task trong 1 Space. TASK_SET_FILTER là UI-only, xử lý ở appReducer. */
 export type TaskAction =
-  | { type: 'TASK_CREATE'; payload: { title: string; content: string; date: string; time: string; createdBy?: string; assigneeIds?: string[] } }
+  | { type: 'TASK_CREATE'; payload: { title: string; content: string; date: string; time: string; createdBy?: string; assigneeIds?: string[]; id?: string } }
   | { type: 'TASK_UPDATE'; payload: { id: string; title: string; content: string; date: string; time: string; assigneeIds: string[] } }
   | { type: 'TASK_DELETE'; payload: { id: string } }
   | { type: 'TASK_TOGGLE_DONE'; payload: { id: string } }
@@ -16,7 +16,7 @@ export function tasksReducer(space: Space, action: TaskAction): Space {
       // yêu cầu thực tế: vừa thêm là thấy ngay, không phải cuộn xuống cuối mới thấy.
       const minOrder = space.tasks.reduce((min, t) => Math.min(min, t.order), 0);
       const newTask: Task = {
-        id: crypto.randomUUID(),
+        id: action.payload.id ?? crypto.randomUUID(),
         title: action.payload.title.trim() || 'Việc chưa đặt tên',
         content: action.payload.content,
         date: action.payload.date,
