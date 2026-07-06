@@ -28,6 +28,7 @@ const CORS_HEADERS = {
 
 interface RequestBody {
   spaceId: string;
+  spaceName: string;
   taskId: string;
   taskTitle: string;
   event: 'assigned' | 'completed';
@@ -57,9 +58,12 @@ Deno.serve(async (req: Request) => {
   } catch {
     return jsonResponse({ error: 'Body không phải JSON hợp lệ.' }, 400);
   }
+  if (!body || typeof body !== 'object') {
+    return jsonResponse({ error: 'Body phải là object JSON hợp lệ.' }, 400);
+  }
 
-  const { spaceId, taskId, taskTitle, event, recipientUserIds, excludeUserId } = body;
-  if (!spaceId || !taskId || !taskTitle || (event !== 'assigned' && event !== 'completed')) {
+  const { spaceId, spaceName, taskId, taskTitle, event, recipientUserIds, excludeUserId } = body;
+  if (!spaceId || !spaceName || !taskId || !taskTitle || (event !== 'assigned' && event !== 'completed')) {
     return jsonResponse({ error: 'Thiếu field bắt buộc hoặc event không hợp lệ.' }, 400);
   }
 
@@ -131,7 +135,9 @@ Deno.serve(async (req: Request) => {
 
   webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
-  const title = event === 'completed' ? `✅ ${taskTitle} đã hoàn thành` : `📌 Bạn được giao "${taskTitle}"`;
+  const title = event === 'completed'
+    ? `✅ ${spaceName}: ${taskTitle} đã hoàn thành`
+    : `📌 ${spaceName}: bạn được giao "${taskTitle}"`;
   const payload = JSON.stringify({ title, url: `/?open=task:${taskId}` });
 
   let pushSent = 0;

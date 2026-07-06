@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabaseClient';
 
 interface NotifyPayload {
   spaceId: string;
+  spaceName: string;
   taskId: string;
   taskTitle: string;
   event: 'assigned' | 'completed';
@@ -26,12 +27,12 @@ async function callNotify(payload: NotifyPayload): Promise<void> {
 }
 
 /** Task vừa tạo/sửa có assignee MỚI — gọi ngay, không debounce (xem spec mục 6.1). */
-export function notifyTaskAssigned(spaceId: string, taskId: string, taskTitle: string, recipientUserIds: string[]): void {
+export function notifyTaskAssigned(spaceId: string, spaceName: string, taskId: string, taskTitle: string, recipientUserIds: string[]): void {
   if (recipientUserIds.length === 0) return;
-  void callNotify({ spaceId, taskId, taskTitle, event: 'assigned', recipientUserIds });
+  void callNotify({ spaceId, spaceName, taskId, taskTitle, event: 'assigned', recipientUserIds });
 }
 
 /** Task vừa chuyển sang hoàn thành — caller (AppStateContext) tự debounce trước khi gọi hàm này. */
-export function notifyTaskCompleted(spaceId: string, taskId: string, taskTitle: string, excludeUserId: string): void {
-  void callNotify({ spaceId, taskId, taskTitle, event: 'completed', excludeUserId });
+export function notifyTaskCompleted(spaceId: string, spaceName: string, taskId: string, taskTitle: string, excludeUserId: string): void {
+  void callNotify({ spaceId, spaceName, taskId, taskTitle, event: 'completed', excludeUserId });
 }

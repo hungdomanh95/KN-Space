@@ -285,20 +285,20 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         const created = nextTasks.find((t) => !prevIds.has(t.id));
         if (created) {
           const effect = computeTaskCreateNotifyEffect(created, currentUserId);
-          if (effect?.kind === 'assigned') notifyTaskAssigned(sharedSpaceId, effect.taskId, effect.taskTitle, effect.recipientUserIds);
+          if (effect?.kind === 'assigned') notifyTaskAssigned(sharedSpaceId, currentSpace.name, effect.taskId, effect.taskTitle, effect.recipientUserIds);
         }
       }
 
       if (action.type === 'TASK_UPDATE') {
         const effect = computeTaskUpdateNotifyEffect(currentSpace, action, currentUserId);
-        if (effect?.kind === 'assigned') notifyTaskAssigned(sharedSpaceId, effect.taskId, effect.taskTitle, effect.recipientUserIds);
+        if (effect?.kind === 'assigned') notifyTaskAssigned(sharedSpaceId, currentSpace.name, effect.taskId, effect.taskTitle, effect.recipientUserIds);
       }
 
       if (action.type === 'TASK_TOGGLE_DONE') {
         const effect = computeTaskToggleDoneNotifyEffect(currentSpace, action);
         if (effect?.kind === 'completed-schedule') {
           const { taskId, taskTitle } = effect;
-          scheduleCompletedNotify(taskId, () => notifyTaskCompleted(sharedSpaceId, taskId, taskTitle, currentUserId));
+          scheduleCompletedNotify(taskId, () => notifyTaskCompleted(sharedSpaceId, currentSpace.name, taskId, taskTitle, currentUserId));
         } else if (effect?.kind === 'completed-cancel') {
           cancelCompletedNotify(effect.taskId);
         }

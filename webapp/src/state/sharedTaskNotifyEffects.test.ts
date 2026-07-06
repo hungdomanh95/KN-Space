@@ -56,6 +56,16 @@ describe('computeTaskUpdateNotifyEffect', () => {
     );
     expect(effect).toBeNull();
   });
+
+  it('title rỗng/toàn khoảng trắng → fallback "Việc chưa đặt tên" (không gửi taskTitle rỗng)', () => {
+    const prevSpace = spaceWithTask(['u2']);
+    const effect = computeTaskUpdateNotifyEffect(
+      prevSpace,
+      { type: 'TASK_UPDATE', payload: { id: 't1', title: '   ', content: '', date: '', time: '', assigneeIds: ['u2', 'u3'] } },
+      'u1',
+    );
+    expect(effect).toEqual({ kind: 'assigned', taskId: 't1', taskTitle: 'Việc chưa đặt tên', recipientUserIds: ['u3'] });
+  });
 });
 
 describe('computeTaskToggleDoneNotifyEffect', () => {

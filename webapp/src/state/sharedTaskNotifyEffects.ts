@@ -36,7 +36,11 @@ export function computeTaskUpdateNotifyEffect(
   const prevAssignees = new Set(prevTask?.assigneeIds ?? []);
   const newlyAdded = action.payload.assigneeIds.filter((id) => !prevAssignees.has(id) && id !== currentUserId);
   if (newlyAdded.length === 0) return null;
-  return { kind: 'assigned', taskId: action.payload.id, taskTitle: action.payload.title, recipientUserIds: newlyAdded };
+  // Cùng fallback title với TASK_CREATE (reducers/tasks.ts) — tránh gửi taskTitle rỗng khiến
+  // Edge Function từ chối cả request (400 thiếu field bắt buộc), làm assignee mới không nhận
+  // được gì dù đã được gán thật.
+  const taskTitle = action.payload.title.trim() || 'Việc chưa đặt tên';
+  return { kind: 'assigned', taskId: action.payload.id, taskTitle, recipientUserIds: newlyAdded };
 }
 
 export function computeTaskToggleDoneNotifyEffect(
