@@ -48,10 +48,11 @@ interface TaskRowProps {
   onDelete: (task: Task) => void;
   memberDotColor?: string; // màu avatar nếu task của người khác trong shared space
   memberDotName?: string;  // tên hiện trong avatar + chip bên dưới tiêu đề
+  assignees?: { name: string; color: string }[]; // avatar assignee, hiển thị cạnh chip meta
 }
 
 /** 1 dòng task — kéo-thả qua icon grip, cùng kỹ thuật armDraggable/imperative ref như NoteCard. */
-function TaskRow({ task, draggedId, onDragStartId, onDragEndAll, onEdit, onDelete, memberDotColor, memberDotName }: TaskRowProps) {
+function TaskRow({ task, draggedId, onDragStartId, onDragEndAll, onEdit, onDelete, memberDotColor, memberDotName, assignees }: TaskRowProps) {
   const { dispatch } = useAppState();
   const rowRef = useRef<HTMLDivElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -154,7 +155,7 @@ function TaskRow({ task, draggedId, onDragStartId, onDragEndAll, onEdit, onDelet
             </span>
           )}
         </div>
-        {(meta || memberDotName) && (
+        {(meta || memberDotName || (assignees && assignees.length > 0)) && (
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             {meta && (
               <span className="inline-flex items-center gap-1 rounded-md bg-[var(--raised)] px-[7px] py-0.5 text-[0.7188rem] font-semibold text-[var(--text-dim)]">
@@ -167,6 +168,16 @@ function TaskRow({ task, draggedId, onDragStartId, onDragEndAll, onEdit, onDelet
                 style={{ color: memberDotColor, background: `color-mix(in srgb, ${memberDotColor} 14%, var(--raised))` }}
               >
                 {memberDotName}
+              </span>
+            )}
+            {assignees && assignees.length > 0 && (
+              <span className="inline-flex items-center gap-1" title={`Giao cho: ${assignees.map((a) => a.name).join(', ')}`}>
+                {assignees.slice(0, 3).map((a, i) => (
+                  <MemberAvatar key={i} name={a.name} color={a.color} size={16} />
+                ))}
+                {assignees.length > 3 && (
+                  <span className="text-[0.7188rem] font-semibold text-[var(--text-dim)]">+{assignees.length - 3}</span>
+                )}
               </span>
             )}
           </div>
@@ -287,6 +298,13 @@ export function TasksBlock({
         ) : (
           list.map((task) => {
             const isOther = space.isShared && task.createdBy && task.createdBy !== currentUserId;
+            const assignees =
+              space.isShared && task.assigneeIds.length > 0
+                ? task.assigneeIds.map((uid) => ({
+                    name: getMemberDisplayName(uid, members, 20),
+                    color: getMemberColor(uid, members),
+                  }))
+                : undefined;
             return (
               <TaskRow
                 key={task.id}
@@ -297,8 +315,8 @@ export function TasksBlock({
                 onEdit={setEditingTask}
                 onDelete={handleDelete}
                 memberDotColor={isOther ? getMemberColor(task.createdBy!, members) : undefined}
-                // maxLen lớn — chip tên nằm riêng dòng dưới tiêu đề, đủ chỗ hơn hẳn khung 15 ký tự mặc định (dành cho chỗ chật như tooltip)
                 memberDotName={isOther ? getMemberDisplayName(task.createdBy!, members, 40) : undefined}
+                assignees={assignees}
               />
             );
           })
