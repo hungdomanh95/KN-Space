@@ -15,6 +15,15 @@ import { buildUiInitialState } from '../storage/normalize';
 import { defaultSettings } from './seed';
 import type { AppAction } from './appReducer';
 import { appReducer } from './appReducer';
+import { useAuth } from '../auth/AuthContext';
+import { tasksReducer } from './reducers/tasks';
+import { notifyTaskAssigned, notifyTaskCompleted } from '../storage/notifySharedTaskEvent';
+import { scheduleCompletedNotify, cancelCompletedNotify } from './completeNotifyDebounce';
+import {
+  computeTaskCreateNotifyEffect,
+  computeTaskUpdateNotifyEffect,
+  computeTaskToggleDoneNotifyEffect,
+} from './sharedTaskNotifyEffects';
 
 interface AppStateContextValue {
   state: AppState;
@@ -50,6 +59,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const hydratedRef = useRef(false);
+  const { session } = useAuth();
 
   // Bootstrap: load từ storage hoặc seed nếu rỗng.
   useEffect(() => {
@@ -240,6 +250,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
   // Wrap dispatch để intercept SPACE_DELETE cho shared space:
   // reducer xoá khỏi local state ngay, đồng thời gọi Supabase xoá trên DB.
+  /**
+   * Ngoài việc dispatch bình thường, chặn thêm 1 số action để bắn notify sự kiện Shared Space
+   * (assign/hoàn thành task — xem docs/features/shared-space-task-assign-notify.md). Tính effect
+   * TRƯỚC khi gọi dispatch() thật (dựa trên state hiện tại) vì cần biết giá trị "trước đó" để
+   * so sánh (assigneeIds cũ, done cũ) — sau dispatch() thì state cũ đã mất.
+   */
   const smartDispatch = React.useCallback((action: AppAction) => {
     if (action.type === 'SPACE_DELETE') {
       const space = state.spaces.find((s) => s.id === action.payload.id);
@@ -249,8 +265,48 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         );
       }
     }
+
+    const currentUserId = session?.user?.id;
+    const currentSpace = state.spaces.find((s) => s.id === state.currentSpaceId);
+
+    if (currentSpace?.isShared && currentSpace.sharedSpaceId && currentUserId) {
+      const sharedSpaceId = currentSpace.sharedSpaceId;
+
+      if (action.type === 'TASK_CREATE') {
+        // Task chưa có id thật ở payload (reducer tự sinh crypto.randomUUID()) — tính trước
+        // bằng chính tasksReducer (pure) rồi diff với tasks cũ để tìm đúng task vừa tạo.
+        const nextTasks = tasksReducer(currentSpace, action).tasks;
+        const prevIds = new Set(currentSpace.tasks.map((t) => t.id));
+        const created = nextTasks.find((t) => !prevIds.has(t.id));
+        if (created) {
+          const effect = computeTaskCreateNotifyEffect(created, currentUserId);
+          if (effect?.kind === 'assigned') notifyTaskAssigned(sharedSpaceId, effect.taskId, effect.taskTitle, effect.recipientUserIds);
+        }
+      }
+
+      if (action.type === 'TASK_UPDATE') {
+        const effect = computeTaskUpdateNotifyEffect(currentSpace, action, currentUserId);
+        if (effect?.kind === 'assigned') notifyTaskAssigned(sharedSpaceId, effect.taskId, effect.taskTitle, effect.recipientUserIds);
+      }
+
+      if (action.type === 'TASK_TOGGLE_DONE') {
+        const effect = computeTaskToggleDoneNotifyEffect(currentSpace, action);
+        if (effect?.kind === 'completed-schedule') {
+          const { taskId, taskTitle } = effect;
+          scheduleCompletedNotify(taskId, () => notifyTaskCompleted(sharedSpaceId, taskId, taskTitle, currentUserId));
+        } else if (effect?.kind === 'completed-cancel') {
+          cancelCompletedNotify(effect.taskId);
+        }
+      }
+
+      if (action.type === 'TASK_DELETE') {
+        // Task bị xoá trước khi debounce 15s kịp chạy — huỷ lịch, tránh notify về task không còn tồn tại.
+        cancelCompletedNotify(action.payload.id);
+      }
+    }
+
     dispatch(action);
-  }, [state.spaces]);
+  }, [state.spaces, state.currentSpaceId, session?.user?.id]);
 
   /**
    * Dispatch + lưu ngay lập tức, đợi kết quả thật — xem giải thích ở khai báo type phía trên.
