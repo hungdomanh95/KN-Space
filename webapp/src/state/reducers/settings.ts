@@ -26,7 +26,8 @@ export type SettingsAction =
   | { type: 'BLOCK_TOGGLE_COLLAPSED'; payload: { key: keyof CollapsedBlocks } }
   | { type: 'NOTE_SET_VIEW'; payload: { view: NoteView } }
   | { type: 'SETTINGS_SET_DASHBOARD_LAYOUT'; payload: { layout: DashboardLayout } }
-  | { type: 'SETTINGS_RESET_DASHBOARD_LAYOUT' };
+  | { type: 'SETTINGS_RESET_DASHBOARD_LAYOUT' }
+  | { type: 'SETTINGS_SET_PUSH_NOTIFY_SHARED_EVENTS'; payload: { enabled: boolean } };
 
 export function settingsReducer(settings: Settings, action: SettingsAction): Settings {
   switch (action.type) {
@@ -99,6 +100,8 @@ export function settingsReducer(settings: Settings, action: SettingsAction): Set
       return { ...settings, dashboardLayout: action.payload.layout };
     case 'SETTINGS_RESET_DASHBOARD_LAYOUT':
       return { ...settings, dashboardLayout: defaultDashboardLayout() };
+    case 'SETTINGS_SET_PUSH_NOTIFY_SHARED_EVENTS':
+      return { ...settings, pushNotifySharedSpaceEvents: action.payload.enabled };
     default:
       return settings;
   }

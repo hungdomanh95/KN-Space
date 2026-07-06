@@ -21,7 +21,7 @@ export function TaskFormModal({ task, onClose }: TaskFormModalProps) {
 
   function handleSave() {
     if (task) {
-      dispatch({ type: 'TASK_UPDATE', payload: { id: task.id, title, content, date, time } });
+      dispatch({ type: 'TASK_UPDATE', payload: { id: task.id, title, content, date, time, assigneeIds: task.assigneeIds } });
     } else {
       const createdBy = space.isShared && currentUserId ? currentUserId : undefined;
       dispatch({ type: 'TASK_CREATE', payload: { title, content, date, time, createdBy } });

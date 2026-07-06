@@ -12,6 +12,8 @@ export interface Task {
   order: number; // thứ tự sắp xếp thủ công (kéo-thả qua icon grip)
   createdBy?: string; // userId — chỉ set trong shared space
   createdAt?: string; // ISO timestamp lúc tạo — dùng hiện giờ gửi trong MobileChatScreen
+  /** user_id được giao việc — chỉ có ý nghĩa ở Shared Space, rỗng = chưa giao ai */
+  assigneeIds: string[];
 }
 
 export type ReminderFreqUnit = 'hour' | 'day' | 'month';
@@ -199,6 +201,8 @@ export interface Settings {
    * layout riêng từng Space — tránh hẳn việc đồng bộ/copy layout giữa các Space.
    */
   dashboardLayout: DashboardLayout;
+  /** Bật/tắt thông báo push cho sự kiện Shared Space (giao việc/hoàn thành) — độc lập với thông báo đến hạn. */
+  pushNotifySharedSpaceEvents: boolean;
 }
 
 /** UI state ephemeral — KHÔNG persist xuống storage. */

@@ -18,7 +18,12 @@ export function normalizeSpace(space: Space): Space {
       today: space.enabledBlocks?.today ?? true,
     },
     tasks: Array.isArray(space.tasks)
-      ? space.tasks.map((t, idx) => ({ ...t, content: t.content ?? '', order: t.order ?? idx }))
+      ? space.tasks.map((t, idx) => ({
+          ...t,
+          content: t.content ?? '',
+          order: t.order ?? idx,
+          assigneeIds: Array.isArray(t.assigneeIds) ? t.assigneeIds : [],
+        }))
       : [],
     reminders: Array.isArray(space.reminders)
       ? space.reminders.map((r) => {
@@ -183,6 +188,10 @@ export function normalizeSettings(
     // Dữ liệu cũ (trước khi có field này) không có `lastOpenedEpochDay` -> -1 để HYDRATE coi
     // là "ngày mới", tự snap lại ảnh nền/quote theo dayIndex đúng 1 lần khi nâng cấp lên.
     lastOpenedEpochDay: typeof settings.lastOpenedEpochDay === 'number' ? settings.lastOpenedEpochDay : -1,
+    pushNotifySharedSpaceEvents:
+      typeof settings.pushNotifySharedSpaceEvents === 'boolean'
+        ? settings.pushNotifySharedSpaceEvents
+        : fallback.pushNotifySharedSpaceEvents,
     dashboardLayout: normalizeDashboardLayout(settings.dashboardLayout ?? legacyDashboardLayout),
   };
 }

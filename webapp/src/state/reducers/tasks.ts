@@ -2,8 +2,8 @@ import type { Space, Task } from '../../types';
 
 /** Actions tác động lên dữ liệu Task trong 1 Space. TASK_SET_FILTER là UI-only, xử lý ở appReducer. */
 export type TaskAction =
-  | { type: 'TASK_CREATE'; payload: { title: string; content: string; date: string; time: string; createdBy?: string } }
-  | { type: 'TASK_UPDATE'; payload: { id: string; title: string; content: string; date: string; time: string } }
+  | { type: 'TASK_CREATE'; payload: { title: string; content: string; date: string; time: string; createdBy?: string; assigneeIds?: string[] } }
+  | { type: 'TASK_UPDATE'; payload: { id: string; title: string; content: string; date: string; time: string; assigneeIds: string[] } }
   | { type: 'TASK_DELETE'; payload: { id: string } }
   | { type: 'TASK_TOGGLE_DONE'; payload: { id: string } }
   | { type: 'TASK_REORDER'; payload: { draggedId: string; targetId: string } };
@@ -24,6 +24,7 @@ export function tasksReducer(space: Space, action: TaskAction): Space {
         done: false,
         order: minOrder - 1,
         createdAt: new Date().toISOString(),
+        assigneeIds: action.payload.assigneeIds ?? [],
         ...(action.payload.createdBy ? { createdBy: action.payload.createdBy } : {}),
       };
       return { ...space, tasks: [...space.tasks, newTask] };
@@ -39,6 +40,7 @@ export function tasksReducer(space: Space, action: TaskAction): Space {
                 content: action.payload.content,
                 date: action.payload.date,
                 time: action.payload.time,
+                assigneeIds: action.payload.assigneeIds,
               }
             : t,
         ),

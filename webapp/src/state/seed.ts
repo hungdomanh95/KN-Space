@@ -58,6 +58,7 @@ export function defaultSettings(): Settings {
     // (ngay sau seed, cùng lượt) không snap lại lần nữa một cách dư thừa.
     lastOpenedEpochDay: epochDay(),
     dashboardLayout: defaultDashboardLayout(),
+    pushNotifySharedSpaceEvents: true,
   };
 }
 
