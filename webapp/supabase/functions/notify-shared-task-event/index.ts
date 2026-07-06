@@ -135,10 +135,13 @@ Deno.serve(async (req: Request) => {
 
   webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
-  const title = event === 'completed'
-    ? `✅ ${spaceName}: ${taskTitle} đã hoàn thành`
-    : `📌 ${spaceName}: bạn được giao "${taskTitle}"`;
-  const payload = JSON.stringify({ title, url: `/?open=task:${taskId}` });
+  // title cố định, ngắn — tên Space + tên task (có thể dài) để ở body (không rút gọn) tránh bị
+  // điện thoại cắt mất khi 2 tên cộng dồn dài, xem mục 5.4 (cập nhật 2026-07-07).
+  const title = event === 'completed' ? '✅ Hoàn thành việc' : '📌 Được giao việc mới';
+  const body = event === 'completed'
+    ? `${spaceName}: ${taskTitle} đã hoàn thành`
+    : `${spaceName}: bạn được giao "${taskTitle}"`;
+  const payload = JSON.stringify({ title, body, url: `/?open=task:${taskId}` });
 
   let pushSent = 0;
   let pushFailed = 0;

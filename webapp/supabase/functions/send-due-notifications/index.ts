@@ -413,9 +413,12 @@ Deno.serve(async (req: Request) => {
   // 7) Gửi push cho từng item x từng subscription của user liên quan.
   for (const it of toSend) {
     const recipients = it.isShared ? (membersBySpace.get(it.spaceId) ?? []) : it.ownerUserId ? [it.ownerUserId] : [];
+    // title cố định, ngắn — tên item thật để ở body (không rút gọn) tránh bị điện thoại cắt mất
+    // khi tên item dài, xem docs/features/push-notification.md mục 5.3 (cập nhật 2026-07-07).
     const label = it.kind === 'task' ? 'Việc cần làm' : 'Nhắc việc';
     const payload = JSON.stringify({
-      title: `${label}: ${it.title}`,
+      title: `⏰ ${label} đến hạn`,
+      body: it.title,
       url: `/?open=${it.itemKey}`,
     });
 

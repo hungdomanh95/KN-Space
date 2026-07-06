@@ -96,7 +96,10 @@ Vẫn hiện cùng UI này trong Settings trên desktop (không ẩn riêng theo
 
 ### 5.3 Nội dung thông báo
 
-- Tiền tố nguồn gốc ngắn + tên item, tối đa khoảng 1 dòng. Ví dụ: "Nhắc việc: Họp team 15h" hoặc "Việc cần làm: Nộp báo cáo".
+> **Cập nhật 2026-07-07:** phát hiện khi test thật — nhồi hết tên item vào 1 chuỗi `title` duy nhất bị điện thoại (đặc biệt iOS) cắt mất thông tin khi tên item dài (`title` thông báo chỉ hiển thị gọn 1 dòng rồi tự cắt "…", không xuống dòng như `body`). Đổi sang tách `title` (nhãn ngắn **cố định**, không đổi theo item) + `body` (tên item thật, được phép dài/xuống dòng, không cắt).
+
+- `title`: `"⏰ Việc cần làm đến hạn"` hoặc `"⏰ Nhắc việc đến hạn"` — cố định, không chứa tên item.
+- `body`: tên item thật (task/reminder title), không rút gọn.
 - Bấm vào mở thẳng Dashboard đúng Space/item (không phải màn Home).
 
 ### 5.4 Accessibility
