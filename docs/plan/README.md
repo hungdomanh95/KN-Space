@@ -7,7 +7,7 @@ Toàn bộ UX sản phẩm (5 khối, đa Space, masonry, streak, modal tuỳ bi
 
 > Cập nhật quan trọng: **Phase 1 (Chrome Extension) đã bị thay thế hoàn toàn bởi Phase 2 (Web App)**. Thư mục `extension/` đã bị xoá khỏi repo. Lý do/diễn biến xem [phase-1-extension.md](phase-1-extension.md) (giữ lại làm lịch sử) và [phase-2-pwa-supabase.md](phase-2-pwa-supabase.md) (nền tảng hiện hành).
 >
-> Cập nhật (2026-07-03): **Phase 3 (Shared space) không còn ở trạng thái "hoãn"** — đang được code tích cực song song với việc hoàn thiện Phase 2 (invite link, Owner/Member, chat mobile theo Space chung, xem [../features/shared-space.md](../features/shared-space.md) và `webapp/CLAUDE.md`). Nếu tài liệu này và code thật lệch nhau, ưu tiên tin code (`webapp/src/storage/sharedSpaceStore.ts`, `webapp/src/features/spaces/`).
+> Cập nhật (2026-07-03): **Phase 3 (Shared space) không còn ở trạng thái "hoãn"** — đang được code tích cực song song với việc hoàn thiện Phase 2 (invite link, Owner/Member, chat mobile theo Space chung, xem [../features/shared-space.md](../features/shared-space.md) và `CLAUDE.md`). Nếu tài liệu này và code thật lệch nhau, ưu tiên tin code (`src/storage/sharedSpaceStore.ts`, `src/features/spaces/`).
 
 ## Roadmap
 

@@ -1,5 +1,7 @@
 # Assign Task + Thông báo sự kiện Shared Space — Implementation Plan
 
+> **Lưu ý cấu trúc (2026-07-07):** repo đã được gộp phẳng sau khi plan này thực thi xong — thư mục `webapp/` không còn tồn tại, toàn bộ code/docs giờ nằm thẳng ở root. Mọi đường dẫn `webapp/...` và lệnh `cd webapp && ...` bên dưới là ghi chép lịch sử tại thời điểm viết (trước khi gộp) — đọc là `webapp/xxx` → `xxx` (bỏ tiền tố), không cần `cd webapp` nữa.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Cho phép Member trong Shared Space gán (assign) Task cho 1/nhiều/tất cả Member, và gửi push notification tức thời khi Task được giao hoặc được đánh dấu hoàn thành.

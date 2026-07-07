@@ -1,7 +1,7 @@
 -- =============================================================================
 -- KN-Space — Schema cho tính năng Shared Space (Phase 3)
 -- =============================================================================
--- Chạy file này RIÊNG, SAU KHI đã có schema Phase 2 (webapp/supabase/schema.sql).
+-- Chạy file này RIÊNG, SAU KHI đã có schema Phase 2 (supabase/schema.sql).
 -- Không xung đột với bảng kn_space_state đã có.
 --
 -- Quyết định thiết kế đã chốt:

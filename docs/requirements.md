@@ -25,7 +25,7 @@ Người dùng chấp nhận:
 - Vẫn có thể dùng Export/Import JSON làm backup thủ công.
 
 ### 2.1 Nền tảng & môi trường chạy
-- **Web App**: React + TypeScript + Vite + Tailwind CSS (`webapp/`).
+- **Web App**: React + TypeScript + Vite + Tailwind CSS.
 - **Hosting**: Vercel, domain riêng `kn-space.io.vn`.
 - **Lưu trữ**: Supabase (Postgres), không còn `chrome.storage`.
 - **Đăng nhập**: Google OAuth qua Supabase Auth (không phải magic-link email).
@@ -411,7 +411,7 @@ Accessibility cơ bản:
 
 ## 10. Ràng Buộc Kỹ Thuật
 Nền tảng:
-- Web App: React + TypeScript + Vite + Tailwind CSS (`webapp/`).
+- Web App: React + TypeScript + Vite + Tailwind CSS.
 - Hosting: Vercel, domain riêng `kn-space.io.vn` (DNS: A record `216.198.79.1` + CNAME `www`, mua tại matbao.net).
 - Không phải Chrome Extension, không cần permission/manifest MV3, không có CSP riêng của extension.
 - Dùng **lucide-react** làm thư viện icon chính.
@@ -434,7 +434,7 @@ Lưu trữ (Supabase):
 - **Mất mạng giữa lúc sửa dữ liệu — quyết định đã chốt:** không cần hàng đợi/retry tự động. Giữ nguyên hành vi hiện tại: `flushSave` lỗi → chỉ hiện banner cảnh báo lưu lỗi, người dùng tự sửa lại (thường chỉ 1 lần) khi có mạng trở lại. Đủ cho quy mô cá nhân hiện tại (1-2 người dùng); không xây thêm cơ chế lưu tạm/queue (xem mục 12).
 
 PWA:
-- `webapp/public/manifest.webmanifest`: tên, icon 192/512, `display: standalone`, `theme_color`/`background_color` — đủ để "Add to Home Screen" trên iOS/Android, mở full-screen như app gốc.
+- `public/manifest.webmanifest`: tên, icon 192/512, `display: standalone`, `theme_color`/`background_color` — đủ để "Add to Home Screen" trên iOS/Android, mở full-screen như app gốc.
 - **Chưa có service worker / offline-first** — cố ý chưa làm, không phải bug; có thể bổ sung sau nếu phát sinh nhu cầu dùng khi mất mạng.
 
 Responsive desktop/di động:
@@ -444,8 +444,7 @@ Responsive desktop/di động:
 
 ## 11. Cấu Trúc Web App
 ```
-webapp/
-  index.html
+index.html
   package.json
   tsconfig.json
   vite.config.ts
@@ -500,7 +499,7 @@ Vai trò:
 
 ## 12. Verification
 Dev cần kiểm tra:
-- `npm run build` thành công (`webapp/`).
+- `npm run build` thành công.
 - Đăng nhập Google OAuth thành công, redirect đúng về app sau khi xác thực.
 - Đăng xuất hoạt động, quay lại màn đăng nhập.
 - User mới (chưa có hàng trong `kn_space_state`) được seed dữ liệu demo đúng, lưu thành công lên Supabase.
@@ -521,5 +520,5 @@ Dev cần kiểm tra:
 - Mất mạng giữa lúc sửa dữ liệu: có cảnh báo, không crash app (chưa có offline-first/queue — quyết định đã chốt, không cần, xem mục 10).
 
 ## Câu hỏi mở / việc tồn đọng
-1. **Mục 4/4.1 (Layout Dashboard tự do) đã được rà soát lại đúng code thật** (`webapp/src/layout/AppLayout.tsx`, `useDashboardLayout.ts`, `dashboardLayoutUtils.ts`) — khối "Hôm nay" đã được bổ sung mô tả riêng ở **mục 5.6**. 2 câu hỏi mở còn lại được ghi ngay cuối mục 4.1 (các mục 5.5/6/8/12 vẫn còn câu chữ tham chiếu bố cục "3 khối cố định" cũ, cần một lượt rà soát riêng để đồng bộ; và câu hỏi về giới hạn số khối ghép ngang tối đa/slot).
+1. **Mục 4/4.1 (Layout Dashboard tự do) đã được rà soát lại đúng code thật** (`src/layout/AppLayout.tsx`, `useDashboardLayout.ts`, `dashboardLayoutUtils.ts`) — khối "Hôm nay" đã được bổ sung mô tả riêng ở **mục 5.6**. 2 câu hỏi mở còn lại được ghi ngay cuối mục 4.1 (các mục 5.5/6/8/12 vẫn còn câu chữ tham chiếu bố cục "3 khối cố định" cũ, cần một lượt rà soát riêng để đồng bộ; và câu hỏi về giới hạn số khối ghép ngang tối đa/slot).
 2. ~~Phát sinh khi viết mục 5.6: hành vi khối Hôm nay không khớp mô tả ban đầu~~ — **đã chốt (2026-07-03)**: giữ đúng code thật (resize được + tắt/bật theo Space), xem ghi chú "Đã chốt" cuối mục 5.6.

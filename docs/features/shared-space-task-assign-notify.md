@@ -68,13 +68,115 @@ Tất cả Member (kể cả Owner) đều **assign được cho bất kỳ ai**
 
 ---
 
-## 5. UX / UI (định hướng — chi tiết để `uiux` quyết)
+## 5. UX / UI
+
+> **Cập nhật 2026-07-07 (uiux):** mục 5.1/5.2 dưới đây đã chốt số liệu cụ thể sau khi audit UI thật (đối chiếu code
+> `TaskFormModal.tsx`, `TasksBlock.tsx`, `MemberAvatar.tsx`). Trước đó phần này chỉ là định hướng chung chung
+> ("chi tiết để uiux quyết") và code đã được dev hiện thực theo phỏng đoán riêng (checkbox mặc định trình duyệt,
+> avatar `size={16}`/`size={18}` cố định không đổi theo breakpoint, checklist không có xử lý mobile) — audit phát hiện
+> đây là nguồn gốc cảm giác "còn lỗi nhiều" khi nhìn UI thật. Spec dưới đây là **con số cuối cùng, cần dev áp dụng lại**.
 
 ### 5.1 Chọn assignee
-Checklist Member (đã có sẵn danh sách này từ panel quản lý Member) + nút "Chọn tất cả". Chỉ hiện khối này khi `space.isShared`.
+
+Checklist Member (đã có sẵn danh sách này từ panel quản lý Member) + nút "Chọn tất cả". Chỉ hiện khối này khi
+`space.isShared`.
+
+**Vấn đề phát hiện khi audit:** khối này (label `flex items-center gap-2`, `<input type="checkbox">` mặc định
+trình duyệt, không `max-md:` nào) là field DUY NHẤT trong `TaskFormModal` không có override mobile, trong khi field
+nội dung ngay phía trên đã có (`note-content-field max-md:min-h-[120px]`). Checkbox mặc định trình duyệt cao khoảng
+13-16px, thấp hơn nhiều ngưỡng touch-target khuyến nghị 44px (WCAG 2.5.5). Mỗi dòng trong checklist cũng không có
+padding dọc riêng nên vùng bấm thực tế cả dòng (dù `<label>` bọc quanh `<input>` nên về logic click-anywhere đã đúng)
+vẫn quá thấp trên mobile.
+
+**Spec chốt:**
+
+| Thuộc tính | Desktop | Mobile (`≤639px`, `max-md:`) |
+|---|---|---|
+| Kích thước ô checkbox | 16px (`h-4 w-4`) | 20px (`h-5 w-5`) |
+| Màu checkbox khi tick | `accent-[var(--accent)]` (đồng bộ màu accent theme, tránh xanh mặc định của trình duyệt lệch tông) | như desktop |
+| Chiều cao tối thiểu mỗi dòng (`<label>`) | `min-h-[32px]` | `min-h-[44px]` (đạt ngưỡng touch-target khuyến nghị) |
+| Padding dọc mỗi dòng | `py-1` | `py-2` |
+| Feedback khi bấm (touch) | — | thêm `active:bg-[var(--raised)] rounded-[8px] -mx-1 px-1` để có phản hồi thị giác tức thời khi chạm (native checkbox không tự có hiệu ứng active rõ trên mobile) |
+| Avatar trong checklist (`MemberAvatar size`) | 18px (giữ nguyên) | 22px |
+| Khung checklist (`max-h-[160px] overflow-y-auto`) | giữ nguyên `max-h-[160px]` | **bỏ giới hạn chiều cao riêng**: `max-md:max-h-none max-md:overflow-visible` |
+
+Lý do bỏ `max-h` trên mobile: `Modal.tsx` đã tự chuyển modal thành full-height + scroll riêng
+(`max-md:h-full max-md:max-h-full ... overflow-y-auto`) khi ở mobile. Nếu vẫn giữ khung con `max-h-[160px]
+overflow-y-auto` bên trong, sẽ tạo ra **2 vùng cuộn lồng nhau** (nested scroll) — trải nghiệm cuộn trên cảm ứng rất
+khó chịu (ngón tay đặt đúng vùng nào cuộn vùng đó, dễ cuộn nhầm). Trên mobile nên để checklist giãn tự nhiên theo nội
+dung, cuộn chung với toàn modal. Trên desktop vẫn giữ khung 160px vì đó là hành vi hữu ích (tránh modal quá cao khi
+Space có nhiều Member, chuột cuộn 1 vùng nhỏ không gây khó chịu như cảm ứng).
+
+**Có cần thay checkbox mặc định bằng custom control riêng (div/SVG) không?** Không cần thiết — chỉ cần resize +
+đổi màu qua `accent-color` (đã hỗ trợ tốt trên Chrome/Safari/Firefox hiện đại, kể cả iOS Safari ≥15.4) là đủ đạt
+kích thước touch-target mong muốn mà **vẫn giữ nguyên semantics/accessibility gốc** của `<input type="checkbox">`
+(focus ring mặc định, phím Space để tick, screen reader đọc đúng trạng thái) — không có lý do để đánh đổi lấy 1
+custom control phức tạp hơn khi native đã đáp ứng đủ yêu cầu kích thước.
 
 ### 5.2 Hiển thị assignee trên Task item
-Avatar/initials nhỏ cạnh tiêu đề task, tối đa hiển thị vài người rồi rút gọn kiểu "+2" nếu nhiều — theo pattern avatar đã dùng ở panel Member.
+
+Avatar/initials nhỏ cạnh tiêu đề task, tối đa hiển thị vài người rồi rút gọn kiểu "+N" nếu nhiều.
+
+> Lưu ý: pattern "avatar đã dùng ở panel Member" (nhắc ở bản định hướng cũ) là avatar 28px (`h-7 w-7`) trong
+> `SpaceInviteModal` — đó là avatar cho **nội dung chính** của 1 dòng danh sách Member đầy đủ, không phải bối cảnh
+> phù hợp để áp thẳng vào đây. Avatar trên `TaskRow` chỉ là **badge phụ** cạnh chip meta/tiêu đề — cần nhỏ hơn để
+> không lấn át tiêu đề task, nhưng vẫn phải đổi theo breakpoint để không bị "lệch tỉ lệ" so với các control cạnh nó
+> (nút tick-done đã to lên `max-md:h-[24px] w-[24px]` trên mobile trong khi avatar đứng yên `size={16}` — đây chính
+> là 1 trong 3 điểm audit phát hiện).
+
+**Vấn đề phát hiện khi audit:** cả avatar "người tạo" (`memberDotColor`, đầu dòng) lẫn avatar "assignee" (cụm cạnh
+chip meta) đều dùng `MemberAvatar size={16}` cố định, không đổi theo breakpoint — trong khi nút tick-done cùng dòng
+to lên `24px` và icon check bên trong to lên `15px` trên mobile. Kết quả: avatar trông nhỏ/khó đọc chữ cái đầu trên
+mobile so với phần còn lại của dòng, lệch nhịp thị giác.
+
+**Spec chốt kích thước avatar (`MemberAvatar size`):**
+
+| Vị trí dùng | Desktop | Mobile (`≤639px`) |
+|---|---|---|
+| Avatar "người tạo" (đầu dòng `TaskRow`, `memberDotColor`) | 16px (giữ nguyên) | 20px |
+| Avatar "assignee" (cụm cạnh chip meta, `TaskRow`) | 16px (giữ nguyên) | 20px |
+| Avatar trong checklist Member (`TaskFormModal`) | 18px (giữ nguyên) | 22px |
+
+> Ghi chú kỹ thuật cho dev: `MemberAvatar` hiện chỉ nhận 1 prop `size: number` áp thẳng vào `style` inline (không
+> phải class Tailwind) nên không tự đổi theo breakpoint được. Cách đơn giản nhất: đọc `window.matchMedia('(max-width:
+> 639px)')` (hoặc hook `useIsMobile` nếu dự án đã có sẵn pattern tương tự ở nơi khác) ở component cha (`TaskRow`,
+> `TaskFormModal`) rồi truyền `size` tương ứng xuống — không cần sửa `MemberAvatar` để nhận className/CSS var, giữ
+> component này đơn giản như hiện tại.
+
+**Khoảng cách (gap) giữa các avatar liền kề trong cụm assignee:**
+
+| | Desktop | Mobile (`≤639px`) |
+|---|---|---|
+| Gap giữa các avatar | 4px (`gap-1`, giữ nguyên) | 6px (`gap-1.5`) — avatar to hơn (20px) cần thêm khoảng thở để không dính chùm, tránh nhìn như 1 khối đặc |
+
+**Cụm "+N" khi nhiều hơn số avatar hiển thị tối đa:**
+
+- Desktop: giữ nguyên `assignees.slice(0, 3)` — 3 avatar rồi rút gọn "+N".
+- Mobile (`≤639px`): giảm xuống `assignees.slice(0, 2)` — 2 avatar rồi rút gọn "+N". Lý do: avatar mobile lớn hơn
+  (20px so với 16px desktop) + gap lớn hơn (6px so với 4px) → 3 avatar + "+N" trên màn hẹp (320-375px) chiếm quá
+  nhiều bề ngang của 1 dòng vốn đã phải chia sẻ chỗ với chip ngày-giờ, dễ đẩy toàn bộ xuống dòng riêng không cần
+  thiết. 2 avatar + "+N" đủ truyền tải "có nhiều người được giao" mà gọn hơn.
+
+**Hành vi wrap/overflow khi 1 dòng có đủ cả 3 cụm (chip ngày-giờ + chip tên người tạo + cụm avatar assignee) trên
+mobile:**
+
+Container `flex flex-wrap items-center gap-1.5` đã cho phép tự xuống dòng, không bị vỡ layout — vấn đề chỉ là
+**thứ tự ưu tiên khi phải xuống dòng**, hiện chưa được kiểm soát (thứ tự DOM = thứ tự hiển thị mặc định). Chốt thứ
+tự ưu tiên theo mức độ actionable, từ cao xuống thấp:
+
+1. **Chip ngày-giờ** (`meta`) — thông tin hạn chót, quan trọng nhất, luôn hiển thị đầu tiên mọi breakpoint.
+2. **Cụm avatar assignee** — cho biết ai chịu trách nhiệm, actionable thứ nhì.
+3. **Chip tên người tạo** (`memberDotName`, dạng text) — thông tin **trùng lặp một phần** với avatar người tạo đã
+   hiển thị riêng ở đầu dòng (`memberDotColor`), chỉ khác là chip có tên đầy đủ dạng chữ còn avatar chỉ có 1 ký tự
+   viết tắt + `title` tooltip (tooltip hover không đáng tin trên cảm ứng). Vì có avatar đầu dòng "gánh" một phần vai
+   trò nhận diện rồi, chip text này là ứng viên rút gọn đầu tiên khi thiếu chỗ.
+
+Áp dụng: trên mobile (`max-md:`), đổi thứ tự hiển thị bằng `order-*` (không đổi thứ tự DOM, giữ nguyên thứ tự đọc
+cho screen reader) — `meta` → `order-1`, cụm avatar assignee → `order-2`, chip người tạo → `order-3`. Trên màn cực
+hẹp (`max-sm:`, `≤479px`), **ẩn hẳn chip tên người tạo** (`max-sm:hidden`) — chấp nhận mất tên đầy đủ dạng chữ ở
+kích thước màn này, giữ lại avatar đầu dòng (đã có `title`/`aria-label` đúng tên) làm nguồn nhận diện duy nhất. Cụm
+avatar assignee và chip ngày-giờ **không bao giờ bị ẩn** — đây là thông tin actionable, chỉ chip người tạo (thông
+tin phụ, trùng lặp) mới bị rút gọn.
 
 ### 5.3 Toggle Settings riêng
 Trong Settings → tab "Chung" → khối "Thông báo đẩy" hiện có, thêm 1 sub-toggle: **"Thông báo hoạt động Space chung"** (mặc định bật), độc lập với toggle chính. Tắt sub-toggle này → không nhận noti sự kiện (giao việc/hoàn thành) nhưng **vẫn** nhận noti đến hạn bình thường.
@@ -85,6 +187,27 @@ Trong Settings → tab "Chung" → khối "Thông báo đẩy" hiện có, thêm
 
 - Giao việc: `title: "📌 Được giao việc mới"`, `body: "[Tên Space]: bạn được giao "<tên task>""`
 - Hoàn thành: `title: "✅ Hoàn thành việc"`, `body: "[Tên Space]: <tên task> đã hoàn thành"`
+
+### 5.5 Audit UI khối Thông báo (Dashboard) + sub-toggle Settings — 2026-07-07
+
+Đã đọc lại trực tiếp `NotificationsBlock.tsx` + `computeNotifications.ts` (khối "Thông báo" trên Dashboard) và
+`PushNotificationSettings.tsx` (sub-toggle mục 5.3) để xác nhận có bug hiển thị/responsive liên quan tính năng này
+hay không.
+
+**Kết luận: không phát hiện bug.**
+
+- `NotificationsBlock` hoàn toàn **độc lập** với 2 sự kiện push mới ("được giao"/"hoàn thành") — nó chỉ derive từ
+  Task có `date === hôm nay` + Reminder đến hạn + Habit chưa xong trong ngày (`computeNotifications.ts`), không đọc
+  `assigneeIds` hay liên quan gì đến cơ chế push event-driven ở tài liệu này. Vì vậy tính năng Assign Task không thể
+  gây bug ở khối này — 2 hệ thống tách biệt hoàn toàn, đúng như mục 1 mô tả ("không dùng chung code").
+- Khối "Thông báo" dùng `flex items-start gap-2`, text trong `min-w-0 flex-1 flex-col` (wrap tự nhiên, không có
+  `truncate`/`line-clamp` gây cắt chữ), nút "Xong"/"Đã xong" `flex-none` không co giãn — không thấy dấu hiệu tràn
+  chữ/vỡ layout ở cả 2 breakpoint khi đọc code.
+- Sub-toggle "Thông báo hoạt động Space chung" trong `PushNotificationSettings.tsx` (dòng ~87-115) copy đúng cấu
+  trúc/class của toggle chính ngay phía trên (đã responsive-tested trước đó) — `min-w-0` cho phần text (title + hint
+  wrap tự nhiên, không cắt), switch `flex-none` cố định 42px. Không cần sửa gì thêm.
+
+Không cập nhật `push-notification.md` vì không có phát hiện mới liên quan.
 
 ---
 
@@ -167,13 +290,13 @@ Không còn câu hỏi mở — đã chốt với chủ dự án (2026-07-06):
 `docs/superpowers/plans/2026-07-06-shared-space-task-assign-notify.md` và ledger `.superpowers/sdd/progress.md`).
 
 Đã verify tại chỗ (trong phiên code):
-- `cd webapp && npx vitest run` — 15/15 test pass (4 file test: `tasks.test.ts`, `settings.test.ts`, `completeNotifyDebounce.test.ts`, `sharedTaskNotifyEffects.test.ts`).
+- `npx vitest run` — 15/15 test pass (4 file test: `tasks.test.ts`, `settings.test.ts`, `completeNotifyDebounce.test.ts`, `sharedTaskNotifyEffects.test.ts`).
 - `npx tsc --noEmit` — sạch, không lỗi.
 - `npm run build` — build thành công.
 - Review riêng cho Task 5 (Edge Function) đã trace kỹ luồng bảo mật (JWT verify → membership check → lọc recipient theo member thật → tôn trọng opt-out) — không tìm thấy đường nào bypass auth/gửi push cho người không phải member.
 
 **CHƯA verify được** (cần chủ dự án tự làm, không có credentials/thiết bị thật trong phiên code):
-1. Deploy Edge Function: `cd webapp && supabase functions deploy notify-shared-task-event` (không cần set thêm secret VAPID — dùng chung với `send-due-notifications`).
+1. Deploy Edge Function: `supabase functions deploy notify-shared-task-event` (không cần set thêm secret VAPID — dùng chung với `send-due-notifications`).
 2. Test end-to-end thật với 2 tài khoản Google khác nhau (đã cài PWA + bật push):
    - A tạo Shared Space, mời B join.
    - A tạo task, giao (assign) cho B → xác nhận B nhận push "📌 Bạn được giao...", A không nhận gì.
@@ -183,3 +306,11 @@ Không còn câu hỏi mở — đã chốt với chủ dự án (2026-07-06):
 3. Kiểm tra UI thật trên browser: assignee checklist trong `TaskFormModal`, avatar hiển thị trên `TaskRow`, sub-toggle Settings — tất cả mới chỉ qua code review, chưa có screenshot/thao tác tay thật.
 
 > Xem chi tiết đầy đủ ở Task 9 trong file plan.
+
+**Cập nhật 2026-07-07 (uiux):** đã audit UI thật theo yêu cầu chủ dự án (nhìn giao diện thấy "còn lỗi nhiều") —
+xác nhận 3 điểm cụ thể: (1) checklist "Giao cho" trong `TaskFormModal` không có override mobile nào, checkbox mặc
+định quá nhỏ so với touch-target khuyến nghị; (2) avatar assignee + avatar người tạo trên `TaskRow` dùng `size`
+cố định không đổi theo breakpoint trong khi nút tick-done cạnh đó có đổi; (3) chưa có thứ tự ưu tiên rõ ràng khi
+chip ngày-giờ + chip người tạo + cụm avatar assignee cùng tranh chỗ trên 1 dòng ở mobile. Đã chốt số liệu cụ thể ở
+mục 5.1/5.2 ở trên — **cần dev áp dụng lại rồi mới verify UI thật lần nữa** (bước 3 ở trên coi như phải làm lại sau
+khi áp dụng spec mới). Khối Thông báo (Dashboard) + sub-toggle Settings đã audit riêng ở mục 5.5 — không có bug.

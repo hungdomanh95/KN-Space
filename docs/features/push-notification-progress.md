@@ -1,5 +1,7 @@
 # Push Notification — Tiến độ triển khai
 
+> **Lưu ý cấu trúc (2026-07-07):** repo đã được gộp phẳng — thư mục `webapp/` không còn tồn tại, toàn bộ code/docs giờ nằm thẳng ở root. Mọi đường dẫn `webapp/...` và lệnh `cd webapp && ...` bên dưới là ghi chép lịch sử tại thời điểm viết (trước khi gộp) — đọc là `webapp/xxx` → `xxx` (bỏ tiền tố), không cần `cd webapp` nữa.
+
 > Theo dõi tiến độ code thật cho `docs/features/push-notification.md`. Cập nhật ngay sau khi hoàn thành mỗi phần nhỏ — làm theo kiểu cuốn chiếu (1 phần xong mới sang phần kế), để nếu mất phiên làm việc vẫn biết chính xác đang ở đâu và resume đúng chỗ.
 
 Quy ước trạng thái: `⬜ Chưa làm` / `🔶 Đang làm` / `✅ Xong` / `⛔ Bị chặn (ghi rõ lý do)`.

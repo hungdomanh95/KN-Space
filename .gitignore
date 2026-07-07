@@ -3,19 +3,19 @@
 # File export/import dữ liệu cá nhân (qua Settings > Export JSON) — không phải code, không commit.
 kn-space-backup-*.json
 
-# webapp (web app cá nhân — Phase 2: React + Vite + Supabase)
-webapp/node_modules/
-webapp/dist/
-webapp/*.tsbuildinfo
-# Chứa Supabase URL/anon key của riêng máy — KHÔNG commit (xem webapp/.env.example).
-webapp/.env.local
+# Web App (React + Vite + Supabase)
+node_modules/
+dist/
+*.tsbuildinfo
+# Chứa Supabase URL/anon key của riêng máy — KHÔNG commit (xem .env.example).
+.env.local
 .playwright-mcp
 
 # Cache cục bộ của Supabase CLI (project ref đã link, không phải code) — không commit.
-webapp/supabase/.temp/
+supabase/.temp/
 
 # Test files — không commit, chỉ dùng local
-webapp/src/__tests__/
+src/__tests__/
 
 # Scratch working memory của Subagent-Driven Development (task brief/report/diff/ledger)
 # — không phải code/tài liệu chính thức, không commit.

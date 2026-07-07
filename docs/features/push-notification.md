@@ -211,7 +211,7 @@ Hiện repo **chưa có** service worker nào (chỉ có `manifest.webmanifest` 
 
 Mục này **liên quan gián tiếp** tới Push Notification (không phải cùng tính năng) nhưng được chốt cùng lúc vì cùng phát sinh từ nỗi lo chạm giới hạn dung lượng Supabase Free tier (500MB database) trong buổi thảo luận này.
 
-**Hiện trạng:** `webapp/src/features/settings/HomeBackgroundSettings.tsx` đã có resize ảnh nền upload (`MAX_DIMENSION = 1920px` cạnh dài) + nén JPEG (`JPEG_QUALITY = 0.85`) trước khi lưu base64 vào `settings.homeBackground` (đồng bộ qua Supabase, 6 slot/user). Tuy nhiên **chưa có giới hạn dung lượng byte cứng** sau khi nén — ảnh gốc rất lớn/nhiều chi tiết vẫn có thể cho ra base64 khá nặng dù đã resize/nén theo kích thước và quality cố định.
+**Hiện trạng:** `src/features/settings/HomeBackgroundSettings.tsx` đã có resize ảnh nền upload (`MAX_DIMENSION = 1920px` cạnh dài) + nén JPEG (`JPEG_QUALITY = 0.85`) trước khi lưu base64 vào `settings.homeBackground` (đồng bộ qua Supabase, 6 slot/user). Tuy nhiên **chưa có giới hạn dung lượng byte cứng** sau khi nén — ảnh gốc rất lớn/nhiều chi tiết vẫn có thể cho ra base64 khá nặng dù đã resize/nén theo kích thước và quality cố định.
 
 **Yêu cầu bổ sung:** thêm giới hạn dung lượng tối đa sau khi nén cho mỗi ảnh nền upload.
 
