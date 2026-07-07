@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import * as Checkbox from '@radix-ui/react-checkbox';
 import { Flame, Pencil, Plus, Trash2, Check } from 'lucide-react';
 import { BlockShell } from '../../components/BlockShell';
 import { EmptyState } from '../../components/EmptyState';
@@ -103,33 +104,26 @@ export function HabitsBlock({
                     doneToday ? '[&_.habit-title]:text-[var(--done)]' : ''
                   }`}
                 >
-                  <span
+                  <Checkbox.Root
+                    checked={doneToday}
+                    onCheckedChange={() => dispatch({ type: 'HABIT_TOGGLE_TODAY', payload: { id: habit.id } })}
                     className="flex min-w-0 flex-[1_1_120px] cursor-pointer items-center gap-[9px]"
-                    role="checkbox"
-                    aria-checked={doneToday}
-                    tabIndex={0}
                     title={doneToday ? 'Đánh dấu chưa hoàn thành hôm nay' : 'Đánh dấu đã hoàn thành hôm nay'}
-                    onClick={() => dispatch({ type: 'HABIT_TOGGLE_TODAY', payload: { id: habit.id } })}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        dispatch({ type: 'HABIT_TOGGLE_TODAY', payload: { id: habit.id } });
-                      }
-                    }}
                   >
                     <span
-                      className={`mt-px flex h-[17px] w-[17px] flex-none cursor-pointer items-center justify-center
-                        rounded-[6px] border-[1.6px] transition-all
-                        duration-150 [&_.icon]:opacity-0 [&_.icon]:transition-opacity [&_.icon]:duration-100
-                        ${doneToday ? '[&_.icon]:opacity-100' : ''}`}
-                      style={doneToday
-                        ? { background: 'var(--done)', borderColor: 'var(--done)' }
-                        : { background: 'var(--raised)', borderColor: 'var(--border-control)' }}
+                      className={`mt-px flex h-[17px] w-[17px] flex-none items-center justify-center
+                        rounded-[6px] border-[1.6px] transition-all duration-150 ${
+                          doneToday
+                            ? 'bg-[var(--done)] border-[color:var(--done)]'
+                            : 'bg-[var(--raised)] border-[color:var(--border-control)]'
+                        }`}
                     >
-                      <Check className="icon h-[11px] w-[11px] text-white" size={11} strokeWidth={3} />
+                      <Checkbox.Indicator>
+                        <Check className="icon h-[11px] w-[11px] text-white" size={11} strokeWidth={3} />
+                      </Checkbox.Indicator>
                     </span>
                     <span className="habit-title overflow-hidden text-ellipsis whitespace-nowrap">{habit.title}</span>
-                  </span>
+                  </Checkbox.Root>
                   <span className="flex flex-none items-center gap-1.5">
                     <span className="inline-flex flex-none items-center gap-1.5 whitespace-nowrap rounded-[20px] bg-[rgba(255,138,61,.12)] px-[9px] py-1 text-[0.7812rem] font-bold text-[var(--habit-color)]">
                       <Flame className="icon h-3 w-3" size={12} /> {streak} ngày liên tiếp

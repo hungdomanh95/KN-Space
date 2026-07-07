@@ -17,6 +17,7 @@
 // =============================================================================
 
 import { useEffect, useState } from 'react';
+import { PartyPopper, XCircle, HelpCircle } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { acceptInvite, loadSharedSpaces } from '../storage/sharedSpaceStore';
 import type { Space } from '../types';
@@ -177,40 +178,10 @@ export function JoinSpacePage({ token, onJoined, onCancel }: JoinSpacePageProps)
   // ---------------------------------------------------------------------------
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '100vh',
-        backgroundColor: 'var(--bg)',
-        color: 'var(--text)',
-        padding: '24px 16px',
-      }}
-    >
-      <div
-        style={{
-          width: '100%',
-          maxWidth: '400px',
-          borderRadius: '20px',
-          border: '1px solid var(--border)',
-          backgroundColor: 'var(--modal-bg)',
-          padding: '40px 32px',
-          boxShadow: 'var(--shadow)',
-          textAlign: 'center',
-        }}
-      >
+    <div className="flex min-h-screen items-center justify-center bg-[var(--bg)] px-4 py-6 text-[var(--text)]">
+      <div className="w-full max-w-[400px] rounded-2xl border border-[color:var(--border)] bg-[var(--modal-bg)] px-8 py-10 text-center shadow-[var(--shadow)]">
         {/* Logo / wordmark */}
-        <p
-          style={{
-            fontSize: '0.8125rem',
-            fontWeight: 600,
-            color: 'var(--accent)',
-            letterSpacing: '0.06em',
-            textTransform: 'uppercase',
-            marginBottom: '24px',
-          }}
-        >
+        <p className="mb-6 text-[0.8125rem] font-semibold uppercase tracking-[.06em] text-[var(--accent)]">
           KN-Space
         </p>
 
@@ -240,19 +211,11 @@ export function JoinSpacePage({ token, onJoined, onCancel }: JoinSpacePageProps)
 
         {status.phase === 'success' && (
           <StatusView
-            icon={
-              <span style={{ fontSize: '2.5rem', lineHeight: 1 }}>
-                🎉
-              </span>
-            }
+            icon={<PartyPopper size={40} strokeWidth={1.75} className="text-[var(--accent)]" aria-hidden="true" />}
             title={`Bạn đã tham gia Space "${status.spaceName}"!`}
             subtitle="Space đã được thêm vào danh sách của bạn."
           >
-            <button
-              type="button"
-              onClick={onCancel}
-              style={btnPrimaryStyle}
-            >
+            <button type="button" onClick={onCancel} className="btn-primary w-full justify-center py-[11px] text-[0.9375rem]">
               Vào Space ngay
             </button>
           </StatusView>
@@ -260,19 +223,11 @@ export function JoinSpacePage({ token, onJoined, onCancel }: JoinSpacePageProps)
 
         {status.phase === 'error' && (
           <StatusView
-            icon={
-              <span style={{ fontSize: '2rem', lineHeight: 1, color: 'var(--reminder-color)' }}>
-                ✕
-              </span>
-            }
+            icon={<XCircle size={32} className="text-[var(--reminder-color)]" aria-hidden="true" />}
             title="Lời mời không hợp lệ hoặc đã hết hạn"
             subtitle={status.message}
           >
-            <button
-              type="button"
-              onClick={onCancel}
-              style={btnSecondaryStyle}
-            >
+            <button type="button" onClick={onCancel} className="btn-ghost w-full justify-center py-[11px] text-[0.9375rem]">
               Về trang chủ
             </button>
           </StatusView>
@@ -280,19 +235,11 @@ export function JoinSpacePage({ token, onJoined, onCancel }: JoinSpacePageProps)
 
         {status.phase === 'no-token' && (
           <StatusView
-            icon={
-              <span style={{ fontSize: '2rem', lineHeight: 1, color: 'var(--text-dim)' }}>
-                ?
-              </span>
-            }
+            icon={<HelpCircle size={32} className="text-[var(--text-dim)]" aria-hidden="true" />}
             title="Không tìm thấy lời mời"
             subtitle="Link có vẻ không đúng. Hãy thử yêu cầu người mời gửi lại link."
           >
-            <button
-              type="button"
-              onClick={onCancel}
-              style={btnSecondaryStyle}
-            >
+            <button type="button" onClick={onCancel} className="btn-ghost w-full justify-center py-[11px] text-[0.9375rem]">
               Về trang chủ
             </button>
           </StatusView>
@@ -319,27 +266,9 @@ function StatusView({
 }) {
   return (
     <div>
-      <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center' }}>{icon}</div>
-      <h2
-        style={{
-          fontSize: '1.0625rem',
-          fontWeight: 600,
-          marginBottom: '8px',
-          lineHeight: 1.4,
-        }}
-      >
-        {title}
-      </h2>
-      <p
-        style={{
-          fontSize: '0.875rem',
-          color: 'var(--text-dim)',
-          marginBottom: children ? '24px' : 0,
-          lineHeight: 1.5,
-        }}
-      >
-        {subtitle}
-      </p>
+      <div className="mb-4 flex justify-center">{icon}</div>
+      <h2 className="mb-2 text-[1.0625rem] font-semibold leading-[1.4]">{title}</h2>
+      <p className={`text-[0.875rem] leading-[1.5] text-[var(--text-dim)] ${children ? 'mb-6' : 'mb-0'}`}>{subtitle}</p>
       {children}
     </div>
   );
@@ -353,12 +282,8 @@ function Spinner() {
       viewBox="0 0 32 32"
       fill="none"
       aria-hidden="true"
-      style={{
-        animation: 'kn-spin 0.8s linear infinite',
-        color: 'var(--accent)',
-      }}
+      className="animate-spin text-[var(--accent)]"
     >
-      <style>{`@keyframes kn-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
       <circle
         cx="16"
         cy="16"
@@ -373,38 +298,6 @@ function Spinner() {
     </svg>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Styles — inline để không phụ thuộc class CSS global
-// ---------------------------------------------------------------------------
-
-const btnPrimaryStyle: React.CSSProperties = {
-  display: 'inline-block',
-  width: '100%',
-  padding: '11px 24px',
-  borderRadius: '12px',
-  backgroundColor: 'var(--accent)',
-  color: '#fff',
-  fontWeight: 600,
-  fontSize: '0.9375rem',
-  cursor: 'pointer',
-  border: 'none',
-  fontFamily: 'inherit',
-};
-
-const btnSecondaryStyle: React.CSSProperties = {
-  display: 'inline-block',
-  width: '100%',
-  padding: '11px 24px',
-  borderRadius: '12px',
-  backgroundColor: 'transparent',
-  color: 'var(--text-dim)',
-  fontWeight: 500,
-  fontSize: '0.9375rem',
-  cursor: 'pointer',
-  border: '1px solid var(--border)',
-  fontFamily: 'inherit',
-};
 
 // ---------------------------------------------------------------------------
 // Error message mapping

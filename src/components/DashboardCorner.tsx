@@ -71,21 +71,23 @@ export function DashboardCorner({
           onClick={onGoHome}
           title="Về Home"
           aria-label="Về Home"
-          className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-[9px] border
+          style={{ '--touch-inset': '-5px' } as React.CSSProperties}
+          className="touch-target-44 flex h-[34px] w-[34px] flex-none items-center justify-center rounded-[9px] border
             border-[color:var(--border)] bg-[var(--raised)] text-[var(--text-dim)] transition-[color,border-color]
             duration-150 hover:border-[color:var(--accent)] hover:text-[var(--accent)]"
         >
           <Home className="icon h-4 w-4" size={16} />
         </button>
       )}
-      <SpaceSwitcher />
+      <SpaceSwitcher compact={compact} />
       <button
         id="dashboard-corner-settings-btn"
         type="button"
         onClick={() => setSettingsOpen(true)}
         title="Cài đặt"
         aria-label="Cài đặt"
-        className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-[9px] border
+        style={{ '--touch-inset': '-5px' } as React.CSSProperties}
+        className="touch-target-44 flex h-[34px] w-[34px] flex-none items-center justify-center rounded-[9px] border
           border-[color:var(--border)] bg-[var(--raised)] text-[var(--text-dim)] transition-[color,border-color]
           duration-150 hover:border-[color:var(--accent)] hover:text-[var(--accent)]"
       >

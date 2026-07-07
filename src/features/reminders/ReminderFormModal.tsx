@@ -1,6 +1,9 @@
 import { useState } from 'react';
-import { Pin, Repeat } from 'lucide-react';
+import * as Select from '@radix-ui/react-select';
+import { ChevronDown, Pin, Repeat } from 'lucide-react';
 import { Modal } from '../../components/Modal';
+import { DatePicker } from '../../components/DatePicker';
+import { TimePicker } from '../../components/TimePicker';
 import { useAppState } from '../../state/AppStateContext';
 import type { ReminderDefinition, ReminderFreqUnit } from '../../types';
 
@@ -76,11 +79,11 @@ export function ReminderFormModal({ reminder, onClose }: ReminderFormModalProps)
         <div className="field-row">
           <div className="field">
             <label>Ngày</label>
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            <DatePicker value={date} onChange={setDate} />
           </div>
           <div className="field">
             <label>Giờ (tuỳ chọn)</label>
-            <input type="time" value={onceTime} onChange={(e) => setOnceTime(e.target.value)} />
+            <TimePicker value={onceTime} onChange={setOnceTime} />
           </div>
         </div>
       ) : (
@@ -97,11 +100,29 @@ export function ReminderFormModal({ reminder, onClose }: ReminderFormModalProps)
             </div>
             <div className="field">
               <label>Đơn vị</label>
-              <select value={freqUnit} onChange={(e) => setFreqUnit(e.target.value as ReminderFreqUnit)}>
-                <option value="hour">Giờ</option>
-                <option value="day">Ngày</option>
-                <option value="month">Tháng</option>
-              </select>
+              <Select.Root value={freqUnit} onValueChange={(v) => setFreqUnit(v as ReminderFreqUnit)}>
+                <Select.Trigger className="flex w-full items-center justify-between rounded-[9px] border border-[color:var(--border)] bg-[var(--raised)] px-[11px] py-[9px] font-sans text-[0.9375rem] text-[var(--text)]">
+                  <Select.Value />
+                  <Select.Icon>
+                    <ChevronDown className="icon" size={14} />
+                  </Select.Icon>
+                </Select.Trigger>
+                <Select.Portal>
+                  <Select.Content className="space-menu-surface" position="popper" sideOffset={4}>
+                    <Select.Viewport>
+                      <Select.Item value="hour" className="space-menu-item">
+                        <Select.ItemText>Giờ</Select.ItemText>
+                      </Select.Item>
+                      <Select.Item value="day" className="space-menu-item">
+                        <Select.ItemText>Ngày</Select.ItemText>
+                      </Select.Item>
+                      <Select.Item value="month" className="space-menu-item">
+                        <Select.ItemText>Tháng</Select.ItemText>
+                      </Select.Item>
+                    </Select.Viewport>
+                  </Select.Content>
+                </Select.Portal>
+              </Select.Root>
             </div>
           </div>
           {freqUnit === 'month' && (
@@ -119,7 +140,7 @@ export function ReminderFormModal({ reminder, onClose }: ReminderFormModalProps)
           {freqUnit !== 'hour' && (
             <div className="field">
               <label>Giờ trong ngày (tuỳ chọn)</label>
-              <input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+              <TimePicker value={time} onChange={setTime} />
             </div>
           )}
         </>
@@ -129,7 +150,7 @@ export function ReminderFormModal({ reminder, onClose }: ReminderFormModalProps)
         <button className="btn-ghost" onClick={onClose}>
           Hủy
         </button>
-        <button className="btn-primary" onClick={handleSave}>
+        <button className="btn-primary" onClick={handleSave} disabled={!title.trim()}>
           Lưu
         </button>
       </div>

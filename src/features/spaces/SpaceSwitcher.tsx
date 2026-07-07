@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
+import * as Popover from '@radix-ui/react-popover';
 import { ChevronDown, ChevronUp, Pencil, Plus, Share2, Trash2, UserPlus } from 'lucide-react';
 import { useAppState } from '../../state/AppStateContext';
 import { useConfirm } from '../../components/ConfirmContext';
@@ -135,14 +136,28 @@ function SpaceMenuItem({
 // ---------------------------------------------------------------------------
 // SpaceSwitcher
 // ---------------------------------------------------------------------------
-export function SpaceSwitcher() {
+interface SpaceSwitcherProps {
+  /** Truyền từ DashboardCorner — mobile compact bar có gap thật 8px với khối dưới (từ `py-2`
+   * của accordion), khác 12px (`gap-3`) của desktop free-layout. Dùng lại đúng tín hiệu
+   * DashboardCorner đã tính sẵn, không tự gọi `useMobileLayout()` riêng (tránh 2 instance hook
+   * lệch pha do hysteresis nội bộ mỗi hook độc lập). */
+  compact?: boolean;
+}
+
+export function SpaceSwitcher({ compact }: SpaceSwitcherProps) {
   const { state, dispatch } = useAppState();
   const showConfirm = useConfirm();
   const [open, setOpen] = useState(false);
   const [formSpace, setFormSpace] = useState<Space | null | 'new'>(null);
   const [showSharedForm, setShowSharedForm] = useState(false);
   const [inviteModalSpaceId, setInviteModalSpaceId] = useState<string | null>(null);
-  const wrapRef = useRef<HTMLDivElement>(null);
+  // Virtual anchor cho Popover: đo trực tiếp khối #dashboard-corner (Home + switcher + Settings,
+  // xem DashboardCorner.tsx) mỗi lần Radix cần định vị lại — không lưu rect tĩnh nên luôn đúng dù
+  // layout đổi (resize, kéo-thả khối). SpaceSwitcher không có ref sẵn tới div cha đó nên tra qua id.
+  const cornerAnchorRef = useRef({
+    getBoundingClientRect: () =>
+      document.getElementById('dashboard-corner')?.getBoundingClientRect() ?? new DOMRect(),
+  });
 
   const currentSpace = state.spaces.find((s) => s.id === state.currentSpaceId);
 
@@ -155,14 +170,6 @@ export function SpaceSwitcher() {
   const orderedSharedSpaces = orderedSpaces.filter((s) => s.isShared);
 
   const today = todayStr();
-
-  useEffect(() => {
-    function onMouseDown(e: MouseEvent) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener('mousedown', onMouseDown);
-    return () => document.removeEventListener('mousedown', onMouseDown);
-  }, []);
 
   function handleDelete(space: Space) {
     // Chỉ cản xoá nếu đây là private space duy nhất còn lại (shared space có thể xoá tự do)
@@ -204,36 +211,52 @@ export function SpaceSwitcher() {
   }
 
   return (
-    <div className="relative min-w-0 flex-1" ref={wrapRef}>
-      <button
-        className="flex w-full items-center justify-center gap-1.5 rounded-[9px] border border-[color:var(--border)] bg-[var(--raised)]
-          px-3 py-[7px] text-[0.8125rem] font-semibold text-[var(--text)] transition-[border-color,color] duration-150
-          hover:border-[color:var(--accent)] hover:text-[var(--accent)] max-sm:[&_span]:inline-block max-sm:[&_span]:max-w-[90px]
-          max-sm:[&_span]:overflow-hidden max-sm:[&_span]:text-ellipsis max-sm:[&_span]:whitespace-nowrap"
-        onClick={() => setOpen((v) => !v)}
-        title="Đổi space"
-        aria-label="Đổi space hiện tại"
-      >
-        {currentSpace?.isShared ? (
-          <Share2 className="icon h-3 w-3 flex-none text-[var(--accent)]" size={12} aria-hidden="true" />
-        ) : (
-          <span
-            className="h-2 w-2 flex-none rounded-full"
-            aria-hidden="true"
-            style={{ background: spaceDotColor(currentIdx) }}
-          />
-        )}
-        <span id="space-switcher-label" className="overflow-hidden text-ellipsis whitespace-nowrap">
-          {currentSpace?.name ?? ''}
-        </span>
-        <ChevronDown className="icon h-3 w-3 text-[var(--text-dim)]" size={12} />
-      </button>
+    <div className="min-w-0 flex-1">
+      <Popover.Root open={open} onOpenChange={setOpen}>
+        {/* Anchor "ảo" trỏ tới cả khối #dashboard-corner (Home + switcher + Settings) — dropdown
+            cần khớp độ rộng cả khối điều hướng này, không chỉ riêng nút trigger hẹp hơn bên trong. */}
+        <Popover.Anchor virtualRef={cornerAnchorRef} />
+        <Popover.Trigger asChild>
+          <button
+            className="flex w-full items-center justify-center gap-1.5 rounded-[9px] border border-[color:var(--border)] bg-[var(--raised)]
+              px-3 py-[7px] text-[0.8125rem] font-semibold text-[var(--text)] transition-[border-color,color] duration-150
+              hover:border-[color:var(--accent)] hover:text-[var(--accent)] max-sm:[&_span]:inline-block max-sm:[&_span]:max-w-[90px]
+              max-sm:[&_span]:overflow-hidden max-sm:[&_span]:text-ellipsis max-sm:[&_span]:whitespace-nowrap"
+            title="Đổi space"
+            aria-label="Đổi space hiện tại"
+            aria-haspopup="true"
+            aria-expanded={open}
+          >
+            {currentSpace?.isShared ? (
+              <Share2 className="icon h-3 w-3 flex-none text-[var(--accent)]" size={12} aria-hidden="true" />
+            ) : (
+              <span
+                className="h-2 w-2 flex-none rounded-full"
+                aria-hidden="true"
+                style={{ background: spaceDotColor(currentIdx) }}
+              />
+            )}
+            <span id="space-switcher-label" className="overflow-hidden text-ellipsis whitespace-nowrap">
+              {currentSpace?.name ?? ''}
+            </span>
+            <ChevronDown className="icon h-3 w-3 text-[var(--text-dim)]" size={12} />
+          </button>
+        </Popover.Trigger>
 
-      {/* -42px mỗi bên để mở rộng dropdown khi parent là khung hẹp kẹp giữa nút Home/Settings
-          (bản desktop) — trên mobile (DashboardCorner compact) parent đã gần full-width, cộng
-          thêm -42px sẽ tràn ra ngoài viewport. max-md: reset về khớp đúng parent. */}
-      {open && (
-        <div className="space-menu !left-[-42px] !right-[-42px] !min-w-[240px] max-md:!inset-x-0 max-md:!min-w-0">
+        <Popover.Portal>
+          {/* align="start" (không phải "center") — đã test thật bằng Playwright + đo getBoundingClientRect:
+              "center" kết hợp width tính động qua var(--radix-popover-trigger-width) bị lệch đúng bằng
+              1/2 chiều rộng content trong bản Radix Popover 1.1.19 đang dùng (bug định vị, không phải do
+              CSS class cũ) — "start" luôn khớp chính xác content.left === trigger.left bất kể width.
+              Không dùng alignOffset âm để giả lập "tràn 2 bên" nữa (cũng bị bug tương tự, alignOffset âm
+              không có tác dụng trong bản này) — thay bằng min-width 240px, neo trái theo trigger. */}
+          <Popover.Content
+            align="start"
+            sideOffset={compact ? 8 : 12}
+            collisionPadding={8}
+            className="space-menu-surface"
+            style={{ width: 'var(--radix-popover-trigger-width)' }}
+          >
           {/* ── Section: Space của tôi ── */}
           <SectionHeader
             label="Space của tôi"
@@ -377,8 +400,9 @@ export function SpaceSwitcher() {
 
           {/* Padding cuối dropdown */}
           <div className="h-1" />
-        </div>
-      )}
+          </Popover.Content>
+        </Popover.Portal>
+      </Popover.Root>
 
       {formSpace && (
         <SpaceFormModal space={formSpace === 'new' ? null : formSpace} onClose={() => setFormSpace(null)} />

@@ -63,7 +63,7 @@ export function NoteFormModal({ note, noteCount, onClose }: NoteFormModalProps) 
         <button className="btn-ghost" onClick={onClose}>
           Hủy
         </button>
-        <button className="btn-primary" onClick={handleSave}>
+        <button className="btn-primary" onClick={handleSave} disabled={!title.trim()}>
           Lưu
         </button>
       </div>

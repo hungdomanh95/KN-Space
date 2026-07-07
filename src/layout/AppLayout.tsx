@@ -568,7 +568,11 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
   }
 
   return (
-    <div id="dashboard" className="flex min-h-0 flex-1 gap-3 bg-transparent p-3.5 max-sm:gap-2 max-sm:p-2">
+    // Nhánh desktop này chỉ render khi !isMobile (useMobileLayout, ngưỡng ~999-1010px) — nhánh
+    // mobile ở trên đã return sớm cho mọi viewport hẹp hơn. Do đó max-sm (≤479px, xem
+    // tailwind.config.js screens.sm) không bao giờ khớp ở đây; đã bỏ 2 class chết
+    // max-sm:gap-2/max-sm:p-2 (mục L3, docs/features/ui-audit-2026-07.md).
+    <div id="dashboard" className="flex min-h-0 flex-1 gap-3 bg-transparent p-3.5">
       <div ref={wrapRef} id="cols-wrap" className="relative flex h-full min-h-0 min-w-0 w-full flex-1 gap-3 max-lg:flex-col">
         {visibleLayout.cols.map((col, ci) => (
           <div

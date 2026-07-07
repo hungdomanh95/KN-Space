@@ -30,3 +30,4 @@ Toàn bộ UX sản phẩm (5 khối, đa Space, masonry, streak, modal tuỳ bi
 - [phase-3-shared-space.md](phase-3-shared-space.md) — ⏸ hoãn
 - [phase-4-commercial.md](phase-4-commercial.md) — ⏸ hoãn
 - [storage-decision.md](storage-decision.md) — ghi nhận quyết định storage cho Phase 1 (lịch sử, đã không còn áp dụng — xem [phase-2-pwa-supabase.md](phase-2-pwa-supabase.md) cho quyết định storage hiện hành)
+- [ui-primitive-library-decision.md](ui-primitive-library-decision.md) — quyết định dùng Radix UI (primitives) cho Popover/Dialog/Checkbox/Switch/DropdownMenu, áp dụng đầu tiên cho Assignee Picker ([shared-space-task-assign-notify.md](../features/shared-space-task-assign-notify.md) mục 5.1)

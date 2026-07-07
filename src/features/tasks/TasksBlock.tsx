@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import * as Checkbox from '@radix-ui/react-checkbox';
 import { CheckSquare, FileText, GripVertical, Pencil, Plus, Trash2, Check } from 'lucide-react';
 import { BlockShell } from '../../components/BlockShell';
 import { EmptyState } from '../../components/EmptyState';
@@ -8,6 +9,7 @@ import { useConfirm } from '../../components/ConfirmContext';
 import { TaskFormModal } from './TaskFormModal';
 import { useCurrentUserId } from '../../state/useCurrentUserId';
 import { useSpaceMembers } from '../../state/useSpaceMembers';
+import { useMediaQuery } from '../../layout/useMediaQuery';
 import { getMemberColor, getMemberDisplayName } from '../../utils/memberColors';
 import type { Task, TaskFilter } from '../../types';
 
@@ -58,8 +60,12 @@ function TaskRow({ task, draggedId, onDragStartId, onDragEndAll, onEdit, onDelet
   const [dragOver, setDragOver] = useState(false);
   const isDragging = draggedId === task.id;
   const isDropTarget = dragOver && draggedId !== null && draggedId !== task.id;
-  const meta = task.date ? `${task.date.slice(5)} ${task.time || ''}`.trim() : '';
+  // task.date lưu ISO "YYYY-MM-DD" — hiển thị DD/MM/YYYY cho quen thuộc với người dùng Việt Nam.
+  const meta = task.date ? `${task.date.split('-').reverse().join('/')} ${task.time || ''}`.trim() : '';
   const hasContent = task.content.trim().length > 0;
+  const isMobile = useMediaQuery('(max-width: 639px)');
+  const avatarSize = isMobile ? 20 : 16;
+  const assigneeVisibleCount = isMobile ? 2 : 3;
 
   function armDraggable() {
     if (rowRef.current) rowRef.current.draggable = true;
@@ -109,7 +115,7 @@ function TaskRow({ task, draggedId, onDragStartId, onDragEndAll, onEdit, onDelet
           chấm màu trơn, không đủ phân biệt member (chỉ biết màu, không biết ai) nếu không hover. */}
       {memberDotColor ? (
         <span style={{ marginTop: 3, flex: 'none' }}>
-          <MemberAvatar name={memberDotName || 'Thành viên'} color={memberDotColor} size={16} />
+          <MemberAvatar name={memberDotName || 'Thành viên'} color={memberDotColor} size={avatarSize} />
         </span>
       ) : (
         <span style={{ width: 16, minWidth: 16 }} />
@@ -122,30 +128,19 @@ function TaskRow({ task, draggedId, onDragStartId, onDragEndAll, onEdit, onDelet
       >
         <GripVertical className="icon h-[13px] w-[13px]" size={13} />
       </span>
-      <span
-        className={`mt-px flex h-[17px] w-[17px] flex-none cursor-pointer items-center justify-center rounded-[6px]
-          border-[1.6px] transition-all duration-150
-          [&_.icon]:opacity-0 [&_.icon]:transition-opacity [&_.icon]:duration-100
+      <Checkbox.Root
+        checked={task.done}
+        onCheckedChange={() => dispatch({ type: 'TASK_TOGGLE_DONE', payload: { id: task.id } })}
+        className="mt-px flex h-[17px] w-[17px] flex-none cursor-pointer items-center justify-center rounded-[6px]
+          border-solid border-[1.6px] bg-[var(--raised)] border-[color:var(--border-control)] transition-all duration-150
           max-md:h-[24px] max-md:w-[24px] max-md:rounded-[8px]
-          ${task.done ? '[&_.icon]:opacity-100' : ''}`}
-        style={task.done
-          ? { background: 'var(--done)', borderColor: 'var(--done)' }
-          : { background: 'var(--raised)', borderColor: 'var(--border-control)' }}
-        role="checkbox"
-        aria-checked={task.done}
-        tabIndex={0}
+          data-[state=checked]:bg-[var(--done)] data-[state=checked]:border-[color:var(--done)]"
         title={task.done ? 'Đánh dấu chưa xong' : 'Đánh dấu đã xong'}
-        onTouchEnd={(e) => { e.preventDefault(); dispatch({ type: 'TASK_TOGGLE_DONE', payload: { id: task.id } }); }}
-        onClick={() => dispatch({ type: 'TASK_TOGGLE_DONE', payload: { id: task.id } })}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            dispatch({ type: 'TASK_TOGGLE_DONE', payload: { id: task.id } });
-          }
-        }}
       >
-        <Check className="icon text-white max-md:!h-[15px] max-md:!w-[15px]" size={11} strokeWidth={3} />
-      </span>
+        <Checkbox.Indicator>
+          <Check className="icon text-white max-md:!h-[15px] max-md:!w-[15px]" size={11} strokeWidth={3} />
+        </Checkbox.Indicator>
+      </Checkbox.Root>
       <div className="flex-1">
         <div className="row-title font-medium">
           {task.title}
@@ -158,32 +153,37 @@ function TaskRow({ task, draggedId, onDragStartId, onDragEndAll, onEdit, onDelet
         {(meta || memberDotName || (assignees && assignees.length > 0)) && (
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             {meta && (
-              <span className="inline-flex items-center gap-1 rounded-md bg-[var(--raised)] px-[7px] py-0.5 text-[0.7188rem] font-semibold text-[var(--text-dim)]">
+              <span className="inline-flex items-center gap-1 rounded-md bg-[var(--raised)] px-[7px] py-0.5 text-[0.7188rem] font-semibold text-[var(--text-dim)] max-md:order-1">
                 {meta}
               </span>
             )}
             {memberDotName && (
               <span
-                className="inline-flex items-center gap-1 rounded-md px-[7px] py-0.5 text-[0.7188rem] font-semibold"
+                className="inline-flex items-center gap-1 rounded-md px-[7px] py-0.5 text-[0.7188rem] font-semibold max-md:order-3 max-sm:hidden"
                 style={{ color: memberDotColor, background: `color-mix(in srgb, ${memberDotColor} 14%, var(--raised))` }}
               >
                 {memberDotName}
               </span>
             )}
             {assignees && assignees.length > 0 && (
-              <span className="inline-flex items-center gap-1" title={`Giao cho: ${assignees.map((a) => a.name).join(', ')}`}>
-                {assignees.slice(0, 3).map((a, i) => (
-                  <MemberAvatar key={i} name={a.name} color={a.color} size={16} />
+              <span
+                className="inline-flex items-center gap-1 max-md:order-2 max-md:gap-1.5"
+                title={`Giao cho: ${assignees.map((a) => a.name).join(', ')}`}
+              >
+                {assignees.slice(0, assigneeVisibleCount).map((a, i) => (
+                  <MemberAvatar key={i} name={a.name} color={a.color} size={avatarSize} />
                 ))}
-                {assignees.length > 3 && (
-                  <span className="text-[0.7188rem] font-semibold text-[var(--text-dim)]">+{assignees.length - 3}</span>
+                {assignees.length > assigneeVisibleCount && (
+                  <span className="text-[0.7188rem] font-semibold text-[var(--text-dim)]">
+                    +{assignees.length - assigneeVisibleCount}
+                  </span>
                 )}
               </span>
             )}
           </div>
         )}
       </div>
-      <div className="flex gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+      <div className="flex gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100 max-md:opacity-100">
         <button className="icon-btn" title="Sửa việc" aria-label="Sửa việc" onClick={() => onEdit(task)}>
           <Pencil className="icon" size={13} />
         </button>

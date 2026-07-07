@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { BookOpen, ChevronDown, EyeOff, Grid2x2, Plus, Rows2 } from 'lucide-react';
 import { BlockShell } from '../../components/BlockShell';
 import { EmptyState } from '../../components/EmptyState';
@@ -50,21 +51,11 @@ export function NotesBlock({
   const members = useSpaceMembers(space.isShared ? space.sharedSpaceId : undefined);
   const [editingNote, setEditingNote] = useState<Note | null | 'new'>(null);
   const [viewingNoteId, setViewingNoteId] = useState<string | null>(null);
-  const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const [draggedId, setDraggedId] = useState<string | null>(null);
-  const sortWrapRef = useRef<HTMLDivElement>(null);
 
   const collapsed = state.settings.collapsedBlocks.notes;
   const { noteView } = state.settings;
   const { noteSearch, noteSortBy } = state.ui;
-
-  useEffect(() => {
-    function onMouseDown(e: MouseEvent) {
-      if (sortWrapRef.current && !sortWrapRef.current.contains(e.target as Node)) setSortMenuOpen(false);
-    }
-    document.addEventListener('mousedown', onMouseDown);
-    return () => document.removeEventListener('mousedown', onMouseDown);
-  }, []);
 
   // Disarm draggable trên mọi card khi nhấc chuột ra, dù không drop đúng chỗ.
   useEffect(() => {
@@ -193,33 +184,36 @@ export function NotesBlock({
             <Rows2 className="icon h-3.5 w-3.5" size={14} />
           </button>
         </div>
-        <div className="relative flex-none" ref={sortWrapRef}>
-          <button
-            className="flex items-center gap-1.5 rounded-lg border border-[color:var(--border)] bg-[var(--raised)]
-              px-2.5 py-1.5 text-[0.7812rem] font-semibold text-[var(--text)] transition-[border-color,color] duration-150
-              hover:border-[color:var(--accent)] hover:text-[var(--accent)]"
-            onClick={() => setSortMenuOpen((v) => !v)}
-          >
-            <span>{SORT_OPTIONS.find((o) => o.value === noteSortBy)?.label}</span>
-            <ChevronDown className="icon h-[11px] w-[11px] text-[var(--text-dim)]" size={11} />
-          </button>
-          {sortMenuOpen && (
-            <div className="space-menu !left-auto !right-0 !min-w-[190px]" id="sort-menu">
-              {SORT_OPTIONS.map((o) => (
-                <div
-                  key={o.value}
-                  className={`space-menu-item ${o.value === noteSortBy ? 'active' : ''}`}
-                  onClick={() => {
-                    dispatch({ type: 'NOTE_SET_SORT', payload: { sortBy: o.value } });
-                    setSortMenuOpen(false);
-                  }}
-                >
-                  <span className="overflow-hidden text-ellipsis whitespace-nowrap">{o.label}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger asChild>
+            <button
+              className="flex items-center gap-1.5 rounded-lg border border-[color:var(--border)] bg-[var(--raised)]
+                px-2.5 py-1.5 text-[0.7812rem] font-semibold text-[var(--text)] transition-[border-color,color] duration-150
+                hover:border-[color:var(--accent)] hover:text-[var(--accent)]"
+            >
+              <span>{SORT_OPTIONS.find((o) => o.value === noteSortBy)?.label}</span>
+              <ChevronDown className="icon h-[11px] w-[11px] text-[var(--text-dim)]" size={11} />
+            </button>
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content align="end" sideOffset={8} className="space-menu-surface" style={{ minWidth: 190 }}>
+              <DropdownMenu.RadioGroup
+                value={noteSortBy}
+                onValueChange={(v) => dispatch({ type: 'NOTE_SET_SORT', payload: { sortBy: v as NoteSortBy } })}
+              >
+                {SORT_OPTIONS.map((o) => (
+                  <DropdownMenu.RadioItem
+                    key={o.value}
+                    value={o.value}
+                    className="space-menu-item data-[state=checked]:font-bold data-[state=checked]:text-[var(--accent)]"
+                  >
+                    <span className="overflow-hidden text-ellipsis whitespace-nowrap">{o.label}</span>
+                  </DropdownMenu.RadioItem>
+                ))}
+              </DropdownMenu.RadioGroup>
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
       </div>
       <div className="block-body">
         {list.length === 0 ? (

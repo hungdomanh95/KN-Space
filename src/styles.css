@@ -14,7 +14,11 @@
   --modal-bg: #fdfdfc;
   --raised: #f5f4f1;
   --text: #232220;
-  --text-dim: #8a857c;
+  /* Cập nhật 2026-07-07 (UI audit): #8a857c cho contrast ≈3.33:1 trên --raised, dưới ngưỡng
+     WCAG AA 4.5:1 cho chữ thường. Đổi sang #706b64 (≈4.80:1 trên --raised, ≈5.19:1 trên
+     --panel-bg) — đã preview trực quan qua Playwright trước khi đổi, xem
+     docs/features/ui-audit-2026-07.md mục A1/C1. Theme tối không đổi (đã đạt ≈5.16:1). */
+  --text-dim: #706b64;
   --border: #e7e5e0;
   /* Border đậm hơn cho phần tử tương tác (checkbox, circle habit) — --border quá nhạt trên nền sáng. */
   --border-control: #b0ada6;
@@ -145,5 +149,32 @@ input, textarea, select { font-family: inherit; }
   .space-menu-item {
     padding-top: 13px;
     padding-bottom: 13px;
+  }
+
+  /* Mở rộng vùng chạm 44px cho các nút icon KHÔNG dùng .icon-btn (kích thước/border-radius
+     riêng, không thể áp .icon-btn trực tiếp vì sẽ đè visual size — xem T1-T3 trong
+     docs/features/ui-audit-2026-07.md). Giữ nguyên kích thước hiển thị, chỉ mở rộng vùng bấm
+     ảo qua ::before. Mặc định -10px (khớp .icon-btn, dùng cho nút ~24px hiển thị); nút to hơn
+     tự override qua biến CSS --touch-inset (inline style) để không tràn quá vào nút cạnh bên. */
+  .touch-target-44 {
+    position: relative;
+  }
+  .touch-target-44::before {
+    content: '';
+    position: absolute;
+    inset: var(--touch-inset, -10px);
+  }
+}
+
+/* ===== prefers-reduced-motion =====
+   2 animation infinite duy nhất trong app (homeEnterBounce ở nút "Vào Dashboard", newestPulse
+   ở dòng thông báo mới nhất trong NotificationsBlock) đều chỉ để nhấn mạnh/gợi ý thị giác,
+   không mang thông tin bắt buộc — tắt hẳn khi user bật "giảm hiệu ứng chuyển động" của hệ điều
+   hành (mục An2, docs/features/ui-audit-2026-07.md). Các animation một-lần (fadeInPop,
+   modalPopIn, overlayFadeIn...) giữ nguyên vì ngắn (<250ms) và không lặp lại. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-homeEnterBounce,
+  .animate-newestPulse {
+    animation: none;
   }
 }

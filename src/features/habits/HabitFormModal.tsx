@@ -38,7 +38,7 @@ export function HabitFormModal({ habit, onClose }: HabitFormModalProps) {
         <button className="btn-ghost" onClick={onClose}>
           Hủy
         </button>
-        <button className="btn-primary" onClick={handleSave}>
+        <button className="btn-primary" onClick={handleSave} disabled={!title.trim()}>
           Lưu
         </button>
       </div>

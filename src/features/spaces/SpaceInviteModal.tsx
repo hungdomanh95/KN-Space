@@ -11,6 +11,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Copy, Check, Link, RefreshCw, X, UserMinus, LogOut, UserPlus } from 'lucide-react';
 import { Modal } from '../../components/Modal';
+import { useConfirm } from '../../components/ConfirmContext';
 import {
   listMembers,
   listActiveInvites,
@@ -58,6 +59,7 @@ type TabId = 'members' | 'invite';
 
 export function SpaceInviteModal({ spaceId, spaceName, onClose }: SpaceInviteModalProps) {
   const { dispatch } = useAppState();
+  const showConfirm = useConfirm();
 
   const [tab, setTab] = useState<TabId>('members');
 
@@ -161,32 +163,43 @@ export function SpaceInviteModal({ spaceId, spaceName, onClose }: SpaceInviteMod
     }
   }
 
-  async function handleKick(member: SharedSpaceMember) {
-    if (!window.confirm(`Kick "${memberLabel(member)}" khỏi space?`)) return;
-    setKickingId(member.userId);
-    setError(null);
-    try {
-      await kickMember(spaceId, member.userId);
-      setMembers((prev) => prev.filter((m) => m.userId !== member.userId));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Không kick được member');
-    } finally {
-      setKickingId(null);
-    }
+  function handleKick(member: SharedSpaceMember) {
+    const label = memberLabel(member);
+    showConfirm(
+      'Xoá thành viên?',
+      `Xoá ${label} khỏi space này? Họ sẽ mất quyền truy cập ngay lập tức.`,
+      async () => {
+        setKickingId(member.userId);
+        setError(null);
+        try {
+          await kickMember(spaceId, member.userId);
+          setMembers((prev) => prev.filter((m) => m.userId !== member.userId));
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Không kick được member');
+        } finally {
+          setKickingId(null);
+        }
+      },
+    );
   }
 
-  async function handleLeave() {
-    if (!window.confirm(`Rời space "${spaceName}"?`)) return;
-    setLeaving(true);
-    setError(null);
-    try {
-      await leaveSpace(spaceId);
-      dispatch({ type: 'SPACE_DELETE', payload: { id: spaceId } });
-      onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Không rời được space');
-      setLeaving(false);
-    }
+  function handleLeave() {
+    showConfirm(
+      'Rời space?',
+      `Rời space "${spaceName}"? Bạn sẽ mất quyền truy cập. Nếu muốn vào lại cần được Owner mời lại.`,
+      async () => {
+        setLeaving(true);
+        setError(null);
+        try {
+          await leaveSpace(spaceId);
+          dispatch({ type: 'SPACE_DELETE', payload: { id: spaceId } });
+          onClose();
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Không rời được space');
+          setLeaving(false);
+        }
+      },
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -276,7 +289,7 @@ export function SpaceInviteModal({ spaceId, spaceName, onClose }: SpaceInviteMod
         {!isOwner && myRole === 'member' && (
           <div className="modal-actions mt-4">
             <button
-              className="btn-ghost flex items-center gap-1.5 text-red-500 hover:border-red-400"
+              className="btn-ghost flex items-center gap-1.5 text-[var(--reminder-color)] hover:border-[color:var(--reminder-color)]"
               onClick={handleLeave}
               disabled={leaving}
             >
@@ -352,9 +365,9 @@ export function SpaceInviteModal({ spaceId, spaceName, onClose }: SpaceInviteMod
                       <span
                         className={`text-[0.75rem] font-medium ${
                           remaining <= 1
-                            ? 'text-red-500'
+                            ? 'text-[var(--reminder-color)]'
                             : remaining <= 3
-                            ? 'text-orange-400'
+                            ? 'text-[var(--habit-color)]'
                             : 'text-[var(--text-dim)]'
                         }`}
                       >
@@ -387,7 +400,7 @@ export function SpaceInviteModal({ spaceId, spaceName, onClose }: SpaceInviteMod
                     {/* Thu hồi */}
                     <div className="flex justify-end">
                       <button
-                        className="inline-flex items-center gap-1 rounded-[7px] px-2 py-1 text-[0.75rem] font-semibold text-red-500 transition-colors hover:bg-red-500/10 disabled:pointer-events-none disabled:opacity-50"
+                        className="inline-flex items-center gap-1 rounded-[7px] px-2 py-1 text-[0.75rem] font-semibold text-[var(--reminder-color)] transition-colors hover:bg-[color-mix(in_srgb,var(--reminder-color)_10%,transparent)] disabled:pointer-events-none disabled:opacity-50"
                         onClick={() => handleRevoke(invite)}
                         disabled={isRevoking}
                       >
@@ -447,10 +460,10 @@ export function SpaceInviteModal({ spaceId, spaceName, onClose }: SpaceInviteMod
       <div className="mt-4">
         {/* Error banner */}
         {error && (
-          <div className="mb-3 flex items-start gap-2 rounded-[9px] border border-red-300 bg-red-50 px-3 py-2.5 text-[0.8125rem] text-red-700 dark:border-red-700/40 dark:bg-red-900/20 dark:text-red-400">
+          <div className="mb-3 flex items-start gap-2 rounded-[9px] border border-[color:color-mix(in_srgb,var(--reminder-color)_45%,transparent)] bg-[color-mix(in_srgb,var(--reminder-color)_10%,var(--modal-bg))] px-3 py-2.5 text-[0.8125rem] text-[var(--reminder-color)]">
             <span className="flex-1">{error}</span>
             <button
-              className="flex-none text-red-400 hover:text-red-600"
+              className="flex-none text-[color:color-mix(in_srgb,var(--reminder-color)_70%,transparent)] hover:text-[var(--reminder-color)]"
               onClick={() => setError(null)}
               aria-label="Đóng lỗi"
             >

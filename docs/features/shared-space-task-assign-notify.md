@@ -76,44 +76,130 @@ Tất cả Member (kể cả Owner) đều **assign được cho bất kỳ ai**
 > avatar `size={16}`/`size={18}` cố định không đổi theo breakpoint, checklist không có xử lý mobile) — audit phát hiện
 > đây là nguồn gốc cảm giác "còn lỗi nhiều" khi nhìn UI thật. Spec dưới đây là **con số cuối cùng, cần dev áp dụng lại**.
 
-### 5.1 Chọn assignee
+### 5.1 Chọn assignee — Assignee Picker dạng popover
 
-Checklist Member (đã có sẵn danh sách này từ panel quản lý Member) + nút "Chọn tất cả". Chỉ hiện khối này khi
-`space.isShared`.
+> **Cập nhật 2026-07-07 (uiux) — đề xuất thư viện UI:** toàn bộ logic mở/đóng/flip/focus/Escape mô tả ở
+> mục B/C dưới đây hiện được viết ra như thể tự code tay từ đầu — nhưng đây chính là ứng viên đầu tiên nên
+> dùng thư viện UI primitive (Radix UI) thay vì tự viết, xem quyết định + lý do đầy đủ ở
+> [`docs/plan/ui-primitive-library-decision.md`](../plan/ui-primitive-library-decision.md) (đặt ở `docs/plan/`
+> vì đây là quyết định kỹ thuật áp dụng toàn dự án, không riêng tính năng này). Mô tả UX/số liệu bên dưới
+> (vị trí, kích thước, kích thước checkbox/avatar, nội dung...) vẫn là spec chính thức cần dev bám theo —
+> chỉ đổi **cách hiện thực** phần khung mở/đóng/flip/focus, không đổi hành vi/hình thức nhìn thấy được.
 
-**Vấn đề phát hiện khi audit:** khối này (label `flex items-center gap-2`, `<input type="checkbox">` mặc định
-trình duyệt, không `max-md:` nào) là field DUY NHẤT trong `TaskFormModal` không có override mobile, trong khi field
-nội dung ngay phía trên đã có (`note-content-field max-md:min-h-[120px]`). Checkbox mặc định trình duyệt cao khoảng
-13-16px, thấp hơn nhiều ngưỡng touch-target khuyến nghị 44px (WCAG 2.5.5). Mỗi dòng trong checklist cũng không có
-padding dọc riêng nên vùng bấm thực tế cả dòng (dù `<label>` bọc quanh `<input>` nên về logic click-anywhere đã đúng)
-vẫn quá thấp trên mobile.
+> **Cập nhật 2026-07-07 (uiux) — THAY THẾ hoàn toàn bản checklist trước đó.** Bản checklist (audit cùng
+> ngày, số liệu 16/20px checkbox, `max-h-[160px]`...) đã đúng về mặt touch-target/accessibility, nhưng
+> chủ dự án nhận thấy khi nhìn UI thật: **1 khối checklist luôn-hiện, cao tới 160px, là quá nhiều diện
+> tích cố định cho 1 field tuỳ chọn** — nhất là khi Space có nhiều Member, field này chiếm phần lớn modal
+> dù không phải lúc nào tạo/sửa việc cũng cần giao cho ai. Thay bằng pattern **assignee picker dạng
+> popover** — tham khảo trực tiếp ClickUp/Trello/Notion (3 tool quản lý task phổ biến đều dùng đúng
+> pattern này): 1 nút/chip gọn hiển thị trạng thái đã chọn, bấm vào mới mở danh sách chọn nổi lên trên,
+> không chiếm chỗ cố định trong modal khi không thao tác. Số liệu kích thước cụ thể (checkbox 16/20px,
+> avatar 18/22px, row min-height 32/44px) được **giữ nguyên từ bản audit trước** — chỉ đổi cách trình
+> bày từ "khối checklist luôn hiện" sang "danh sách trong popover, chỉ hiện khi mở", không phí công audit
+> cũ.
 
-**Spec chốt:**
+Chỉ hiển thị field này khi `space.isShared && members.length > 0` (không đổi điều kiện gốc). Vị trí
+trong form: giữ nguyên như hiện tại (sau field-row Ngày/Giờ, cuối modal trước nút Lưu) — không đổi thứ
+tự các field khác.
 
-| Thuộc tính | Desktop | Mobile (`≤639px`, `max-md:`) |
+**A. Nút trigger (chip gọn thay cho khối checklist cũ)**
+
+| Trạng thái | Nội dung nút | Style |
 |---|---|---|
-| Kích thước ô checkbox | 16px (`h-4 w-4`) | 20px (`h-5 w-5`) |
-| Màu checkbox khi tick | `accent-[var(--accent)]` (đồng bộ màu accent theme, tránh xanh mặc định của trình duyệt lệch tông) | như desktop |
-| Chiều cao tối thiểu mỗi dòng (`<label>`) | `min-h-[32px]` | `min-h-[44px]` (đạt ngưỡng touch-target khuyến nghị) |
-| Padding dọc mỗi dòng | `py-1` | `py-2` |
-| Feedback khi bấm (touch) | — | thêm `active:bg-[var(--raised)] rounded-[8px] -mx-1 px-1` để có phản hồi thị giác tức thời khi chạm (native checkbox không tự có hiệu ứng active rõ trên mobile) |
-| Avatar trong checklist (`MemberAvatar size`) | 18px (giữ nguyên) | 22px |
-| Khung checklist (`max-h-[160px] overflow-y-auto`) | giữ nguyên `max-h-[160px]` | **bỏ giới hạn chiều cao riêng**: `max-md:max-h-none max-md:overflow-visible` |
+| Chưa chọn ai (`assigneeIds.length === 0`) | Icon `UserPlus` (16px desktop/18px mobile) + text `+ Giao cho` | Pill: border `1.5px solid var(--border)`, bg `var(--raised)`, `rounded-[10px]`, cao 34px desktop/40px mobile (đạt touch-target). Hover: đổi border/color sang `var(--accent)` — tái dùng đúng convention hover đã có ở nút Space-switcher (`SpaceSwitcher.tsx`) để nhất quán toàn app. |
+| Đã chọn ≥1 người | Avatar-stack chồng nhẹ (tối đa 4 avatar, dư ra rút gọn `+N`) + `ChevronDown` 12px bên phải gợi ý "bấm để mở" | Cùng khung pill như trên. Avatar 20px desktop/22px mobile, chồng lấn `margin-left: -6px` từ avatar thứ 2 trở đi, mỗi avatar viền `2px solid var(--modal-bg)` tạo hiệu ứng "cắt lớp" chuẩn kiểu ClickUp/Trello (khác cụm avatar cạnh-nhau có `gap` dùng trên `TaskRow` — xem ghi chú phân biệt ở mục 5.2). |
 
-Lý do bỏ `max-h` trên mobile: `Modal.tsx` đã tự chuyển modal thành full-height + scroll riêng
-(`max-md:h-full max-md:max-h-full ... overflow-y-auto`) khi ở mobile. Nếu vẫn giữ khung con `max-h-[160px]
-overflow-y-auto` bên trong, sẽ tạo ra **2 vùng cuộn lồng nhau** (nested scroll) — trải nghiệm cuộn trên cảm ứng rất
-khó chịu (ngón tay đặt đúng vùng nào cuộn vùng đó, dễ cuộn nhầm). Trên mobile nên để checklist giãn tự nhiên theo nội
-dung, cuộn chung với toàn modal. Trên desktop vẫn giữ khung 160px vì đó là hành vi hữu ích (tránh modal quá cao khi
-Space có nhiều Member, chuột cuộn 1 vùng nhỏ không gây khó chịu như cảm ứng).
+- Không hiển thị tên dạng chữ trên nút (kể cả khi chỉ chọn 1 người) — giữ nút gọn tối đa; toàn bộ tên
+  đầy đủ đặt trong `title` của nút (vd `title="Giao cho: Hưng, Lan"`) để tra cứu nhanh bằng hover, không
+  bắt buộc phải mở popover chỉ để xem đã giao ai.
+- Responsive bề rộng nút: desktop `inline-flex` (tự co theo nội dung, không kéo full-width, giữ cảm giác
+  "chip" gọn như ClickUp); mobile (`≤639px`) đổi sang `flex w-full justify-between` (full-width như mọi
+  input khác trong form, đồng bộ thị giác + dễ bấm hơn trên màn hẹp).
+- `aria-haspopup="true"`, `aria-expanded={open}`, `title`/`aria-label` mô tả đúng trạng thái (vd "Giao cho
+  (chưa chọn ai)" / "Giao cho: Hưng, Lan").
 
-**Có cần thay checkbox mặc định bằng custom control riêng (div/SVG) không?** Không cần thiết — chỉ cần resize +
-đổi màu qua `accent-color` (đã hỗ trợ tốt trên Chrome/Safari/Firefox hiện đại, kể cả iOS Safari ≥15.4) là đủ đạt
-kích thước touch-target mong muốn mà **vẫn giữ nguyên semantics/accessibility gốc** của `<input type="checkbox">`
-(focus ring mặc định, phím Space để tick, screen reader đọc đúng trạng thái) — không có lý do để đánh đổi lấy 1
-custom control phức tạp hơn khi native đã đáp ứng đủ yêu cầu kích thước.
+**B. Popover (mở khi bấm trigger)**
+
+Vị trí neo: `position: absolute`, `top: calc(100% + 6px)`, `left: 0` (mobile: `inset-x-0` thay vì
+`left-0` để full-width theo đúng bề ngang trigger). Không cần portal riêng ra `document.body` như
+`Modal.tsx` — popover đã nằm bên trong modal vốn đã được portal ra ngoài rồi, không gặp vấn đề
+containing-block do `backdrop-filter` như comment trong `Modal.tsx` (đó là vấn đề của khối/cột dashboard
+ngoài modal, không áp dụng ở đây).
+
+Kích thước: `min-width: 260px` / `max-width: 320px` desktop; mobile full-width theo field cha. Nền
+`var(--modal-bg)` đặc (không kính mờ — đúng quy ước "modal không glassmorphism" của dự án; popover này
+không phải `<Modal>` nhưng vẫn nằm trong ngữ cảnh 1 modal nên giữ cùng độ rõ chữ), `border-radius` 12px,
+border `1px solid var(--border)`, shadow tương tự `.space-menu` đã có sẵn trong `src/styles/components.css`
+(tái dùng đúng token dropdown đã chốt, không phát minh style mới).
+
+Cấu trúc nội dung, từ trên xuống:
+1. **Ô tìm kiếm** — chỉ hiện khi `members.length > 6` (Space nhỏ hơn thì search không có giá trị, thêm
+   vào chỉ dư thừa UI). Input full-width trong popover, icon `Search` (14px) bên trái, placeholder
+   "Tìm thành viên...", `autoFocus` khi popover vừa mở (gõ tìm ngay, giống Notion/ClickUp).
+2. **"Chọn tất cả" / "Bỏ chọn tất cả"** — 1 hàng ngay dưới ô tìm kiếm (hoặc đầu danh sách nếu không có ô
+   tìm kiếm), style `btn-ghost` thu nhỏ. Label đổi động theo trạng thái **toàn bộ member thật của Space**
+   — **quan trọng:** dù đang gõ tìm kiếm lọc danh sách, bấm nút này vẫn áp dụng cho toàn bộ member (không
+   giới hạn theo kết quả đang lọc), tránh hành vi khó đoán "chọn tất cả nhưng chỉ chọn được vài người đang
+   hiện". Giữ nguyên logic `toggleSelectAll` gốc, chỉ đổi vị trí đặt UI.
+3. **Danh sách member cuộn riêng** — `max-height: 224px` cả desktop lẫn mobile (khác bản checklist cũ
+   từng phải bỏ `max-h` trên mobile để tránh nested-scroll — ở đây **không còn vấn đề đó** vì popover là
+   1 lớp nổi `position:absolute` tách khỏi luồng cuộn chính của modal, cuộn riêng độc lập, không lồng
+   trong `overflow-y-auto` của modal). Mỗi dòng:
+   - Checkbox tuỳ biến (không dùng `<input type="checkbox">` mặc định — đúng quy ước "Checkbox tuỳ biến,
+     không dùng checkbox mặc định của OS" ở `docs/requirements.md` mục 9, khác quyết định tạm thời ở bản
+     checklist cũ vốn chấp nhận native để đơn giản hoá): `role="checkbox"`, `aria-checked`, hình vuông bo
+     góc 5-6px, `border: 1.5px solid var(--border-control)`; khi checked → nền `var(--accent)` + icon
+     `Check` trắng nhỏ bên trong — tái dùng đúng visual đã có ở nút tick-done trên `TaskRow` (component
+     nội bộ trong `TasksBlock.tsx`) để nhất quán 1 kiểu "custom check control" duy nhất trong toàn app,
+     không phát minh kiểu mới. Kích thước: 16px desktop / 20px mobile (giữ nguyên số đã chốt ở bản audit
+     checklist).
+   - Avatar (`MemberAvatar`) 18px desktop / 22px mobile (giữ nguyên số đã chốt).
+   - Tên member + `(bạn)` nếu là `currentUserId`.
+   - Chiều cao dòng: `min-h-[32px]` desktop / `min-h-[44px]` mobile, `active:bg-[var(--raised)]` khi chạm
+     trên mobile (giữ nguyên toàn bộ số liệu/lý do đã chốt ở bản audit checklist cũ — chỉ đổi khung chứa
+     từ "khối luôn hiện trong modal" sang "danh sách trong popover").
+   - Click bất kỳ đâu trên dòng để toggle (không chỉ riêng ô check).
+4. **Empty state khi tìm kiếm không khớp**: text nhỏ "Không tìm thấy thành viên phù hợp" (`text-dim`,
+   *italic*).
+
+**C. Hành vi đóng/mở**
+
+- Mở: click trigger.
+- Đóng: (1) click ra ngoài popover (mousedown ngoài, cùng kỹ thuật `wrapRef` +
+  `document.addEventListener('mousedown', ...)` đã dùng ở `SpaceSwitcher.tsx` — tái dùng nguyên pattern),
+  (2) phím `Escape` khi popover đang mở (mới — `SpaceSwitcher.tsx` hiện tại **chưa** có Escape, ngoài
+  phạm vi việc này để bổ sung ngược cho `SpaceSwitcher`, nhưng popover mới này bắt buộc phải có theo yêu
+  cầu chủ dự án), (3) **không tự đóng khi tick chọn 1 member** — vì thao tác thường là chọn nhiều người
+  liên tiếp, tự đóng sau mỗi lần tick sẽ bắt user mở lại popover nhiều lần; đúng hành vi chuẩn của
+  ClickUp/Trello/Notion (assignee picker luôn ở trạng thái mở cho tới khi người dùng chủ động đóng).
+- Đóng xong (bất kỳ lý do nào): trả focus về đúng nút trigger đã mở popover (accessibility).
+- **Flip khi thiếu chỗ phía dưới**: nếu trigger nằm gần đáy modal (modal có `overflow-y-auto`, phần dưới
+  có thể không đủ chỗ hiển thị popover `max-height 224px` + phần search/nút), popover tự chuyển sang mở
+  **lên trên** trigger (`bottom: calc(100% + 6px)` thay vì `top`) — hành vi "flip" chuẩn của mọi dropdown/
+  popover hiện đại (Radix Popover, Floating UI...). Cách đơn giản nhất: so sánh
+  `trigger.getBoundingClientRect()` với chiều cao còn lại của modal viewport lúc mở, không cần thư viện
+  định vị phức tạp nếu dự án chưa có sẵn.
+- Không cần focus-trap đầy đủ kiểu modal thật (Tab có thể thoát ra khỏi popover khi hết item) — đồng bộ
+  đúng mức độ accessibility hiện có của `SpaceSwitcher.tsx` (dropdown tương tự đã có sẵn trong dự án,
+  cũng không trap focus), tránh làm phức tạp hơn mức cần thiết so với pattern đã được chấp nhận.
+
+**D. Vì sao không dùng bottom-sheet trên mobile**
+
+Modal đã tự chuyển full-height + full-width trên mobile (`max-md:h-full max-md:w-full` trong
+`Modal.tsx`). Popover full-width ngay dưới trigger về bản chất đã chiếm gần hết bề ngang màn hình rồi —
+thêm 1 lớp bottom-sheet riêng (dính đáy màn hình, overlay riêng, animation trượt lên, khoá scroll nền) là
+dư thừa so với 1 dropdown neo đúng vị trí field. Member trong 1 Shared Space (định vị sản phẩm hiện tại là
+nhóm nhỏ) thường không nhiều tới mức cần UI phức tạp hơn.
 
 ### 5.2 Hiển thị assignee trên Task item
+
+> **Phạm vi mục này không đổi** — mô tả cách hiển thị avatar assignee/người tạo trên **`TaskRow`** (dòng
+> task trong danh sách, component nội bộ của `TasksBlock.tsx`), độc lập với UI **chọn** assignee (đã
+> chuyển sang popover ở mục 5.1). 2 nơi dùng avatar-stack trông hơi khác nhau **có chủ đích**: cụm avatar
+> trên `TaskRow` xếp cạnh nhau có `gap` (xem bảng gap bên dưới) vì đây là **nội dung hiển thị chính** của
+> dòng task, cần mỗi avatar tách bạch rõ ràng; avatar-stack trên **nút trigger** ở mục 5.1 lại xếp
+> **chồng lấn** (kiểu ClickUp/Trello) vì đó chỉ là 1 **chip trạng thái gọn** trong modal, không phải nội
+> dung chính cần đọc kỹ từng người.
 
 Avatar/initials nhỏ cạnh tiêu đề task, tối đa hiển thị vài người rồi rút gọn kiểu "+N" nếu nhiều.
 
@@ -208,6 +294,68 @@ hay không.
   wrap tự nhiên, không cắt), switch `flex-none` cố định 42px. Không cần sửa gì thêm.
 
 Không cập nhật `push-notification.md` vì không có phát hiện mới liên quan.
+
+### 5.6 UX modal Thêm/Sửa việc — field "Nội dung (tuỳ chọn)" dạng collapsible
+
+> **Mới, 2026-07-07 (uiux):** chủ dự án chỉ ra khi xem UI thật — field `content` (textarea, min-height
+> 90px desktop/120px mobile) trong `TaskFormModal` luôn mở rộng sẵn dù rất ít khi dùng đến (đa phần task
+> chỉ cần tên + ngày giờ). Đổi sang **dạng collapsible** (tham khảo pattern "Description" của ClickUp:
+> hiện rút gọn dạng link/preview, bấm vào mới mở textarea đầy đủ), mặc định thu gọn để tiết kiệm diện
+> tích modal, chỉ mở khi user chủ động cần nhập. Không liên quan tới Assign Task/notify (mục 1-4 ở trên)
+> — chỉ gộp chung file vì cùng nằm trong `TaskFormModal.tsx` và cùng đợt uiux audit UI thật.
+
+**Vị trí trong form:** giữ nguyên như hiện tại (ngay sau "Tên việc", trước field-row Ngày/Giờ) — không
+đổi thứ tự các field khác, chỉ đổi cách hiển thị của chính field này.
+
+**Trạng thái mặc định khi mở modal:**
+
+| Ngữ cảnh | `contentOpen` mặc định |
+|---|---|
+| Tạo việc mới | Đóng |
+| Sửa việc, `content` rỗng | Đóng |
+| Sửa việc, `content` đã có nội dung | **Mở** |
+
+Lý do mở sẵn khi Sửa việc đã có nội dung: nếu mặc định đóng cả trong trường hợp này, dữ liệu đã nhập
+trước đó sẽ bị "giấu" ngay khi user mở modal để sửa — cảm giác giống mất dữ liệu, lại bắt thêm 1 click để
+xem lại thứ vốn đã tồn tại. Field chỉ nên "biến mất mặc định" khi nó thực sự trống — đúng tinh thần gốc
+của phản hồi (thu gọn cái không dùng đến, không giấu cái đang có).
+
+**1 hàng disclosure duy nhất, dùng chung cho mọi trạng thái** (thay hẳn cặp `<label>` + `<textarea>`
+luôn-hiện hiện tại):
+
+```
+[Chevron ▸/▾]  <label/preview theo trạng thái, xem bảng dưới>
+```
+
+- Cả hàng là 1 `<button type="button" aria-expanded={contentOpen}>` full-width, `hover:bg-[var(--raised)]`
+  nhẹ, bo góc 8px, padding dọc `py-2` desktop/`py-2.5` mobile (đủ touch-target khi đóng ở dạng hàng đơn).
+- Icon chevron: `ChevronRight` khi đóng, `ChevronDown` khi mở, size 14px desktop/16px mobile, xoay
+  `transition-transform duration-150` (đồng bộ 0.15s theo quy ước "hiệu ứng nhẹ" toàn dự án, mục 9
+  `requirements.md`).
+
+| Trạng thái | Nội dung hàng |
+|---|---|
+| Đóng + rỗng | Text `+ Thêm nội dung`, màu `var(--accent)` (gợi ý đây là hành động thêm mới, giống style `.add-link` đã dùng ở nút "+ Thêm" khác trong app) |
+| Đóng + đã có nội dung | Label tĩnh "Nội dung (tuỳ chọn)" (`text-dim`, giữ nguyên style label field gốc) + icon `FileText` 13px (tái dùng đúng icon đã báo "có nội dung chi tiết" trên `TaskRow`) + **preview rút gọn 1 dòng**: lấy dòng đầu tiên của `content` (`content.split('\n')[0]`), hiển thị `truncate` (CSS ellipsis, không cắt thủ công theo số ký tự) trong khoảng trống còn lại của hàng |
+| Mở (bất kể rỗng hay có nội dung) | Label tĩnh "Nội dung (tuỳ chọn)", không preview (textarea bên dưới đã hiện đủ) |
+
+- Bấm vào hàng bất kỳ lúc nào để đảo trạng thái `contentOpen` — kể cả khi đã có nội dung, user vẫn có thể
+  thu gọn lại để đỡ rối mắt (không mất dữ liệu, `content` state độc lập với `contentOpen`).
+- Khi `contentOpen === true`: hiện `<textarea>` y hệt style/kích thước hiện tại (`note-content-field`,
+  min-height 90px desktop/`max-md:min-h-[120px]` mobile) ngay dưới hàng disclosure, cách `mt-1.5`.
+- `autoFocus` textarea: **chỉ** khi user vừa bấm mở từ trạng thái đóng→mở bằng tay (không áp dụng khi
+  `contentOpen` mặc định là `true` lúc mount — tránh giật focus khỏi field "Tên việc" đang `autoFocus` khi
+  mở modal Sửa việc có sẵn nội dung).
+- Hiệu ứng mở/đóng: nhẹ (opacity + dịch chuyển nhẹ theo trục dọc, ~0.15s) — không bắt buộc animation phức
+  tạp, chỉ cần tránh "giật" bố cục đột ngột.
+
+**Edge case:**
+- Gõ nội dung → đóng lại → mở lại: hiển thị đúng nội dung đã gõ (state giữ nguyên, không reset khi
+  `contentOpen` đổi).
+- Gõ nội dung → xoá hết → đóng lại: hàng tự rơi về trạng thái "Đóng + rỗng" (`+ Thêm nội dung`), không còn
+  preview/icon `FileText` (vì `content.trim() === ''`).
+- Bấm "Lưu" bất kể `contentOpen` đang mở hay đóng: luôn lưu đúng giá trị `content` hiện có trong state —
+  trạng thái mở/đóng chỉ là hiển thị UI, không ảnh hưởng dữ liệu lưu xuống.
 
 ---
 
@@ -314,3 +462,31 @@ cố định không đổi theo breakpoint trong khi nút tick-done cạnh đó 
 chip ngày-giờ + chip người tạo + cụm avatar assignee cùng tranh chỗ trên 1 dòng ở mobile. Đã chốt số liệu cụ thể ở
 mục 5.1/5.2 ở trên — **cần dev áp dụng lại rồi mới verify UI thật lần nữa** (bước 3 ở trên coi như phải làm lại sau
 khi áp dụng spec mới). Khối Thông báo (Dashboard) + sub-toggle Settings đã audit riêng ở mục 5.5 — không có bug.
+
+**Cập nhật 2026-07-07 (uiux, lần 2) — thay thế thiết kế mục 5.1 bằng popover:** sau khi chủ dự án xem UI
+thật, checklist "Giao cho" (dù đã áp dụng số liệu audit ở lần cập nhật trên) vẫn bị đánh giá là **chiếm
+quá nhiều diện tích cố định** trong modal cho 1 field tuỳ chọn. Mục 5.1 đã được **viết lại hoàn toàn**
+sang pattern **assignee picker dạng popover** (tham khảo ClickUp/Trello/Notion) — xem chi tiết mục 5.1
+mới ở trên, mục 5.2 giữ nguyên phạm vi (chỉ thêm ghi chú phân biệt với 5.1). Đây là thay đổi **thiết kế**,
+chưa phải code — code hiện tại (`TaskFormModal.tsx`) vẫn đang ở dạng checklist cũ theo mô tả trước, **cần
+dev cập nhật lại theo spec mới** rồi mới coi mục "Assign Task" là hoàn chỉnh về UI. Đồng thời bổ sung mục
+5.6 (mới) cho field "Nội dung (tuỳ chọn)" — đổi sang dạng collapsible, mặc định thu gọn (trừ khi Sửa việc
+đã có sẵn nội dung) — cũng cần dev áp dụng cùng đợt vì cùng nằm trong `TaskFormModal.tsx`.
+
+**Cập nhật 2026-07-07 (dev) — đã áp dụng mục 5.1 (popover, Radix UI) + 5.6 (collapsible) vào
+`src/features/tasks/TaskFormModal.tsx`:**
+- Cài `@radix-ui/react-popover@^1.1.19` + `@radix-ui/react-checkbox@^1.3.7` (bản mới nhất tại thời
+  điểm cài, peerDependencies hỗ trợ React 18) theo `docs/plan/ui-primitive-library-decision.md` mục 4.
+- Assignee Picker: `Popover.Root/Trigger/Portal/Content` cho khung mở/đóng/flip/focus-return/Escape/
+  click-ngoài (toàn bộ do Radix xử lý, không tự viết `wrapRef`/`mousedown`/`getBoundingClientRect()`
+  như mô tả phương án thủ công cũ trong mục 5.1.C). Mỗi dòng member dùng `Checkbox.Root`/`Checkbox.Indicator`
+  (Radix) — root là `<button>`, tự né bug `.field input` đã xảy ra trước đó, đồng thời do
+  `Popover.Content` portal ra `document.body` nên các dòng `<label>` bên trong không còn nằm trong
+  DOM subtree của `.field` — đã xoá CSS override `.field .assignee-checklist label` (không còn cần).
+- Field "Nội dung" collapsible: 1 hàng `<button aria-expanded>` tự viết (không dùng Radix Collapsible,
+  đúng quyết định "đơn giản nhất trước" ở yêu cầu), state `contentOpen` cục bộ + `autoFocusContentRef`
+  chỉ auto-focus textarea khi user tự bấm mở từ đóng→mở.
+- Verify: `npx tsc --noEmit` sạch, `npm run build` thành công, `npx vitest run` 64/64 test pass (không
+  test nào động tới `TaskFormModal.tsx` trực tiếp).
+- **Chưa verify UI thật trên browser** (thao tác tay, screenshot) — cần chủ dự án tự bấm thử theo
+  hướng dẫn test đã gửi kèm khi báo cáo phần này.

@@ -4,6 +4,16 @@
  * sửa lại 29 file .tsx khi các class này được dùng — chỉ thân class đổi từ CSS thuần sang
  * @apply Tailwind utilities. KHÔNG bake giá trị --accent/--accent-rgb tĩnh: dùng arbitrary
  * value tham chiếu var(...) để vẫn nhận đổi màu runtime qua SettingsModal.
+ *
+ * Thang border-radius tham khảo khi thêm component mới (mục S2, docs/features/ui-audit-2026-07.md
+ * — chỉ ghi lại quy ước thực tế đang dùng, KHÔNG đổi giá trị hiện có của component cũ):
+ *   - control nhỏ (icon-btn, chip nhỏ):        ~7-8px  (vd .icon-btn 7px, IconChip rounded-lg 8px)
+ *   - input/button dạng field:                 ~9-10px (vd .btn-ghost/.btn-primary/.field 9px,
+ *                                                        DatePicker/TimePicker trigger 9px,
+ *                                                        AssigneePicker trigger/HomeBackgroundSettings 10px)
+ *   - card/khối nội dung:                       ~10-14px (vd .note-card 10px, .space-menu-surface
+ *                                                          12px, .main-block/.sub-block 14px)
+ *   - modal:                                    16px (Modal.tsx rounded-2xl)
  */
 @layer components {
   .main-block,
@@ -58,7 +68,8 @@
   }
 
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-[9px] bg-[var(--accent)] px-[14px] py-[7px] text-[0.9062rem] font-semibold text-white;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-[9px] bg-[var(--accent)] px-[14px] py-[7px] text-[0.9062rem] font-semibold text-white
+      disabled:pointer-events-none disabled:opacity-50;
   }
   .btn-ghost {
     @apply inline-flex items-center justify-center gap-1.5 rounded-[9px] border border-[color:var(--border)] bg-[var(--raised)] px-[13px] py-[7px]
@@ -96,7 +107,7 @@
   .field label {
     @apply mb-1.5 block text-[0.8438rem] font-semibold text-[var(--text-dim)];
   }
-  .field input,
+  .field input:not([type='checkbox']):not([type='radio']),
   .field textarea,
   .field select {
     @apply w-full rounded-[9px] border border-[color:var(--border)] bg-[var(--raised)] px-[11px] py-[9px]
@@ -127,10 +138,19 @@
     @apply mb-[18px] text-[1.0938rem] font-bold;
   }
 
-  /* Dùng chung cho dropdown Space switcher (SpaceSwitcher.tsx) và dropdown sort note
-     (NotesBlock.tsx) — cùng 1 visual "dropdown menu kính" lặp lại nhiều item con. */
+  /* .space-menu-surface: dùng cho Popover.Content của Radix (SpaceSwitcher.tsx) — KHÔNG có
+     position/top/left vì Radix tự set position/transform trên 1 wrapper cha riêng
+     (`[data-radix-popper-content-wrapper]`), không phải trên chính node Content; nếu tái dùng
+     .space-menu (có `absolute top-[calc(100%+8px)]`) thì `top` cũ sẽ CỘNG DỒN thêm vào offset của
+     Radix — bug thật đã xảy ra (đo được dư +8px ngoài ý muốn qua Playwright, 2026-07-07). */
+  .space-menu-surface {
+    @apply z-[60] min-w-[220px] max-h-[min(80vh,var(--radix-popper-available-height,80vh))] overflow-y-auto rounded-xl
+      border border-[color:var(--border)] bg-[var(--modal-bg)] p-1.5 shadow-[0_14px_40px_rgba(0,0,0,.18)];
+  }
+  /* .space-menu: dùng cho dropdown tự định vị thủ công (NotesBlock.tsx sort menu, chưa migrate
+     Radix) — vẫn cần position/top/left vì không có wrapper nào khác lo việc đó. */
   .space-menu {
-    @apply absolute top-[calc(100%+8px)] left-0 z-[60] min-w-[220px] max-h-80 overflow-y-auto rounded-xl
+    @apply absolute top-[calc(100%+8px)] left-0 z-[60] min-w-[220px] max-h-[min(80vh,var(--radix-popper-available-height,80vh))] overflow-y-auto rounded-xl
       border border-[color:var(--border)] bg-[var(--modal-bg)] p-1.5 shadow-[0_14px_40px_rgba(0,0,0,.18)];
   }
   .space-menu-item {
@@ -150,9 +170,6 @@
   .block-check-row {
     @apply flex cursor-pointer select-none items-center gap-[9px] text-[0.875rem];
   }
-  .block-check-row input[type='checkbox'] {
-    @apply h-4 w-4 flex-none cursor-pointer accent-[var(--accent)];
-  }
 
   /* ===== Ghi chú: note card (grid + list) =====
      Giữ class literal `note-card`/`dragging`/`nc-tools` vì NotesBlock.tsx dùng
@@ -164,7 +181,7 @@
   .note-card {
     @apply relative cursor-pointer rounded-[10px] border border-[color:var(--border-hairline)] bg-[var(--note-card-bg)]
       px-[11px] pb-6 pt-[9px] text-[0.875rem] shadow-[0_1px_3px_rgba(20,20,43,.04)]
-      transition-[transform,box-shadow] duration-[180ms] [transition-timing-function:var(--ease-standard)];
+      transition-[transform,box-shadow] duration-150 [transition-timing-function:var(--ease-standard)];
     border-left-width: 3px;
   }
   .note-card:hover {
@@ -190,6 +207,9 @@
   }
   .note-card:hover .nc-tools {
     @apply opacity-100;
+  }
+  .note-card .nc-tools {
+    @apply max-md:opacity-100;
   }
   .card-grip {
     @apply flex h-6 w-6 flex-none cursor-grab items-center justify-center text-[var(--text-dim)];

@@ -31,12 +31,17 @@ Người dùng chấp nhận:
 - **Đăng nhập**: Google OAuth qua Supabase Auth (không phải magic-link email).
 - **Đồng bộ đa máy**: KHÔNG dùng Supabase Realtime (đã chủ động bỏ ở commit `aa00fae`, 2026-07-01 — gây 5 bug mất dữ liệu, không ổn định, không cần thiết cho tool cá nhân). Cơ chế thật: mỗi lần mở app/tải lại trang, `loadAppState()` đọc bản mới nhất từ Supabase; sửa dữ liệu chỉ lưu lên Supabase (debounce 600ms), không tự đẩy sang máy khác đang mở sẵn — máy B chỉ thấy thay đổi của máy A sau khi tự mở lại/reload.
 - **PWA**: có manifest + icon để "Add to Home Screen" trên iOS/Android, mở full-screen như app gốc. **Chưa có service worker/offline-first** — đây là việc cố ý chưa làm ở bước hiện tại, không phải bug.
-- **Responsive desktop/mobile**:
-  - Desktop: đầy đủ 5 khối + Settings như mô tả ở mục 4–9.
-  - Di động (≤639px): **chỉ hiện 2 khối** Việc cần làm + Ghi chú, hoạt động dạng **accordion** (khối đang mở chiếm ~80% chiều cao, khối kia thu nhỏ thành thanh tóm tắt icon + tên + số lượng + 1 dòng preview, bấm để đổi chỗ). Mặc định mở "Việc cần làm". Nhắc việc/Thói quen/Thông báo/Hôm nay bị ẩn trên di động — quyết định có chủ đích và **dài hạn**, không phải bug, không có kế hoạch mở rộng thêm khối khác cho mobile.
-  - Trên di động không có nút "Về Home" — chỉ còn Space-switcher (trên cùng) + nút Settings.
+- **Responsive desktop/mobile** — *Cập nhật 2026-07-07: mô tả mobile trong mục này đã đối chiếu lại đúng code thật sau đợt UI audit, thay thế mô tả cũ dựa trên breakpoint 639px:*
+  - **Ngưỡng chuyển đổi mô hình UI** (toàn bộ Dashboard đổi từ layout cột tự do desktop sang UI mobile "Chat-first") là **~1000px chiều rộng cửa sổ**, không phải `≤639px`: vào mobile khi width `≤999px`, chỉ thoát mobile khi width `≥1010px` (hysteresis 2 mốc khác nhau có chủ đích, chống UI nhảy qua-lại khi resize dao động sát biên giữa 2 mô hình hoàn toàn khác nhau) — xem `src/layout/useMobileLayout.ts`. Đây là ngưỡng chính áp dụng cho mọi mô tả "Responsive desktop/mobile" trong tài liệu này, trừ khi nói rõ là breakpoint Tailwind khác (xem gạch đầu dòng cuối).
+  - **Mobile không còn màn Home**: khác desktop (vẫn giữ luồng Home → Dashboard, mục 4.5), trên mobile app vào thẳng UI chính ngay sau đăng nhập — không có bước xem đồng hồ/quote/ảnh nền Home trước, và các phím tắt Enter/Space (vào Dashboard) / Esc (về Home) bị vô hiệu hoàn toàn khi đang ở chế độ mobile (xem `src/App.tsx`). Ảnh nền chung Home/Dashboard (mục 4.6) vẫn hiển thị làm nền cho UI mobile.
+  - **UI chính trên mobile gồm 2 tab, đổi qua `MobileTabBar` dính đáy màn hình**:
+    - **"Trò chuyện" (mặc định)**: màn chat-style hoàn toàn mới (`MobileChatScreen`) — gộp Việc cần làm + Ghi chú thành các "bong bóng" theo dòng thời gian tạo (mới nhất ở dưới cùng), có avatar/tên/màu riêng theo người tạo khi ở Shared Space (phân biệt bong bóng của mình/người khác). 1 ô nhập liệu ở đáy: gõ text + Enter tạo Việc cần làm mới; gõ với tiền tố `/note ` tạo Ghi chú nhanh. Không có filter/sort/kéo-thả trong màn này.
+    - **"Chi tiết"**: giữ đúng hành vi accordion đã mô tả trước đây — chỉ 2 khối Việc cần làm + Ghi chú, khối đang mở chiếm phần lớn chiều cao, khối kia thu nhỏ thành thanh tóm tắt (icon + tên + số lượng, bấm để đổi chỗ). **Sửa lại cho khớp code:** thanh tóm tắt **không có dòng preview nội dung** (đã bỏ theo phản hồi thực tế khi test — chiếm quá nhiều diện tích so với giá trị mang lại, xem comment `MobileCollapsedSummary` trong `AppLayout.tsx`), khác mô tả cũ từng ghi "+ 1 dòng preview". Mặc định mở "Việc cần làm" khi vào tab này.
+    - Nhắc việc/Thói quen/Thông báo/Hôm nay vẫn bị ẩn hoàn toàn trên cả 2 tab mobile — quyết định có chủ đích và **dài hạn**, không phải bug, không có kế hoạch mở rộng thêm khối khác cho mobile.
+  - Trên di động không có nút "Về Home" ở cả 2 tab — chỉ còn thanh trên cùng cố định (Space-switcher + nút Settings, dạng compact) và `MobileTabBar` dưới cùng.
   - Đa Space và toàn bộ Settings (theme, accent, ảnh nền, quote, export/import) vẫn hoạt động đầy đủ trên di động.
   - Lớp lọc "chỉ 2 khối trên di động" **tách biệt hoàn toàn** với `space.enabledBlocks` (cấu hình ẩn/hiện khối theo từng Space, áp dụng đồng thời và đồng nhất trên cả desktop/di động).
+  - Lưu ý phân biệt 2 khái niệm breakpoint khác nhau, tránh nhầm lẫn tiếp: breakpoint Tailwind `≤639px` (`max-sm`) **vẫn tồn tại và có ý nghĩa riêng** ở vài chỗ nhỏ hơn bên trong UI (ví dụ ẩn chip tên người tạo trên `TaskRow` khi màn quá hẹp) — đây là 1 tinh chỉnh responsive cục bộ, **khác hẳn** ngưỡng ~1000px nói trên (ngưỡng chuyển đổi toàn bộ mô hình UI mobile/desktop).
 
 ## 3. Phạm vi
 Trong phạm vi:
@@ -71,6 +76,8 @@ Ngoài phạm vi hiện tại:
 - Tắt/ẩn khối Thông báo theo Space — đã bỏ, khối Thông báo luôn hiện với mọi Space (xem mục 4.1/5.5/6/8).
 
 ## 4. Layout Dashboard
+> **Phạm vi mục 4/4.1:** toàn bộ mô tả layout tự do dưới đây (cột, slot, kéo-thả, splitter) chỉ áp dụng cho **desktop** (ngoài vùng mobile, xem mục 2.1/10). Trên mobile, hệ layout tự do này **không được render** — thay bằng 1 UI cố định hoàn toàn khác (chat-first + accordion 2 khối, xem mục 2.1), không có khái niệm cột/slot/splitter. *Cập nhật 2026-07-07: ghi chú phạm vi này được thêm sau đợt UI audit rà lại đúng code thật, không đổi mô tả desktop bên dưới.*
+
 Dashboard **không còn topbar/header ngang** (đã bỏ logo, dropdown space kiểu cũ, quote, cụm nút Home/Ẩn-tất-cả/Settings ở trên cùng). Toàn bộ điều hướng + 6 khối dữ liệu được xếp trong một **hệ layout tự do (free-form)**: nhiều cột chiếm toàn màn hình trên desktop, mỗi cột là một danh sách các "slot" xếp dọc; người dùng tự kéo-thả để chèn khối trên/dưới hoặc ghép 2 khối nằm ngang trong cùng 1 slot, và tự kéo resize qua các đường splitter ẩn — không còn khái niệm "3 khối cố định" hay slider % trong Settings.
 
 **7 phần tử tham gia layout** (đều bình đẳng, không phần tử nào bị khoá vị trí):
@@ -103,7 +110,7 @@ Mỗi cột là danh sách slot xếp dọc, mỗi slot thuộc 1 trong 2 dạng
 - Không còn slider/input % trong Settings để chỉnh tỉ lệ — toàn bộ resize thực hiện bằng cách **kéo trực tiếp trên Dashboard**, qua các đường splitter trong suốt (không nhìn thấy, chỉ hiện gợi ý khi hover/kéo) chèn đúng vào khoảng gap 12px sẵn có giữa các khối/cột.
 - 3 loại splitter:
   - **Splitter chiều cao** giữa 2 slot xếp dọc liền kề trong cùng 1 cột — kéo đổi trọng số `h` (flex-grow) của 2 slot đó.
-  - **Splitter chiều rộng giữa 2 cột** liền kề — kéo đổi % chiều rộng (`colWidths`) của 2 cột đó. Splitter này **ẩn hoàn toàn** khi màn hình hẹp dưới breakpoint `lg` (979px, các cột dồn xuống xếp chồng dọc, đổi chiều rộng cột không còn ý nghĩa).
+  - **Splitter chiều rộng giữa 2 cột** liền kề — kéo đổi % chiều rộng (`colWidths`) của 2 cột đó. Splitter này **ẩn hoàn toàn** khi màn hình hẹp dưới breakpoint `lg` (979px, các cột dồn xuống xếp chồng dọc, đổi chiều rộng cột không còn ý nghĩa). *Xác nhận (`ba`, 2026-07-07):* điều kiện `lg`/979px này thực chất là **dead code** — từ khi ngưỡng chuyển mobile/desktop nâng lên ~1000px (mục 2.1, hysteresis 999/1010px), mọi viewport `≤979px` đã sớm chuyển hẳn sang UI mobile riêng (`isMobileBlocksOnly` true) từ trước khi chạm ngưỡng `lg`, nên nhánh desktop có splitter/`#cols-wrap` không bao giờ còn render được ở độ rộng đó nữa. Không tự xoá code trong đợt rà soát tài liệu này — để dev cân nhắc dọn khi có dịp sửa `AppLayout.tsx` (xem thêm câu hỏi mở cuối tài liệu).
   - **Splitter chiều rộng giữa 2 khối ghép ngang** trong cùng 1 slot `row` — kéo đổi trọng số `w` của 2 khối đó.
 - Widget điều hướng (`settings`) có chiều cao khoá cứng theo nội dung thật (không theo trọng số `h`) — splitter chiều cao cạnh nó chỉ tác động lên slot còn lại (không đổi được chiều cao widget điều hướng qua kéo splitter). Khối Hôm nay (`today`) **không** bị khoá chiều cao — resize được như mọi khối dữ liệu khác (xem mục 5.6).
 - Resize áp dụng ngay khi kéo (mượt theo chuyển động chuột), chỉ ghi xuống storage 1 lần khi thả chuột (không ghi dồn dập theo từng pixel di chuyển).
@@ -130,11 +137,14 @@ Widget gồm 3 phần theo thứ tự ngang:
 Widget điều hướng **luôn hiện, không phụ thuộc `enabledBlocks` của Space nào** (không nằm trong danh sách các khối có thể tắt ở mục 6/8) — đảm bảo Dashboard luôn có cách đổi Space/mở Settings/về Home, bất kể Space hiện tại tắt bao nhiêu khối dữ liệu. Khối Thông báo cũng luôn hiện với mọi Space, không thể tắt (xem mục 5.5/6/8) — nhưng đây là 2 ràng buộc **độc lập** với nhau (khác bố cục cũ, nơi 2 thứ này bị buộc chung 1 cột); trong bố cục tự do hiện tại, Thông báo và Widget điều hướng có thể nằm ở 2 vị trí bất kỳ, không nhất thiết cùng cột/cạnh nhau.
 
 **Câu hỏi mở cần xác nhận:**
-1. Mục 5.5, mục 6, mục 8 và mục 12 hiện vẫn còn câu chữ tham chiếu bố cục cũ (vd. "cố định vị trí cuối cùng trong layout 3 khối chính", "3 khối chính trên Dashboard") — ngoài phạm vi nhiệm vụ này (chỉ giới hạn mục 4/4.1) nên chưa sửa, cần một lượt rà soát riêng để đồng bộ toàn bộ các mục còn lại với layout tự do đã mô tả ở đây.
+1. ~~Mục 5.5, mục 6, mục 8 và mục 12 hiện vẫn còn câu chữ tham chiếu bố cục cũ...~~ **Đã chốt (`ba`, 2026-07-07):** rà lại toàn bộ — mục 6/8 vốn đã mô tả đúng layout tự do (không cần sửa); mục 5.5 (câu "cố định vị trí cuối cùng") và mục 12 (dòng verification mobile) đã cập nhật lại đúng code thật ngay tại chỗ.
 2. Có cần giới hạn số cột tối đa hay số khối ghép ngang tối đa trong 1 slot (hiện tại tối đa 2 khối/slot `row`, không hỗ trợ ghép 3 khối trở lên) không, hay giữ nguyên như code thật?
+3. *Phát sinh 2026-07-07 (đợt rà soát mobile):* mô tả splitter chiều rộng giữa cột "ẩn khi màn hình hẹp dưới breakpoint `lg` (979px), các cột dồn xuống xếp chồng dọc" (đoạn "Resize qua splitter ẩn" phía trên) dường như là hành vi **không còn khả năng xảy ra trên thực tế**: ngưỡng chuyển sang UI mobile (`≤999px`, xem mục 2.1) luôn kích hoạt TRƯỚC khi cửa sổ desktop co xuống dưới 979px (mobile "nuốt" mất vùng 639-999px từng là desktop-hẹp trước khi ngưỡng mobile được nâng lên ~1000px). Cần xác nhận: đây có phải hành vi tồn dư (vestigial) từ thời breakpoint mobile còn là `≤639px`, chưa dọn sau khi nâng ngưỡng, hay có kịch bản thực tế nào khác (vd. do hysteresis, cửa sổ có thể ở trạng thái desktop trong khoảng 979-999px) khiến nhánh dồn-cột này vẫn xuất hiện được?
 
 ## 4.5 Màn Home (Tabliss-style)
-Home là màn đầu tiên khi mở tab mới, tách hoàn toàn khỏi Dashboard.
+> **Cập nhật 2026-07-07 (phạm vi chỉ desktop):** toàn bộ mục 4.5 mô tả đúng hành vi **desktop**. Trên mobile, màn Home đã bị bỏ hẳn — app vào thẳng UI chính (chat-first, xem mục 2.1/10), không qua Home, không có phím tắt Enter/Space/Esc mô tả ở phần "Điều hướng" bên dưới. Không đổi mô tả desktop bên dưới.
+
+Home là màn đầu tiên khi mở tab mới (trên desktop), tách hoàn toàn khỏi Dashboard.
 
 Nội dung Home:
 - Đồng hồ lớn giờ:phút:giây cập nhật real-time (giây hiển thị nhỏ hơn, kiểu superscript).
@@ -148,7 +158,7 @@ Nội dung Home:
 - Ảnh nền full-screen (xem mục 4.6), dùng chung layer với Dashboard.
 - Dòng nhỏ "X việc cần làm hôm nay" ở góc dưới-phải Home: đếm số task có ngày = hôm nay và chưa xong, **của Space hiện tại**. Tự ẩn hoàn toàn (không chiếm khoảng trống) khi count = 0, không hiện "0 việc".
 
-Điều hướng:
+Điều hướng (chỉ desktop — xem ghi chú phạm vi ở đầu mục):
 - 1 nút CTA duy nhất để chuyển sang Dashboard, đổi sang phong cách tối giản: chỉ gồm 1 icon mũi tên to (có animation nảy nhẹ liên tục, lặp vô hạn) kèm caption nhỏ uppercase ngay dưới icon — không khung/nền/viền/shadow/blur quanh icon. Vẫn là 1 nút bấm thật (giữ đầy đủ semantics/accessibility), có thể bấm bất kỳ đâu trong vùng icon + caption (vùng bấm mở rộng hơn phần nhìn thấy).
 - Không có hint text khác, không có nút "Kéo xuống", không có cử chỉ scroll-wheel (đã loại bỏ qua nhiều vòng feedback vì dư thừa).
 - Phím tắt ngầm (không hiển thị gợi ý): `Enter` hoặc `Space` khi đang ở Home và không có input/textarea/select đang focus, không có modal mở → vào Dashboard.
@@ -268,7 +278,7 @@ Yêu cầu:
 - Mục đầu tiên chưa xong được tô nổi bật nhẹ + nhãn "Mới".
 - Với mục từ Việc cần làm/Thói quen: có nút **Xong**, không ẩn khỏi danh sách, chỉ đổi trạng thái UI và đồng bộ về khối gốc.
 - Với mục từ Nhắc việc: chỉ đọc, không có nút Xong.
-- Khối này **cố định vị trí cuối cùng** trong layout 3 khối chính và **width luôn tự động = phần còn lại** (không có slider riêng, không kéo-thả đổi thứ tự) — xem mục 4/4.1.
+- Khối này **cố định vị trí cuối cùng** trong cột chứa widget điều hướng (không phải "3 khối chính" — layout thật là hệ cột/slot tự do, xem mục 4/4.1) và **width luôn tự động = phần còn lại** (không có slider riêng, không kéo-thả đổi thứ tự) — xem mục 4/4.1.
 - Khối Thông báo **luôn hiện với mọi Space, không thể tắt/ẩn theo Space** — khác với các khối dữ liệu còn lại có thể bật/tắt qua `enabledBlocks` (xem mục 6/8). Lý do: khối này dùng chung cột layout với widget điều hướng cố định (Về Home/Space-switcher/Settings, xem mục 4.1); nếu cho tắt sẽ mất luôn widget điều hướng của Space đó, không còn cách đổi Space/mở Settings từ Dashboard (chỉ còn `Esc` về Home). Khối Thông báo vẫn có icon mắt để ẩn/hiện **nội dung** (như mục 8), chỉ không có trong danh sách khối được phép tắt hẳn theo Space.
 
 ### 5.6 Hôm nay
@@ -333,7 +343,7 @@ Settings dùng chung mọi Space:
 - Thứ tự khối chính.
 
 ## 7. Settings
-Settings trình bày dạng **3 tab**, modal Settings có **kích thước cố định** (không co giãn theo nội dung) — header, thanh tab, vùng nút hành động luôn cố định, chỉ phần nội dung từng tab (`.settings-body`) cuộn riêng, không cuộn cả modal:
+Settings trình bày dạng **3 tab**, modal Settings có **kích thước cố định** (không co giãn theo nội dung): header, thanh tab, vùng nút hành động luôn cố định, chỉ phần nội dung từng tab (`.settings-body`) cuộn riêng, không cuộn cả modal:
 - Tab **"Chung"**: Theme sáng/tối, Màu chủ đạo, Bố cục/kích thước khối, Export/Import.
 - Tab **"Ảnh nền"**: lưới ảnh nền Home (6 slot, mỗi slot là link hoặc upload), tuỳ chọn "Tự động đổi ảnh".
 - Tab **"Quote"**: lưới 10 slot quote Home, tuỳ chọn tần suất đổi quote.
@@ -438,8 +448,9 @@ PWA:
 - **Chưa có service worker / offline-first** — cố ý chưa làm, không phải bug; có thể bổ sung sau nếu phát sinh nhu cầu dùng khi mất mạng.
 
 Responsive desktop/di động:
-- Breakpoint mobile: `≤639px`.
-- Trên mobile: chỉ render 2 khối Việc cần làm + Ghi chú (lớp lọc RENDER riêng, tách biệt hoàn toàn `space.enabledBlocks`), dạng accordion (khối mở ~80% chiều cao, khối thu nhỏ còn thanh tóm tắt), mặc định mở "Việc cần làm". Không có nút "Về Home" trên mobile. **Quyết định đã chốt:** phạm vi này là dài hạn, không có kế hoạch mở rộng thêm khối khác cho mobile.
+- **Cập nhật 2026-07-07:** mô tả breakpoint/mobile dưới đây đã đối chiếu lại đúng code thật sau đợt UI audit, thay thế mô tả cũ dựa trên breakpoint `≤639px` (xem thêm mục 2.1 cho phần mô tả đầy đủ hơn).
+- **Ngưỡng chuyển đổi mô hình UI mobile/desktop**: `useMobileLayout()` (`src/layout/useMobileLayout.ts`) — vào mobile khi width `≤999px` (`MOBILE_ENTER_MAX`), chỉ thoát mobile khi width `≥1010px` (`MOBILE_EXIT_MIN`) — hysteresis 2 mốc để chống UI nhảy qua-lại khi resize dao động sát biên giữa 2 mô hình UI khác hẳn nhau (cột tự do desktop / chat-first mobile). Đây là breakpoint chính, khác breakpoint Tailwind `≤639px` (`max-sm`) vẫn còn dùng riêng cho vài tinh chỉnh responsive nhỏ hơn bên trong UI (ví dụ ẩn chip tên người tạo trên `TaskRow`) — 2 khái niệm độc lập, không nhầm lẫn.
+- Trên mobile: bỏ hẳn màn Home (`src/App.tsx`), vào thẳng UI chính. UI chính gồm 2 tab đổi qua `MobileTabBar` dính đáy: **"Trò chuyện"** (mặc định — màn chat-style mới `MobileChatScreen`, gộp Việc cần làm + Ghi chú thành bong bóng theo dòng thời gian, nhập nhanh qua 1 ô input + Enter, tiền tố `/note ` để tạo Ghi chú) và **"Chi tiết"** (accordion 2 khối Việc cần làm + Ghi chú như bản mô tả trước — không có dòng preview nội dung ở thanh tóm tắt, đã bỏ theo test thực tế). Mặc định mở "Việc cần làm" trong tab "Chi tiết". Không có nút "Về Home" ở cả 2 tab (chỉ còn thanh Space-switcher + Settings dạng compact trên cùng). **Quyết định đã chốt:** phạm vi 2 khối + ẩn Nhắc việc/Thói quen/Thông báo/Hôm nay trên mobile là dài hạn, không có kế hoạch mở rộng thêm khối khác.
 - Khối điều hướng (Space-switcher + Settings) luôn hiện trên cả desktop/mobile, không tính vào danh sách khối nội dung bị ẩn trên mobile.
 
 ## 11. Cấu Trúc Web App
@@ -515,10 +526,13 @@ Dev cần kiểm tra:
 - Đổi theme/màu/layout/thứ tự khối, lưu và đồng bộ đúng.
 - Export JSON tải file đúng, bao gồm đầy đủ ảnh upload base64 inline và 10 slot quote.
 - Import JSON khôi phục đúng sau xác nhận — verify thêm: import file export từ bản extension cũ vào web app mới, dữ liệu lên đúng Supabase.
-- Trên di động (≤639px): chỉ thấy 2 khối Việc cần làm/Ghi chú, accordion đổi khối mở đúng, không có nút "Về Home", Space-switcher + Settings vẫn dùng được.
+- Trên di động (ngưỡng ~1000px, xem mục 2.1): không có màn Home, mặc định vào thẳng tab "Trò chuyện" (feed hợp nhất Task+Note dạng bong bóng chat, quick-add có prefix `/note `), chuyển được sang tab "Chi tiết" (accordion Task+Note) qua `MobileTabBar`; Space-switcher + Settings vẫn dùng được trong `DashboardCorner` thu gọn.
 - "Add to Home Screen" trên iOS/Android mở app full-screen đúng theme/icon.
 - Mất mạng giữa lúc sửa dữ liệu: có cảnh báo, không crash app (chưa có offline-first/queue — quyết định đã chốt, không cần, xem mục 10).
 
 ## Câu hỏi mở / việc tồn đọng
-1. **Mục 4/4.1 (Layout Dashboard tự do) đã được rà soát lại đúng code thật** (`src/layout/AppLayout.tsx`, `useDashboardLayout.ts`, `dashboardLayoutUtils.ts`) — khối "Hôm nay" đã được bổ sung mô tả riêng ở **mục 5.6**. 2 câu hỏi mở còn lại được ghi ngay cuối mục 4.1 (các mục 5.5/6/8/12 vẫn còn câu chữ tham chiếu bố cục "3 khối cố định" cũ, cần một lượt rà soát riêng để đồng bộ; và câu hỏi về giới hạn số khối ghép ngang tối đa/slot).
+1. ~~Mục 4/4.1 (Layout Dashboard tự do) đã được rà soát lại đúng code thật~~ (`src/layout/AppLayout.tsx`, `useDashboardLayout.ts`, `dashboardLayoutUtils.ts`) — khối "Hôm nay" đã được bổ sung mô tả riêng ở **mục 5.6**. **Đã chốt (`ba`, 2026-07-07):** câu hỏi về mục 5.5/6/8/12 đã xử lý xong (xem câu hỏi mở cuối mục 4.1); câu hỏi về giới hạn số khối ghép ngang tối đa/slot vẫn còn mở, chưa cần quyết định gấp.
 2. ~~Phát sinh khi viết mục 5.6: hành vi khối Hôm nay không khớp mô tả ban đầu~~ — **đã chốt (2026-07-03)**: giữ đúng code thật (resize được + tắt/bật theo Space), xem ghi chú "Đã chốt" cuối mục 5.6.
+3. **Mục 2.1/4/4.5/10 đã rà soát lại đúng code thật về hành vi mobile (2026-07-07)**, theo phát hiện của `uiux` (`docs/features/ui-audit-2026-07.md` mục 3, câu hỏi mở #1): breakpoint mobile chính đổi từ `≤639px` (sai) sang ~1000px (999/1010 hysteresis, `useMobileLayout.ts`), mobile bỏ hẳn màn Home, thêm mô tả màn "Trò chuyện" (`MobileChatScreen`) + `MobileTabBar`. **Đã chốt (`ba`, 2026-07-07)** — đã đọc lại toàn bộ code liên quan (`useMobileLayout.ts`, `App.tsx`, `AppLayout.tsx`, `MobileChatScreen.tsx`) và xác nhận đây là **1 quyết định thiết kế trọn vẹn, nhất quán nội bộ**, không phải trạng thái dở dang (nhánh mobile `return` sớm hoàn toàn tách khỏi nhánh desktop, `MobileChatScreen` là feature đầy đủ, việc bỏ Home mobile có comment xác nhận với chủ dự án). 2 việc tồn đọng đã xử lý luôn trong đợt này:
+   - Mục 12 (Verification): đã sửa dòng kiểm thử mobile để đúng ngưỡng ~1000px và luồng "Trò chuyện"/"Chi tiết" (không còn ghi `≤639px`/chỉ-accordion).
+   - Câu hỏi splitter "ẩn dưới breakpoint `lg` 979px" (mục 4): **xác nhận là dead code** — vì ngưỡng vào-mobile là `≤999px` không có hysteresis ở chiều "đang desktop" (`MOBILE_ENTER_MAX=999`), nên tại mọi độ rộng `≤979px` app đã sớm chuyển sang UI mobile riêng (nhánh desktop chứa splitter/`#cols-wrap` không còn được render) — không còn kịch bản nào khiến điều kiện `lg`/979px này còn ý nghĩa thực tế. Đã ghi chú kết luận này ngay tại mục 4 (không tự xoá code — để dev cân nhắc dọn khi có dịp sửa `AppLayout.tsx`).

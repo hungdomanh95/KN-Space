@@ -173,7 +173,8 @@ export function HomeBackgroundSettings() {
                 />
                 <button
                   type="button"
-                  className="flex h-[26px] w-[26px] flex-none items-center justify-center rounded-md border
+                  style={{ '--touch-inset': '-9px' } as React.CSSProperties}
+                  className="touch-target-44 flex h-[26px] w-[26px] flex-none items-center justify-center rounded-md border
                     border-[color:var(--border)] bg-[var(--raised)] text-[var(--text-dim)] transition-[color,border-color]
                     duration-150 [transition-timing-function:var(--ease-standard)] hover:border-[color:var(--accent)] hover:text-[var(--accent)]"
                   title="Upload ảnh từ máy"

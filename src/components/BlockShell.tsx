@@ -99,7 +99,7 @@ export function BlockShell({
           {!collapsed && headerActions}
           {headerActions && <span className="h-[18px] w-px flex-none bg-[var(--border)]" />}
           <button
-            className="flex flex-none items-center justify-center rounded-[7px] bg-transparent p-[5px] text-[var(--text-dim)] transition-[color,background] duration-150 hover:bg-[rgba(var(--accent-rgb),.1)] hover:text-[var(--accent)]"
+            className="touch-target-44 flex flex-none items-center justify-center rounded-[7px] bg-transparent p-[5px] text-[var(--text-dim)] transition-[color,background] duration-150 hover:bg-[rgba(var(--accent-rgb),.1)] hover:text-[var(--accent)]"
             onClick={onToggleCollapsed}
             title={collapsed ? `Hiện nội dung ${title}` : `Ẩn nội dung ${title}`}
             aria-label={collapsed ? `Hiện nội dung ${title}` : `Ẩn nội dung ${title}`}

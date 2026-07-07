@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import * as Checkbox from '@radix-ui/react-checkbox';
+import { Check } from 'lucide-react';
 import { Modal } from '../../components/Modal';
 import { useAppState } from '../../state/AppStateContext';
 import { defaultEnabledBlocks } from '../../state/reducers/spaces';
@@ -65,7 +67,17 @@ export function SpaceFormModal({ space, onClose }: SpaceFormModalProps) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {BLOCK_DEFS.map((b) => (
               <label key={b.key} className="block-check-row">
-                <input type="checkbox" checked={blocks[b.key]} onChange={() => toggleBlock(b.key)} />
+                <Checkbox.Root
+                  checked={blocks[b.key]}
+                  onCheckedChange={() => toggleBlock(b.key)}
+                  className="flex h-4 w-4 flex-none items-center justify-center rounded-[5px] border-solid border-[1.5px]
+                    border-[color:var(--border-control)] transition-colors duration-150 data-[state=checked]:border-[var(--accent)]
+                    data-[state=checked]:bg-[var(--accent)]"
+                >
+                  <Checkbox.Indicator>
+                    <Check className="icon text-white" size={10} strokeWidth={3} />
+                  </Checkbox.Indicator>
+                </Checkbox.Root>
                 <span>{b.label}</span>
               </label>
             ))}

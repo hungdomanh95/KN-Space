@@ -83,6 +83,9 @@ export function HomeScreen({ onEnterDashboard }: HomeScreenProps) {
           aria-label="Vào Dashboard"
           className="-mx-4 -mt-[10px] -mb-[10px] flex flex-col items-center gap-1.5 px-4 py-[10px] text-white transition-opacity duration-150 [transition-timing-function:var(--ease-standard)] hover:opacity-[.82] focus-visible:rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
         >
+          {/* strokeWidth 1.7 (thay vì mặc định 2) — nét icon mảnh hơn, hợp icon lớn 26px đứng
+              một mình giữa nền ảnh; size=17 chỉ set kích thước viewBox nội bộ, w/h thật do
+              class Tailwind h-[26px]/w-[26px] quyết định (mục S3, docs/features/ui-audit-2026-07.md). */}
           <ChevronsDown className="icon h-[26px] w-[26px] animate-homeEnterBounce" strokeWidth={1.7} size={17} />
           <span className="text-[0.7188rem] font-semibold uppercase tracking-[.08em] opacity-75">Vào Dashboard</span>
         </button>

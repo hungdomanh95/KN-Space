@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import * as Switch from '@radix-ui/react-switch';
 import { BellRing, Download } from 'lucide-react';
 import { usePushSubscription } from '../notifications/usePushSubscription';
 import { useAppState } from '../../state/AppStateContext';
@@ -63,25 +64,20 @@ export function PushNotificationSettings() {
           </p>
           <p className="hint mt-1">{statusText}</p>
         </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={checked}
+        <Switch.Root
+          checked={checked}
+          onCheckedChange={handleToggle}
           aria-label="Bật/tắt thông báo đẩy"
           disabled={isBusy || (!checked && !canToggleOn)}
-          onClick={handleToggle}
-          className={`relative h-6 w-[42px] flex-none rounded-full border-[1.5px] transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40 ${
-            checked
-              ? 'border-[color:var(--accent)] bg-[var(--accent)]'
-              : 'border-[color:var(--border-control)] bg-[var(--bg)]'
-          }`}
+          className="relative h-6 w-[42px] flex-none rounded-full border-solid border-[1.5px] transition-colors duration-150
+            disabled:cursor-not-allowed disabled:opacity-40 border-[color:var(--border-control)] bg-[var(--bg)]
+            data-[state=checked]:border-[color:var(--accent)] data-[state=checked]:bg-[var(--accent)]"
         >
-          <span
-            className={`absolute top-1/2 h-[17px] w-[17px] -translate-y-1/2 rounded-full bg-white shadow-sm transition-transform duration-150 ${
-              checked ? 'translate-x-[21px]' : 'translate-x-[3px]'
-            }`}
+          <Switch.Thumb
+            className="absolute left-0 top-1/2 h-[17px] w-[17px] -translate-y-1/2 translate-x-[3px] rounded-full bg-white shadow-sm transition-transform duration-150
+              data-[state=checked]:translate-x-[21px]"
           />
-        </button>
+        </Switch.Root>
       </div>
 
       <div className="mt-2.5 flex items-center justify-between gap-3 rounded-[10px] border-[1.5px] border-[color:var(--border)] bg-[var(--raised)] p-3">
@@ -89,29 +85,24 @@ export function PushNotificationSettings() {
           <p className="m-0 text-[0.9062rem] font-semibold text-[var(--text)]">Thông báo hoạt động Space chung</p>
           <p className="hint mt-1">Báo khi task trong Space chung được giao cho bạn hoặc được hoàn thành.</p>
         </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={state.settings.pushNotifySharedSpaceEvents}
-          aria-label="Bật/tắt thông báo hoạt động Space chung"
-          onClick={() =>
+        <Switch.Root
+          checked={state.settings.pushNotifySharedSpaceEvents}
+          onCheckedChange={(v) =>
             dispatch({
               type: 'SETTINGS_SET_PUSH_NOTIFY_SHARED_EVENTS',
-              payload: { enabled: !state.settings.pushNotifySharedSpaceEvents },
+              payload: { enabled: v },
             })
           }
-          className={`relative h-6 w-[42px] flex-none rounded-full border-[1.5px] transition-colors duration-150 ${
-            state.settings.pushNotifySharedSpaceEvents
-              ? 'border-[color:var(--accent)] bg-[var(--accent)]'
-              : 'border-[color:var(--border-control)] bg-[var(--bg)]'
-          }`}
+          aria-label="Bật/tắt thông báo hoạt động Space chung"
+          className="relative h-6 w-[42px] flex-none rounded-full border-solid border-[1.5px] transition-colors duration-150
+            border-[color:var(--border-control)] bg-[var(--bg)]
+            data-[state=checked]:border-[color:var(--accent)] data-[state=checked]:bg-[var(--accent)]"
         >
-          <span
-            className={`absolute top-1/2 h-[17px] w-[17px] -translate-y-1/2 rounded-full bg-white shadow-sm transition-transform duration-150 ${
-              state.settings.pushNotifySharedSpaceEvents ? 'translate-x-[21px]' : 'translate-x-[3px]'
-            }`}
+          <Switch.Thumb
+            className="absolute left-0 top-1/2 h-[17px] w-[17px] -translate-y-1/2 translate-x-[3px] rounded-full bg-white shadow-sm transition-transform duration-150
+              data-[state=checked]:translate-x-[21px]"
           />
-        </button>
+        </Switch.Root>
       </div>
 
       {error && (

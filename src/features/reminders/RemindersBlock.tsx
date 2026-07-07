@@ -101,7 +101,7 @@ export function RemindersBlock({
                         <Pin className="icon h-2.5 w-2.5" size={10} /> 1 lần
                       </span>
                       <span className="inline-flex items-center gap-1 rounded-md bg-[var(--raised)] px-[7px] py-0.5 text-[0.7188rem] font-semibold text-[var(--text-dim)]">
-                        {(r.date || '').slice(5)} {r.time || ''}
+                        {(r.date || '').split('-').reverse().join('/')} {r.time || ''}
                       </span>
                     </>
                   ) : (
