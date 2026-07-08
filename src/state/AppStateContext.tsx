@@ -133,6 +133,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   // Dùng để flush ngay khi tab ẩn (F5/đóng tab) tránh mất data trong cửa sổ debounce 800ms
   const pendingSharedSavesRef = useRef<Map<string, {
     tasks: Space['tasks']; notes: Space['notes']; reminders: Space['reminders']; logs: Space['logs']; name: string;
+    enabledBlocks: Space['enabledBlocks'];
   }>>(new Map());
 
   /**
@@ -181,7 +182,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       if (!sharedVersionsRef.current.has(sid) && space._sharedVersion !== undefined) {
         sharedVersionsRef.current.set(sid, space._sharedVersion);
       }
-      const snapshot = JSON.stringify({ tasks: space.tasks, notes: space.notes, reminders: space.reminders, logs: space.logs, name: space.name });
+      const snapshot = JSON.stringify({ tasks: space.tasks, notes: space.notes, reminders: space.reminders, logs: space.logs, name: space.name, enabledBlocks: space.enabledBlocks });
       // Lần đầu thấy space này (vừa hydrate/load) → chỉ ghi nhận baseline, KHÔNG save.
       // Trước đây thiếu bước này khiến lần render đầu tiên luôn bị coi là "có thay đổi"
       // (Map rỗng nên snapshot cũ luôn undefined !== snapshot hiện tại) → tự bắn 1 save
@@ -194,7 +195,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       if (prevSharedRef.current.get(sid) === snapshot) return;
       prevSharedRef.current.set(sid, snapshot);
       // Cập nhật pending data ngay — dùng để flush khi visibilitychange
-      pendingSharedSavesRef.current.set(sid, { tasks: space.tasks, notes: space.notes, reminders: space.reminders, logs: space.logs, name: space.name });
+      pendingSharedSavesRef.current.set(sid, { tasks: space.tasks, notes: space.notes, reminders: space.reminders, logs: space.logs, name: space.name, enabledBlocks: space.enabledBlocks });
       // Debounce 800ms
       const existing = sharedSaveTimersRef.current.get(sid);
       if (existing) clearTimeout(existing);
@@ -335,6 +336,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         reminders: targetSpace.reminders,
         logs: targetSpace.logs,
         name: targetSpace.name,
+        enabledBlocks: targetSpace.enabledBlocks,
       };
 
       // Huỷ debounce timer đang chờ của space này — data mới nhất được gửi thẳng ngay bây giờ,

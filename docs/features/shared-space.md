@@ -183,6 +183,15 @@ Habit là dữ liệu cực kỳ cá nhân (chuỗi ngày hoàn thành từng ng
 - Người dùng không thể bật lại Habit trong Shared Space dù vào Settings.
 - UI ẩn luôn cả toggle Habit trong Settings khi đang ở Shared Space.
 
+> **Cập nhật 2026-07-08 (fix bug enabledBlocks hard-code):** trước đây `enabledBlocks` của
+> Shared Space bị ép cứng hoàn toàn ở client (`rowToSpace()` trong `src/storage/sharedSpaceStore.ts`)
+> vì bảng `kn_shared_spaces` chưa có cột lưu field này — user tắt/bật "Nhắc việc"/"Ghi chú"/"Nhật ký
+> nhanh" qua Settings > Sửa Space không bao giờ được lưu lại thật, F5 là mất. Đã fix bằng cách thêm cột
+> `enabled_blocks jsonb` (xem `docs/features/fix-shared-space-enabled-blocks.sql`) và cho phép user tự
+> bật/tắt **"Nhắc việc" (`reminder`)** như các khối khác. Riêng **"Thói quen" (`habits`) vẫn bị ép cứng
+> `false`** — không đổi so với trước, chỉ chuyển lớp ép cứng từ "toàn bộ enabledBlocks bị hard-code" sang
+> "chỉ riêng `habits` bị ép trong `normalizeSharedEnabledBlocks()`", đọc các field còn lại thật từ DB.
+
 ### 6.2 Conflict resolution — Item-level Last-Write-Wins (LWW)
 
 Khi 2+ người cùng sửa cùng lúc:

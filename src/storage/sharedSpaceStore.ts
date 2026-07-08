@@ -16,7 +16,37 @@
 
 import { supabase } from '../lib/supabaseClient';
 import { normalizeSpace } from './normalize';
-import type { Space, SharedSpaceMember, SpaceInvite } from '../types';
+import type { EnabledBlocks, Space, SharedSpaceMember, SpaceInvite } from '../types';
+
+/**
+ * enabledBlocks mặc định cho Shared Space khi hàng DB thiếu cột `enabled_blocks`
+ * (space tạo trước khi chạy docs/features/fix-shared-space-enabled-blocks.sql) hoặc
+ * giá trị lưu không hợp lệ. Không dùng `defaultEnabledBlocks()` của reducers/spaces.ts
+ * (mặc định `habits: true`) vì Shared Space luôn ép `habits: false` — xem
+ * docs/features/shared-space.md mục 6.1.
+ */
+function defaultSharedEnabledBlocks(): EnabledBlocks {
+  return { tasks: true, reminder: true, habits: false, notes: true, reminders: true, logs: true };
+}
+
+/**
+ * Chuẩn hoá `enabled_blocks` đọc từ DB — fallback an toàn nếu thiếu/hỏng.
+ * LUÔN ép `habits: false` bất kể DB lưu gì (lớp phòng thủ ở application layer,
+ * không phụ thuộc default của cột DB) — invariant đã tài liệu hoá: khối "Thói
+ * quen" bị ẩn hoàn toàn ở mọi Shared Space, không cho user bật lại.
+ */
+export function normalizeSharedEnabledBlocks(raw: unknown): EnabledBlocks {
+  const fallback = defaultSharedEnabledBlocks();
+  const r = raw && typeof raw === 'object' ? (raw as Partial<Record<keyof EnabledBlocks, unknown>>) : {};
+  return {
+    tasks: typeof r.tasks === 'boolean' ? r.tasks : fallback.tasks,
+    reminder: typeof r.reminder === 'boolean' ? r.reminder : fallback.reminder,
+    habits: false, // ép cứng — xem comment hàm phía trên
+    notes: typeof r.notes === 'boolean' ? r.notes : fallback.notes,
+    reminders: typeof r.reminders === 'boolean' ? r.reminders : fallback.reminders,
+    logs: typeof r.logs === 'boolean' ? r.logs : fallback.logs,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -52,6 +82,7 @@ function rowToSpace(
     notes: unknown;
     reminders: unknown;
     logs: unknown;
+    enabled_blocks?: unknown;
     version: number;
   },
   order: number,
@@ -60,14 +91,11 @@ function rowToSpace(
     id: row.id,
     name: row.name,
     order,
-    enabledBlocks: {
-      tasks: true,
-      reminder: false, // reminder block (Nhắc việc) ẩn trong shared space
-      habits: false,   // habits block ẩn trong shared space (chốt từ schema Q2)
-      notes: true,
-      reminders: true,
-      logs: true, // Nhật ký nhanh hiển thị bình thường trong Shared Space (không ẩn như habits)
-    },
+    // Đọc enabledBlocks THẬT từ DB (cột `enabled_blocks`, xem
+    // docs/features/fix-shared-space-enabled-blocks.sql) — trước đây bị hard-code cứng ở đây,
+    // khiến user tắt/bật khối qua Settings > Sửa Space không bao giờ được lưu lại.
+    // `habits` luôn bị ép `false` trong normalizeSharedEnabledBlocks() bất kể DB lưu gì.
+    enabledBlocks: normalizeSharedEnabledBlocks(row.enabled_blocks),
     tasks: Array.isArray(row.tasks) ? (row.tasks as Space['tasks']) : [],
     reminders: Array.isArray(row.reminders) ? (row.reminders as Space['reminders']) : [],
     habits: [],        // shared space không có habits
@@ -105,6 +133,7 @@ export async function loadSharedSpaces(): Promise<Space[]> {
         notes,
         reminders,
         logs,
+        enabled_blocks,
         version
       )
     `)
@@ -126,6 +155,7 @@ export async function loadSharedSpaces(): Promise<Space[]> {
       notes: unknown;
       reminders: unknown;
       logs: unknown;
+      enabled_blocks: unknown;
       version: number;
     } | null;
     if (!spaceRow) return; // kn_shared_spaces bị xoá nhưng cascade chưa chạy
@@ -165,7 +195,7 @@ export async function getSharedSpaceVersion(sharedSpaceId: string): Promise<numb
  */
 export async function saveSharedSpace(
   spaceId: string,
-  patch: Partial<Pick<Space, 'tasks' | 'notes' | 'reminders' | 'logs' | 'name'>>,
+  patch: Partial<Pick<Space, 'tasks' | 'notes' | 'reminders' | 'logs' | 'name' | 'enabledBlocks'>>,
   expectedVersion: number,
 ): Promise<{ ok: boolean; conflict: boolean; newVersion?: number }> {
   // Chỉ gửi các field thực sự có trong patch
@@ -175,6 +205,10 @@ export async function saveSharedSpace(
   if (patch.reminders !== undefined) updatePayload.reminders = patch.reminders;
   if (patch.logs !== undefined) updatePayload.logs = patch.logs;
   if (patch.name !== undefined) updatePayload.name = patch.name;
+  // Luôn ép `habits: false` trước khi gửi lên DB — phòng trường hợp caller lỡ truyền
+  // enabledBlocks có habits:true (không nên xảy ra vì UI đã chặn, nhưng đây là lớp
+  // phòng thủ cuối trước khi ghi DB, tránh dữ liệu bẩn nếu có bug ở tầng trên).
+  if (patch.enabledBlocks !== undefined) updatePayload.enabled_blocks = { ...patch.enabledBlocks, habits: false };
 
   if (Object.keys(updatePayload).length === 0) {
     return { ok: true, conflict: false, newVersion: expectedVersion };
@@ -368,7 +402,7 @@ export async function createSharedSpace(name: string): Promise<Space> {
   // Fetch lại hàng đầy đủ để có tasks/notes/reminders/version (mặc định rỗng nhưng cần đồng nhất)
   const { data: spaceRow, error: fetchError } = await supabase
     .from('kn_shared_spaces')
-    .select('id, name, tasks, notes, reminders, logs, version')
+    .select('id, name, tasks, notes, reminders, logs, enabled_blocks, version')
     .eq('id', result.space_id)
     .single<{
       id: string;
@@ -377,6 +411,7 @@ export async function createSharedSpace(name: string): Promise<Space> {
       notes: unknown;
       reminders: unknown;
       logs: unknown;
+      enabled_blocks: unknown;
       version: number;
     }>();
 

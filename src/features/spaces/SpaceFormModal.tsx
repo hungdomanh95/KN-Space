@@ -19,6 +19,16 @@ const BLOCK_DEFS: { key: keyof EnabledBlocks; label: string }[] = [
   { key: 'logs', label: 'Nhật ký nhanh' },
 ];
 
+// Khối "Thói quen" bị ẩn hoàn toàn ở Shared Space — bất biến, không cho user bật lại (xem
+// docs/features/shared-space.md mục 6.1, ép cứng ở nhiều lớp: rowToSpace(), AppLayout,
+// computeNotifications...). Trước đây modal vẫn hiện checkbox này bấm được bình thường cho
+// Shared Space dù giá trị chưa từng được lưu thật — gây hiểu nhầm user tưởng bật/tắt được.
+// Từ giờ ẩn hẳn khỏi danh sách khi đang sửa Shared Space, không chỉ disable (đỡ phải giải
+// thích thêm lý do "vì sao có mà không bấm được" trong UI).
+function blockDefsFor(isShared: boolean | undefined) {
+  return isShared ? BLOCK_DEFS.filter((b) => b.key !== 'habits') : BLOCK_DEFS;
+}
+
 interface SpaceFormModalProps {
   space: Space | null; // null = tạo mới
   onClose: () => void;
@@ -29,24 +39,29 @@ export function SpaceFormModal({ space, onClose }: SpaceFormModalProps) {
   const [name, setName] = useState(space?.name ?? '');
   const [blocks, setBlocks] = useState<EnabledBlocks>(space?.enabledBlocks ?? defaultEnabledBlocks());
   const [showError, setShowError] = useState(false);
+  const visibleBlockDefs = blockDefsFor(space?.isShared);
 
   function toggleBlock(key: keyof EnabledBlocks) {
     setBlocks((prev) => ({ ...prev, [key]: !prev[key] }));
   }
 
   function handleSave() {
-    // Chỉ kiểm tra 4 khối có thể tắt (BLOCK_DEFS) — `reminders` luôn `true` trong `blocks`
-    // (ép ở reducer) nên không được tính vào điều kiện "phải bật ít nhất 1 khối", nếu không
-    // validation sẽ luôn pass dù user tắt hết 4 khối còn lại.
-    if (!BLOCK_DEFS.some((b) => blocks[b.key])) {
+    // Chỉ kiểm tra các khối THẬT SỰ hiện trên UI (visibleBlockDefs) — với Shared Space, "Thói
+    // quen" đã bị lọc khỏi danh sách nên không được tính vào điều kiện "phải bật ít nhất 1 khối".
+    // `reminders` luôn `true` trong `blocks` (ép ở reducer) nên cũng không nằm trong BLOCK_DEFS.
+    if (!visibleBlockDefs.some((b) => blocks[b.key])) {
       setShowError(true);
       return;
     }
+    // Phòng thủ: dù UI đã ẩn checkbox "Thói quen" cho Shared Space, vẫn ép `habits: false`
+    // ở đây trước khi dispatch — tránh trường hợp `blocks` khởi tạo sai (vd data cũ lỗi) vô
+    // tình giữ `habits: true` rồi lưu ngược trở lại DB, phá vỡ invariant đã tài liệu hoá.
+    const finalBlocks = space?.isShared ? { ...blocks, habits: false } : blocks;
     if (space) {
       dispatch({ type: 'SPACE_RENAME', payload: { id: space.id, name } });
-      dispatch({ type: 'SPACE_SET_ENABLED_BLOCKS', payload: { id: space.id, enabledBlocks: blocks } });
+      dispatch({ type: 'SPACE_SET_ENABLED_BLOCKS', payload: { id: space.id, enabledBlocks: finalBlocks } });
     } else {
-      dispatch({ type: 'SPACE_CREATE', payload: { name, enabledBlocks: blocks } });
+      dispatch({ type: 'SPACE_CREATE', payload: { name, enabledBlocks: finalBlocks } });
     }
     onClose();
   }
@@ -68,7 +83,7 @@ export function SpaceFormModal({ space, onClose }: SpaceFormModalProps) {
         <div className="field">
           <label>Khối hiển thị</label>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {BLOCK_DEFS.map((b) => (
+            {visibleBlockDefs.map((b) => (
               <label key={b.key} className="block-check-row">
                 <Checkbox.Root
                   checked={blocks[b.key]}
