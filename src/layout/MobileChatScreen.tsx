@@ -1,26 +1,16 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { BookOpen, Check, SendHorizontal } from 'lucide-react';
+import { BookOpen, Check, ScrollText, SendHorizontal } from 'lucide-react';
 import { useAppState, useCurrentSpace } from '../state/AppStateContext';
 import { useCurrentUserId } from '../state/useCurrentUserId';
 import { useSpaceMembers } from '../state/useSpaceMembers';
 import { getMemberColor, getMemberDisplayName } from '../utils/memberColors';
+import { formatBubbleTime } from '../utils/formatTime';
 import { MemberAvatar } from '../components/MemberAvatar';
 
 type ChatBubble =
   | { id: string; type: 'task'; title: string; done: boolean; createdBy?: string; createdAt?: string }
-  | { id: string; type: 'note'; title: string; createdBy?: string; createdAt?: string };
-
-/** Hiện "HH:mm" nếu cùng ngày hôm nay, "dd/MM HH:mm" nếu khác ngày. Trả '' nếu thiếu dữ liệu (item cũ trước khi có createdAt). */
-function formatBubbleTime(iso: string | undefined): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  const now = new Date();
-  const hhmm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-  const sameDay = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
-  if (sameDay) return hhmm;
-  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} ${hhmm}`;
-}
+  | { id: string; type: 'note'; title: string; createdBy?: string; createdAt?: string }
+  | { id: string; type: 'log'; content: string; createdBy?: string; createdAt: string };
 
 export function MobileChatScreen() {
   const { dispatch } = useAppState();
@@ -31,21 +21,29 @@ export function MobileChatScreen() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Merge task + note từ space, sort theo order (lớn = cũ hơn → hiện cũ→mới, mới nhất dưới cùng).
+  // Merge task + note + log từ space, sort theo `createdAt` (KHÔNG dùng `order` như trước —
+  // `LogEntry` không có field `order`, chỉ có `createdAt`, xem nhat-ky-nhanh.md mục 5.2.1).
+  // So sánh chuỗi ISO tăng dần → cũ nhất đứng đầu mảng, mới nhất cuối mảng (hiện cũ→mới, mới
+  // nhất dưới cùng, đúng hành vi cũ). Item thiếu `createdAt` (dữ liệu cũ) coi như cũ nhất.
   const bubbles = useMemo<ChatBubble[]>(() => {
     const all = [
       ...space.tasks.slice(0, 30).map((t) => ({ ...t, _type: 'task' as const })),
       ...space.notes.slice(0, 30).map((n) => ({ ...n, _type: 'note' as const })),
+      ...space.logs.slice(0, 30).map((l) => ({ ...l, _type: 'log' as const })),
     ]
-      .sort((a, b) => b.order - a.order)
-      .slice(0, 50);
+      .sort((a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? ''))
+      .slice(0, 75); // tăng từ 50 → 75 (nhat-ky-nhanh.md mục 6.5, đủ chỗ cho 30 task+30 note+30 log)
 
-    return all.map((item) =>
-      item._type === 'task'
-        ? ({ id: item.id, type: 'task', title: item.title, done: (item as typeof space.tasks[0]).done, createdBy: item.createdBy, createdAt: item.createdAt } as ChatBubble)
-        : ({ id: item.id, type: 'note', title: item.title, createdBy: item.createdBy, createdAt: item.createdAt } as ChatBubble),
-    );
-  }, [space.tasks, space.notes]);
+    return all.map((item) => {
+      if (item._type === 'task') {
+        return { id: item.id, type: 'task', title: item.title, done: item.done, createdBy: item.createdBy, createdAt: item.createdAt } satisfies ChatBubble;
+      }
+      if (item._type === 'note') {
+        return { id: item.id, type: 'note', title: item.title, createdBy: item.createdBy, createdAt: item.createdAt } satisfies ChatBubble;
+      }
+      return { id: item.id, type: 'log', content: item.content, createdBy: item.createdBy, createdAt: item.createdAt } satisfies ChatBubble;
+    });
+  }, [space.tasks, space.notes, space.logs]);
 
   useLayoutEffect(() => {
     const el = scrollRef.current;
@@ -63,22 +61,36 @@ export function MobileChatScreen() {
     return () => vv.removeEventListener('resize', onViewportResize);
   }, []);
 
-  const isNoteMode = text.trimStart().startsWith('/note');
-
+  // Cơ chế tiền tố (thay cho segmented picker cũ, theo yêu cầu đổi ngược của chủ dự án
+  // 2026-07-07 — xem docs/features/nhat-ky-nhanh-progress.md mục Phần 3):
+  // - Gõ trơn (không tiền tố) + Enter → mặc định tạo LOG (KHÁC bản gốc trước Nhật ký nhanh,
+  //   lúc đó gõ trơn tạo Task).
+  // - "/task " → tạo Task (tiền tố MỚI, trước đây gõ trơn mới ra Task).
+  // - "/note " → tạo Note (giữ nguyên như bản gốc).
   function handleSubmit() {
     const raw = text.trim();
-    const isNote = raw.startsWith('/note');
-    const title = (isNote ? raw.slice(5) : raw).trim();
-    if (!title) return;
+    if (!raw) return;
 
     const createdBy = currentUserId ?? undefined;
-    if (isNote) {
+    if (raw.startsWith('/task')) {
+      const title = raw.slice('/task'.length).trim();
+      if (!title) return;
+      dispatch({ type: 'TASK_CREATE', payload: { title, content: '', date: '', time: '', createdBy } });
+    } else if (raw.startsWith('/note')) {
+      const title = raw.slice('/note'.length).trim();
+      if (!title) return;
       dispatch({ type: 'NOTE_CREATE', payload: { title, content: '', color: '', createdBy } });
     } else {
-      dispatch({ type: 'TASK_CREATE', payload: { title, content: '', date: '', time: '', createdBy } });
+      dispatch({ type: 'LOG_CREATE', payload: { content: raw, createdBy } });
     }
     setText('');
   }
+
+  // Highlight viền ô nhập theo tiền tố đang gõ (live, giống cơ chế `isNoteMode` ở bản gốc) —
+  // gõ trơn (mặc định Log) giữ viền trung tính, chỉ đổi màu khi phát hiện tiền tố rõ ràng.
+  const trimmedStart = text.trimStart();
+  const isTaskMode = trimmedStart.startsWith('/task');
+  const isNoteMode = trimmedStart.startsWith('/note');
 
   // Trong shared space: phân biệt bubble của mình (phải) vs người khác (trái).
   // Nếu createdBy trống → coi là của mình (data cũ, graceful fallback).
@@ -100,7 +112,7 @@ export function MobileChatScreen() {
         <div className="flex-1" />
         {bubbles.length === 0 ? (
           <div className="py-2 text-center text-[0.875rem] text-[var(--text-dim)] opacity-70">
-            Gõ 1 việc cần làm rồi Enter — hoặc &quot;/note &quot; để ghi chú nhanh.
+            Gõ 1 dòng để ghi log nhanh — hoặc &quot;/task &quot; để tạo việc, &quot;/note &quot; để ghi chú.
           </div>
         ) : (
           <div className="flex flex-col gap-2">
@@ -140,7 +152,18 @@ export function MobileChatScreen() {
 
                     {/* Bubble content — nền ĐẶC (không blur/xuyên thấu), pastel theo màu member,
                         giống chuẩn Messenger/Zalo: ảnh nền chỉ lộ ra ở khoảng trống giữa các bubble. */}
-                    {mine ? (
+                    {b.type === 'log' ? (
+                      // Log: style trung tính riêng biệt — dùng CHUNG cho cả mình lẫn người khác
+                      // (khác Task/Note tô đặc theo accent/note-color/member), viền dashed +
+                      // nền --raised, icon ScrollText (nhat-ky-nhanh.md mục 5.2.1).
+                      <div
+                        className="flex items-center gap-2 rounded-2xl border border-dashed border-[color:var(--border)]
+                          bg-[var(--raised)] px-3.5 py-2.5 text-[0.875rem] text-[var(--text)]"
+                      >
+                        <ScrollText className="icon h-3.5 w-3.5 flex-none text-[var(--text-dim)]" size={14} />
+                        <span>{b.content}</span>
+                      </div>
+                    ) : mine ? (
                       <div
                         className={`flex items-center gap-2 rounded-2xl px-3.5 py-2.5 text-[0.875rem] text-white ${
                           b.type === 'note' ? 'bg-[var(--note-color)]' : 'bg-[var(--accent)]'
@@ -200,12 +223,14 @@ export function MobileChatScreen() {
           onKeyDown={(e) => {
             if (e.key === 'Enter') handleSubmit();
           }}
-          placeholder='Gõ việc cần làm, hoặc "/note " để ghi chú nhanh'
+          placeholder='Gõ 1 dòng log, hoặc "/task " để tạo việc, "/note " để ghi chú'
           className={`min-w-0 flex-1 rounded-full border bg-[var(--raised)] px-4 py-2.5 text-[16px] text-[var(--text)]
             transition-[border-color] duration-150 focus:outline-none ${
               isNoteMode
                 ? 'border-[var(--note-color)] focus:border-[var(--note-color)]'
-                : 'border-[color:var(--border)] focus:border-[color:var(--accent)]'
+                : isTaskMode
+                  ? 'border-[color:var(--accent)] focus:border-[color:var(--accent)]'
+                  : 'border-[color:var(--border)] focus:border-[color:var(--accent)]'
             }`}
         />
         <button

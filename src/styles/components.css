@@ -27,10 +27,12 @@
   [data-theme='dark'] .sub-block {
     @apply bg-[color-mix(in_srgb,var(--panel-bg)_90%,transparent)];
   }
-  /* #dashboard-corner (DashboardCorner.tsx) không dùng class .main-block/.sub-block (tự style
-     riêng kiểu pill), nhưng vẫn tham gia kéo-thả chung trong layout tự do (AppLayout.tsx gán
-     cùng modifier class dragging/drag-over/zone-side) — cần khai báo riêng để hiệu ứng kéo-thả
-     áp dụng đúng lên nó, không chỉ 5 khối dữ liệu dùng BlockShell. */
+  /* #dashboard-corner (desktop: DashboardCornerBlock.tsx — khối gộp "Widget điều hướng + Hôm
+     nay"; mobile: DashboardCorner.tsx — thanh top-bar compact, không tham gia kéo-thả) không
+     dùng class .main-block/.sub-block (tự style riêng kiểu pill), nhưng bản desktop vẫn tham
+     gia kéo-thả chung trong layout tự do (AppLayout.tsx gán cùng modifier class
+     dragging/drag-over/zone-side) — cần khai báo riêng để hiệu ứng kéo-thả áp dụng đúng lên nó,
+     không chỉ 6 khối dữ liệu dùng BlockShell. */
   .main-block.drag-over,
   .sub-block.drag-over,
   #dashboard-corner.drag-over {

@@ -1,15 +1,16 @@
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { BookOpen, CheckSquare, ChevronUp, MessageCircle, ListChecks, type LucideIcon } from 'lucide-react';
+import { BookOpen, CheckSquare, ChevronUp, MessageCircle, ListChecks, ScrollText, type LucideIcon } from 'lucide-react';
 import { MobileChatScreen } from './MobileChatScreen';
 import { useCurrentSpace } from '../state/AppStateContext';
 import { TasksBlock } from '../features/tasks/TasksBlock';
 import { RemindersBlock } from '../features/reminders/RemindersBlock';
 import { HabitsBlock } from '../features/habits/HabitsBlock';
 import { NotesBlock } from '../features/notes/NotesBlock';
+import { LogsBlock } from '../features/logs/LogsBlock';
 import { NotificationsBlock } from '../features/notifications/NotificationsBlock';
 import { DashboardCorner } from '../components/DashboardCorner';
-import { TodayBlock } from '../features/today/TodayBlock';
+import { DashboardCornerBlock } from '../components/DashboardCornerBlock';
 import { useDashboardLayout } from './useDashboardLayout';
 import { deriveVisibleLayout, getZone, isHeightLocked } from './dashboardLayoutUtils';
 import { Splitter } from './Splitter';
@@ -18,31 +19,43 @@ import { useMobileLayout } from './useMobileLayout';
 import type { EnabledBlocks, LayoutBlockKey, LayoutSlot } from '../types';
 
 /** Dưới breakpoint useMobileLayout (kể cả desktop resize cửa sổ hẹp lại, không riêng điện
- * thoại), chuyển hẳn sang UI mobile (Chat-first + tab Chi tiết) — chỉ hiện 2 khối chính dùng để
- * note nhanh/xem việc cần làm. Hệ layout cột tự do của desktop (kéo-thả/resize/splitter) nhìn
- * rất kỳ khi bị bóp vào khung hẹp dưới 1000px (cột chồng lên nhau, splitter/drag-handle không
- * còn hợp lý) — dưới mốc này dùng hẳn UI mobile thay vì cố nhồi layout desktop vào khung hẹp.
- * KHÔNG đụng tới `space.enabledBlocks` (cài đặt ẩn/hiện khối của desktop, đồng bộ mọi máy) —
- * đây là 1 lớp lọc RENDER riêng, tách biệt hoàn toàn. */
-const MOBILE_VISIBLE_BLOCKS = new Set<LayoutBlockKey>(['tasks', 'notes']);
+ * thoại), chuyển hẳn sang UI mobile (Chat-first + tab Chi tiết) — chỉ hiện 3 khối chính dùng để
+ * note nhanh/xem việc cần làm/xem nhật ký (2026-07-08: thêm `logs`, xem
+ * docs/features/nhat-ky-nhanh.md mục 5.2.2). Hệ layout cột tự do của desktop (kéo-thả/resize/
+ * splitter) nhìn rất kỳ khi bị bóp vào khung hẹp dưới 1000px (cột chồng lên nhau, splitter/
+ * drag-handle không còn hợp lý) — dưới mốc này dùng hẳn UI mobile thay vì cố nhồi layout desktop
+ * vào khung hẹp. KHÔNG đụng tới `space.enabledBlocks` (cài đặt ẩn/hiện khối của desktop, đồng bộ
+ * mọi máy) — đây là 1 lớp lọc RENDER riêng, tách biệt hoàn toàn. */
+const MOBILE_VISIBLE_BLOCKS = new Set<LayoutBlockKey>(['tasks', 'notes', 'logs']);
+
+/** 3 khối tham gia accordion mobile tab "Chi tiết" (xem `isMobileBlocksOnly` bên dưới) — tách
+ * riêng khỏi `MOBILE_VISIBLE_BLOCKS` (dùng cho mục đích lọc RENDER chung) vì accordion cần thêm
+ * thứ tự hiển thị cố định + icon/label/màu tóm tắt cho từng khối, `settings` không tham gia. */
+type MobileAccordionBlockId = 'tasks' | 'notes' | 'logs';
+const MOBILE_ACCORDION_ORDER: MobileAccordionBlockId[] = ['tasks', 'notes', 'logs'];
+const MOBILE_ACCORDION_DEFS: Record<MobileAccordionBlockId, { icon: LucideIcon; iconBg: string; iconColor: string; label: string }> = {
+  tasks: { icon: CheckSquare, iconBg: 'rgba(var(--accent-rgb),.12)', iconColor: 'var(--accent)', label: 'Việc cần làm' },
+  notes: { icon: BookOpen, iconBg: 'rgba(139,92,246,.12)', iconColor: 'var(--note-color)', label: 'Ghi chú' },
+  logs: { icon: ScrollText, iconBg: 'rgba(138,143,152,.14)', iconColor: 'var(--log-color)', label: 'Nhật ký' },
+};
 
 interface AppLayoutProps {
   onGoHome: () => void;
 }
 
 /**
- * 7 phần tử tham gia layout tự do. `tasks`/`reminder`/`habits`/`notes`/`today` bị ẩn theo
+ * 7 phần tử tham gia layout tự do. `tasks`/`reminder`/`habits`/`notes`/`logs` bị ẩn theo
  * `space.enabledBlocks` của Space hiện tại (chỉ KHÔNG RENDER — vị trí trong cấu trúc layout
  * ĐÃ LƯU vẫn giữ nguyên để bật lại đúng chỗ cũ, xem `deriveVisibleLayout` dùng riêng cho
- * RENDER). `reminders` (Thông báo) và `settings` (DashboardCorner) LUÔN hiển thị, không tắt
- * theo Space (xem requirements mục 4/4.1).
+ * RENDER). `reminders` (Thông báo) và `settings` (khối gộp Widget điều hướng + Hôm nay,
+ * `DashboardCornerBlock`) LUÔN hiển thị, không tắt theo Space (xem requirements mục 4/4.1).
  */
 const ENABLED_BLOCKS_KEY: Partial<Record<LayoutBlockKey, keyof EnabledBlocks>> = {
   tasks: 'tasks',
   reminder: 'reminder',
   habits: 'habits',
   notes: 'notes',
-  today: 'today',
+  logs: 'logs',
 };
 
 // `ci`/`si` = chỉ số trong layout ĐANG HIỂN THỊ (DOM refs/key dùng chỉ số này); `origCi`/`origSi`
@@ -120,7 +133,11 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
   const isMobileBlocksOnly = useMobileLayout();
   // Accordion mobile: khối nào đang mở 80% (khối còn lại thu nhỏ 20%) — mặc định "Việc cần
   // làm" vì đây là khối hành động, ưu tiên kiểm tra trước khi ghi note (đã chốt với chủ dự án).
-  const [mobileExpanded, setMobileExpanded] = useState<'tasks' | 'notes'>('tasks');
+  // MỞ RỘNG 2→3 khối (2026-07-08, xem docs/features/nhat-ky-nhanh.md mục 5.2.2): thêm "Nhật ký
+  // nhanh" — dùng danh sách `MOBILE_ACCORDION_ORDER`/`MOBILE_ACCORDION_DEFS` bên dưới thay vì
+  // 2 biến `tasksExpanded`/`notesExpanded` cứng như trước, để không phải lặp lại y hệt logic
+  // nếu sau này thêm/bớt khối trong accordion này.
+  const [mobileExpanded, setMobileExpanded] = useState<MobileAccordionBlockId>('tasks');
   // Mobile có 2 tab riêng: "Trò chuyện" (MobileChatScreen — màn chính, thay Home) và "Chi tiết"
   // (accordion Task/Notes đầy đủ y như trước). Mặc định mở Chat — đúng yêu cầu "gõ nhanh là
   // việc đầu tiên thấy khi mở app", không qua Home/accordion nữa (xem App.tsx bỏ Home hẳn
@@ -219,9 +236,10 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
 
   function armBlock(id: LayoutBlockKey, e: React.MouseEvent) {
     const target = e.target as HTMLElement;
-    // Khối có .block-head (5 khối dữ liệu) chỉ "arm" khi mousedown đúng vào phần header (để
-    // không xung đột với kéo-thả note/task con bên trong). `settings`/`today` không có
-    // block-head (widget hiển thị thuần) — mousedown bất kỳ đâu trên cả khối đều arm được.
+    // Khối có .block-head (6 khối dữ liệu) chỉ "arm" khi mousedown đúng vào phần header (để
+    // không xung đột với kéo-thả note/task con bên trong). `settings` (khối gộp Widget điều
+    // hướng + Hôm nay) không có block-head — mousedown bất kỳ đâu trên cả khối đều arm được
+    // (xem docs/requirements.md mục 4.1 AC7).
     const hasBlockHead = !!target.closest('.main-block, .sub-block')?.querySelector('.block-head');
     if (hasBlockHead && !target.closest('.block-head')) return;
     const el = blockRefs.current.get(id);
@@ -323,15 +341,16 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
         return <HabitsBlock key={id} style={style} className={className} rootRef={setBlockRef(id)} draggable={false} {...handlers} />;
       case 'notes':
         return <NotesBlock key={id} style={style} className={className} rootRef={setBlockRef(id)} draggable={false} {...handlers} />;
+      case 'logs':
+        return <LogsBlock key={id} style={style} className={className} rootRef={setBlockRef(id)} draggable={false} {...handlers} />;
       case 'reminders':
         return <NotificationsBlock key={id} style={style} className={className} rootRef={setBlockRef(id)} draggable={false} {...handlers} />;
-      case 'today':
-        return <TodayBlock key={id} style={style} className={className} rootRef={setBlockRef(id)} draggable={false} {...handlers} />;
       case 'settings':
         return (
-          <DashboardCorner
+          <DashboardCornerBlock
             key={id}
             onGoHome={onGoHome}
+            style={style}
             className={className}
             rootRef={setBlockRef(id)}
             draggable={false}
@@ -483,29 +502,30 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
     };
   }
 
-  /** Khối "Việc cần làm" chưa xong gần nhất (theo `order`) — dùng làm dòng preview khi khối
-   * này thu nhỏ trên mobile (chỉ còn số lượng — đã bỏ dòng preview nội dung, xem
-   * MobileCollapsedSummary). */
-  function taskCount(): number {
-    return space.tasks.filter((t) => !t.done).length;
-  }
-  function noteCount(): number {
-    return space.notes.length;
+  /** Số lượng hiển thị trên thanh tóm tắt khi 1 khối accordion mobile đang thu nhỏ (xem
+   * MobileCollapsedSummary) — "Việc cần làm" đếm số CHƯA xong (giống trước), "Ghi chú"/"Nhật ký"
+   * đếm tổng số item. */
+  function accordionCount(id: MobileAccordionBlockId): number {
+    if (id === 'tasks') return space.tasks.filter((t) => !t.done).length;
+    if (id === 'notes') return space.notes.length;
+    return space.logs.length;
   }
 
   // Mobile thật: KHÔNG dùng hệ thống cột tự do bên dưới (3 cột desktop chia đều 1/3 chiều cao
   // khi dồn dọc, kể cả cột chỉ chứa "settings" cao vài chục px — để lại khoảng trống lớn lộ
   // background phía dưới, xem ảnh lỗi thực tế khi test). Dựng riêng 1 layout tĩnh: thanh
-  // Space-switcher dính TRÊN cùng; "Việc cần làm" + "Ghi chú" hoạt động dạng accordion — khối
-  // đang mở chiếm 80% chiều cao, khối còn lại thu nhỏ về thanh tóm tắt (tiêu đề + số lượng),
-  // bấm vào để đổi chỗ — KHÔNG ẩn hẳn 0%, để không mất hoàn toàn context của khối kia (đã cân
-  // nhắc với uiux, xem record quyết định kèm câu hỏi này).
+  // Space-switcher dính TRÊN cùng; "Việc cần làm"/"Ghi chú"/"Nhật ký nhanh" hoạt động dạng
+  // accordion (2026-07-08: mở rộng 2→3 khối, xem docs/features/nhat-ky-nhanh.md mục 5.2.2) —
+  // khối đang mở chiếm 80% chiều cao, các khối còn lại thu nhỏ về thanh tóm tắt (tiêu đề + số
+  // lượng), bấm vào để đổi chỗ — KHÔNG ẩn hẳn 0%, để không mất hoàn toàn context của khối kia
+  // (đã cân nhắc với uiux, xem record quyết định kèm câu hỏi này). Chỉ đúng 1 khối mở tại 1 thời
+  // điểm dù có 2 hay 3 khối — khi chỉ còn ≤1 khối hiển thị (do tắt bớt qua enabledBlocks), khối
+  // còn lại luôn coi là "mở" (không có gì để accordion nữa).
   if (isMobileBlocksOnly) {
-    const showNotes = isBlockVisible('notes');
-    const showTasks = isBlockVisible('tasks');
-    const bothVisible = showNotes && showTasks;
-    const tasksExpanded = !bothVisible || mobileExpanded === 'tasks';
-    const notesExpanded = !bothVisible || mobileExpanded === 'notes';
+    const visibleAccordionBlocks = MOBILE_ACCORDION_ORDER.filter(isBlockVisible);
+    const effectiveExpanded = visibleAccordionBlocks.includes(mobileExpanded)
+      ? mobileExpanded
+      : visibleAccordionBlocks[0];
 
     return (
       // max-w-[560px] + mx-auto: UI mobile gốc thiết kế cho màn điện thoại hẹp (~375-414px) —
@@ -521,43 +541,32 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
           <MobileChatScreen />
         ) : (
           <div className="flex min-h-0 flex-1 flex-col gap-2 py-2">
-            {showTasks &&
-              (tasksExpanded ? (
-                <div id="mobile-block-tasks" className="flex min-h-0 flex-[4] flex-col transition-[flex-grow] duration-200 ease-out">
-                  {renderBlock('tasks', false)}
-                </div>
-              ) : (
-                <MobileCollapsedSummary
-                  icon={CheckSquare}
-                  iconBg="rgba(var(--accent-rgb),.12)"
-                  iconColor="var(--accent)"
-                  label="Việc cần làm"
-                  expandedId="mobile-block-tasks"
-                  count={taskCount()}
-                  onClick={() => setMobileExpanded('tasks')}
-                />
-              ))}
-            {showNotes &&
-              (notesExpanded ? (
-                <div id="mobile-block-notes" className="flex min-h-0 flex-[4] flex-col transition-[flex-grow] duration-200 ease-out">
-                  {renderBlock('notes', false)}
-                </div>
-              ) : (
-                <MobileCollapsedSummary
-                  icon={BookOpen}
-                  iconBg="rgba(139,92,246,.12)"
-                  iconColor="var(--note-color)"
-                  label="Ghi chú"
-                  expandedId="mobile-block-notes"
-                  count={noteCount()}
-                  onClick={() => setMobileExpanded('notes')}
-                />
-              ))}
-            {!showTasks && !showNotes && (
+            {visibleAccordionBlocks.length === 0 ? (
               <div className="flex flex-1 flex-col items-center justify-center gap-1.5 px-4 text-center text-[0.875rem] text-[var(--text-dim)]">
-                <span>Space này đã tắt cả 2 khối hiện trên mobile.</span>
-                <span>Vào Settings trên desktop để bật lại Việc cần làm hoặc Ghi chú.</span>
+                <span>Space này đã tắt cả {MOBILE_ACCORDION_ORDER.length} khối hiện trên mobile.</span>
+                <span>Vào Settings trên desktop để bật lại Việc cần làm, Ghi chú hoặc Nhật ký nhanh.</span>
               </div>
+            ) : (
+              visibleAccordionBlocks.map((id) => {
+                const expanded = visibleAccordionBlocks.length <= 1 || effectiveExpanded === id;
+                const def = MOBILE_ACCORDION_DEFS[id];
+                return expanded ? (
+                  <div key={id} id={`mobile-block-${id}`} className="flex min-h-0 flex-[4] flex-col transition-[flex-grow] duration-200 ease-out">
+                    {renderBlock(id, false)}
+                  </div>
+                ) : (
+                  <MobileCollapsedSummary
+                    key={id}
+                    icon={def.icon}
+                    iconBg={def.iconBg}
+                    iconColor={def.iconColor}
+                    label={def.label}
+                    expandedId={`mobile-block-${id}`}
+                    count={accordionCount(id)}
+                    onClick={() => setMobileExpanded(id)}
+                  />
+                );
+              })
             )}
           </div>
         )}

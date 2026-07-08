@@ -4,82 +4,73 @@ import { Home, Settings as SettingsIcon } from 'lucide-react';
 import { SpaceSwitcher } from '../features/spaces/SpaceSwitcher';
 import { SettingsModal } from '../features/settings/SettingsModal';
 
-interface DashboardCornerProps {
+interface DashboardCornerNavProps {
   onGoHome: () => void;
-  /** Mobile: không cần nút về Home (xem AppLayout) — ẩn riêng nút đó, đổi sang dạng thanh
-   * full-width dính trên đầu màn hình thay vì card nổi. Vẫn giữ nút Settings (đổi theme,
-   * export/import, đăng xuất...) — không có cách nào khác để vào Settings trên mobile. */
+  /** Mobile: không cần nút về Home (xem AppLayout) — ẩn riêng nút đó. */
   compact?: boolean;
-  className?: string;
-  rootRef?: React.Ref<HTMLDivElement>;
-  draggable?: boolean;
-  onMouseDownCapture?: (e: React.MouseEvent<HTMLDivElement>) => void;
-  onDragStart?: (e: React.DragEvent<HTMLDivElement>) => void;
-  onDragEnd?: (e: React.DragEvent<HTMLDivElement>) => void;
-  onDragOver?: (e: React.DragEvent<HTMLDivElement>) => void;
-  onDragLeave?: () => void;
-  onDrop?: (e: React.DragEvent<HTMLDivElement>) => void;
+  /** Bật khi hàng nav nổi trực tiếp trên ảnh nền (DashboardCornerBlock, desktop) thay vì trên 1
+   * card nền ổn định như mọi nơi khác — đổi 2 nút icon + trigger Space-switcher sang "ghost
+   * control" (2026-07-08, lần sửa thứ 3 — thay hẳn "dark glass pill" của lần 2, bị bác vì vẫn đọc
+   * như hộp dán lên ảnh): ở trạng thái nghỉ KHÔNG có nền/viền gì cả, chỉ icon/chữ trắng nổi bằng
+   * double drop-shadow; nền mờ + blur chỉ xuất hiện khi hover/focus/active. Không dùng cho
+   * `DashboardCorner` compact (mobile top-bar) vì nơi đó đã nằm trong thanh nền glass theo theme,
+   * không lỗi tông màu — giữ nguyên `--raised` mặc định.
+   */
+  onPhoto?: boolean;
 }
 
 /**
- * Widget điều hướng — kéo-thả tự do được như mọi khối khác trong hệ thống layout
- * (xem AppLayout/useDashboardLayout), nhưng chiều cao LUÔN cố định theo nội dung thật
- * ('settings' nằm trong HEIGHT_LOCKED_IDS) vì chỉ có 1 dòng icon, không có gì co giãn thêm.
- * 3 phần ngang: nút Home icon-only, Space-switcher (flex:1, nội dung căn giữa), nút Settings
- * icon-only. Luôn hiện, không phụ thuộc enabledBlocks của Space nào (xem requirements mục 4.1).
+ * Nội dung THUẦN của hàng nav (nút Home, Space-switcher, nút Settings + modal) — KHÔNG có chrome
+ * ngoài (id/role/background/border/rounded/shadow/drag-handlers). Tách riêng để dùng chung ở 2
+ * nơi cần đúng 1 nội dung nhưng khác chrome bao quanh:
+ * - `DashboardCorner` (dưới đây) — thanh top-bar cố định trên mobile (`compact`, full-width).
+ * - `DashboardCornerBlock.tsx` — hàng nav bên trong khối gộp "Widget điều hướng + Hôm nay" trên
+ *   desktop (chrome do component đó tự quản, xem docs/requirements.md mục 4.1).
  */
-export function DashboardCorner({
-  onGoHome,
-  compact,
-  className,
-  rootRef,
-  draggable,
-  onMouseDownCapture,
-  onDragStart,
-  onDragEnd,
-  onDragOver,
-  onDragLeave,
-  onDrop,
-}: DashboardCornerProps) {
+export function DashboardCornerNav({ onGoHome, compact, onPhoto }: DashboardCornerNavProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
+  const iconBtnClass = onPhoto
+    ? `touch-target-44 flex h-[34px] w-[34px] flex-none items-center justify-center rounded-[10px]
+       bg-transparent text-white opacity-[.92] outline-none
+       transition-[background-color,opacity,transform] duration-150 [transition-timing-function:var(--ease-standard)]
+       hover:bg-[rgba(0,0,0,.22)] hover:opacity-100 hover:scale-[1.05] hover:[backdrop-filter:blur(6px)_saturate(1.1)]
+       active:bg-[rgba(0,0,0,.30)] active:scale-[.96]
+       focus-visible:bg-[rgba(0,0,0,.22)] focus-visible:opacity-100 focus-visible:[backdrop-filter:blur(6px)_saturate(1.1)]
+       focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[rgba(255,255,255,.92)]
+       focus-visible:shadow-[0_0_0_4px_rgba(0,0,0,.28)]`
+    : `touch-target-44 flex h-[34px] w-[34px] flex-none items-center justify-center rounded-[9px] border
+       border-[color:var(--border)] bg-[var(--raised)] text-[var(--text-dim)] transition-[color,border-color]
+       duration-150 hover:border-[color:var(--accent)] hover:text-[var(--accent)]`;
+  const iconClass = onPhoto
+    ? 'icon h-4 w-4 [filter:drop-shadow(0_1px_1px_rgba(0,0,0,.65))_drop-shadow(0_2px_5px_rgba(0,0,0,.35))]'
+    : 'icon h-4 w-4';
+
   return (
-    <div
-      id="dashboard-corner"
-      ref={rootRef}
-      role="group"
-      aria-label={compact ? 'Chuyển space và cài đặt' : 'Về Home, chuyển space và cài đặt'}
-      draggable={draggable}
-      onMouseDownCapture={onMouseDownCapture}
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
-      className={`relative z-[5] flex flex-none items-center gap-2 border-[color:var(--border-hairline)]
-        bg-[color-mix(in_srgb,var(--panel-bg)_88%,transparent)] [backdrop-filter:blur(14px)_saturate(1.15)]
-        dark:bg-[color-mix(in_srgb,var(--panel-bg)_90%,transparent)] ${
-          compact
-            ? 'w-full justify-center border-b px-3 py-2.5'
-            : 'justify-between rounded-xl border px-[9px] py-[7px] shadow-[0_4px_16px_rgba(10,12,40,.10),0_1px_4px_rgba(10,12,40,.08)]'
-        } ${className ?? ''}`.trim()}
-    >
-      {!compact && (
-        <button
-          id="dashboard-corner-home-btn"
-          type="button"
-          onClick={onGoHome}
-          title="Về Home"
-          aria-label="Về Home"
-          style={{ '--touch-inset': '-5px' } as React.CSSProperties}
-          className="touch-target-44 flex h-[34px] w-[34px] flex-none items-center justify-center rounded-[9px] border
-            border-[color:var(--border)] bg-[var(--raised)] text-[var(--text-dim)] transition-[color,border-color]
-            duration-150 hover:border-[color:var(--accent)] hover:text-[var(--accent)]"
-        >
-          <Home className="icon h-4 w-4" size={16} />
-        </button>
-      )}
-      <SpaceSwitcher compact={compact} />
+    <>
+      {/* Cụm trái (Home + Space-switcher) — chỉ cụm này chiếm khoảng trống co giãn (`flex-1`) trên
+       * desktop, để tên Space neo sát nút Home thay vì tự canh giữa "trôi nổi" giữa Home và Settings
+       * (2026-07-08, lần sửa layout — trước đó SpaceSwitcher tự `flex-1` + `w-full justify-center`
+       * chiếm hết khoảng trống còn lại nên tạo 2 khoảng trống đối xứng không neo vào đâu). Trên
+       * mobile compact, Home bị ẩn nên KHÔNG dùng `flex-1` ở đây nữa — hàng ngoài compact dùng
+       * `justify-center` (không phải `justify-between`), nếu wrapper vẫn co giãn thì switcher sẽ bị
+       * đẩy dính sát mép trái. */}
+      <div className={`flex min-w-0 items-center gap-1.5 ${compact ? '' : 'flex-1'}`}>
+        {!compact && (
+          <button
+            id="dashboard-corner-home-btn"
+            type="button"
+            onClick={onGoHome}
+            title="Về Home"
+            aria-label="Về Home"
+            style={{ '--touch-inset': '-5px' } as React.CSSProperties}
+            className={iconBtnClass}
+          >
+            <Home className={iconClass} size={16} />
+          </button>
+        )}
+        <SpaceSwitcher compact={compact} onPhoto={onPhoto} />
+      </div>
       <button
         id="dashboard-corner-settings-btn"
         type="button"
@@ -87,13 +78,38 @@ export function DashboardCorner({
         title="Cài đặt"
         aria-label="Cài đặt"
         style={{ '--touch-inset': '-5px' } as React.CSSProperties}
-        className="touch-target-44 flex h-[34px] w-[34px] flex-none items-center justify-center rounded-[9px] border
-          border-[color:var(--border)] bg-[var(--raised)] text-[var(--text-dim)] transition-[color,border-color]
-          duration-150 hover:border-[color:var(--accent)] hover:text-[var(--accent)]"
+        className={iconBtnClass}
       >
-        <SettingsIcon className="icon h-4 w-4" size={16} />
+        <SettingsIcon className={iconClass} size={16} />
       </button>
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
+    </>
+  );
+}
+
+interface DashboardCornerProps {
+  onGoHome: () => void;
+  /** Thanh trên cùng cố định trên mobile (`<DashboardCorner compact />`, xem AppLayout) — tách
+   * khỏi hệ layout tự do, luôn full-width dính đầu màn hình, chỉ hiện hàng nav (không có hàng
+   * ambient đồng hồ/ngày/quote — hành vi này không đổi kể từ khi gộp `today` vào `settings`, xem
+   * docs/requirements.md mục 4.1 AC6). Kể từ 2026-07-08, đây là nơi DUY NHẤT còn dùng
+   * `DashboardCorner` — trên desktop, `AppLayout.renderBlock()` case `'settings'` dùng
+   * `DashboardCornerBlock` (khối gộp 2 hàng) thay vì component này.
+   */
+  compact?: boolean;
+}
+
+export function DashboardCorner({ onGoHome, compact }: DashboardCornerProps) {
+  return (
+    <div
+      id="dashboard-corner"
+      role="group"
+      aria-label="Chuyển space và cài đặt"
+      className="relative z-[5] flex flex-none items-center gap-2 border-b border-[color:var(--border-hairline)]
+        bg-[color-mix(in_srgb,var(--panel-bg)_88%,transparent)] [backdrop-filter:blur(14px)_saturate(1.15)]
+        dark:bg-[color-mix(in_srgb,var(--panel-bg)_90%,transparent)] w-full justify-center px-3 py-2.5"
+    >
+      <DashboardCornerNav onGoHome={onGoHome} compact={compact} />
     </div>
   );
 }

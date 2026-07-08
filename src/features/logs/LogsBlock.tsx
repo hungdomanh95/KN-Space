@@ -1,0 +1,384 @@
+import React, { useRef, useState } from 'react';
+import * as Checkbox from '@radix-ui/react-checkbox';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import { Check, ChevronDown, ListChecks, ScrollText, SendHorizontal, Trash2 } from 'lucide-react';
+import { BlockShell } from '../../components/BlockShell';
+import { EmptyState } from '../../components/EmptyState';
+import { useAppState, useCurrentSpace } from '../../state/AppStateContext';
+import { useConfirm } from '../../components/ConfirmContext';
+import { useCurrentUserId } from '../../state/useCurrentUserId';
+import { useSpaceMembers } from '../../state/useSpaceMembers';
+import { getMemberColor, getMemberDisplayName } from '../../utils/memberColors';
+import { formatBubbleTime } from '../../utils/formatTime';
+import type { LogEntry } from '../../types';
+
+interface LogsBlockProps {
+  style?: React.CSSProperties;
+  className?: string;
+  rootRef?: React.Ref<HTMLDivElement>;
+  draggable?: boolean;
+  onMouseDownCapture?: (e: React.MouseEvent<HTMLDivElement>) => void;
+  onDragStart?: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragEnd?: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragOver?: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragLeave?: () => void;
+  onDrop?: (e: React.DragEvent<HTMLDivElement>) => void;
+}
+
+type LogSortBy = 'newest' | 'oldest';
+
+const SORT_OPTIONS: { value: LogSortBy; label: string }[] = [
+  { value: 'newest', label: 'Mới nhất' },
+  { value: 'oldest', label: 'Cũ nhất' },
+];
+
+const LONG_PRESS_MS = 500;
+
+/** Cắt chuỗi tối đa `maxLen` ký tự + "…" — cùng kiểu cắt dùng ở `getMemberDisplayName`. */
+function truncate(text: string, maxLen: number): string {
+  return text.length > maxLen ? `${text.slice(0, maxLen)}…` : text;
+}
+
+function sortLogsForDisplay(logs: LogEntry[], sortBy: LogSortBy): LogEntry[] {
+  const sorted = [...logs].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  return sortBy === 'newest' ? sorted.reverse() : sorted;
+}
+
+interface LogRowProps {
+  log: LogEntry;
+  isSelecting: boolean;
+  selected: boolean;
+  onToggleSelect: (id: string) => void;
+  onEnterSelectWith: (id: string) => void;
+  onDelete: (log: LogEntry) => void;
+  creatorName?: string;
+  creatorColor?: string;
+}
+
+/** 1 dòng log — hairline row, không kéo-thả (Nhật ký nhanh luôn sort theo `createdAt`, mục 6.4).
+ * Long-press (~500ms, chỉ cảm ứng) vào chế độ chọn nhiều + tự tick dòng vừa nhấn giữ (mục 5.3). */
+function LogRow({ log, isSelecting, selected, onToggleSelect, onEnterSelectWith, onDelete, creatorName, creatorColor }: LogRowProps) {
+  const pressTimer = useRef<number | null>(null);
+  const suppressNextClick = useRef(false);
+
+  function clearPressTimer() {
+    if (pressTimer.current != null) {
+      window.clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
+  }
+
+  function handleTouchStart() {
+    if (isSelecting) return; // đã ở chế độ chọn — long-press không còn ý nghĩa gì thêm
+    suppressNextClick.current = false;
+    pressTimer.current = window.setTimeout(() => {
+      suppressNextClick.current = true;
+      onEnterSelectWith(log.id);
+    }, LONG_PRESS_MS);
+  }
+
+  function handleTouchEnd() {
+    clearPressTimer();
+  }
+
+  function handleRowClick() {
+    if (suppressNextClick.current) {
+      // Click "ma" ngay sau touchend của long-press — bỏ qua đúng 1 lần để không toggle lại dòng
+      // vừa được long-press tự tick.
+      suppressNextClick.current = false;
+      return;
+    }
+    if (isSelecting) onToggleSelect(log.id);
+  }
+
+  const truncatedForAria = truncate(log.content, 40);
+
+  return (
+    <div
+      className={`group flex items-start gap-2.5 border-b border-[color:var(--border)] py-[9px] max-md:py-[13px] text-[0.875rem]
+        transition-[background-color] duration-150 [transition-timing-function:var(--ease-standard)] last:border-b-0
+        ${isSelecting ? 'cursor-pointer' : ''} ${selected ? 'bg-[rgba(var(--accent-rgb),.08)]' : ''}`.trim()}
+      onClick={handleRowClick}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onTouchMove={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
+    >
+      {isSelecting && (
+        <Checkbox.Root
+          checked={selected}
+          onCheckedChange={() => onToggleSelect(log.id)}
+          onClick={(e) => e.stopPropagation()}
+          className="mt-px flex h-[17px] w-[17px] flex-none cursor-pointer items-center justify-center rounded-[6px]
+            border-solid border-[1.6px] bg-[var(--raised)] border-[color:var(--border-control)] transition-all duration-150
+            max-md:h-[24px] max-md:w-[24px] max-md:rounded-[8px]
+            data-[state=checked]:bg-[var(--accent)] data-[state=checked]:border-[color:var(--accent)]"
+          aria-label={`Chọn log: "${truncatedForAria}"`}
+        >
+          <Checkbox.Indicator>
+            <Check className="icon text-white max-md:!h-[15px] max-md:!w-[15px]" size={11} strokeWidth={3} />
+          </Checkbox.Indicator>
+        </Checkbox.Root>
+      )}
+      <span className="mt-px flex-none rounded-md bg-[var(--raised)] px-[7px] py-0.5 text-[0.75rem] font-semibold text-[var(--text-dim)]">
+        {formatBubbleTime(log.createdAt)}
+      </span>
+      <span className="line-clamp-2 flex-1 text-[0.875rem] text-[var(--text)]">{log.content}</span>
+      {creatorName && (
+        <span
+          className="flex-none rounded-md px-[7px] py-0.5 text-[0.7188rem] font-semibold max-sm:hidden"
+          style={{ color: creatorColor, background: `color-mix(in srgb, ${creatorColor} 14%, var(--raised))` }}
+        >
+          {creatorName}
+        </span>
+      )}
+      {!isSelecting && (
+        <button
+          className="icon-btn flex-none opacity-0 transition-opacity duration-150 group-hover:opacity-100 max-md:opacity-100"
+          title={`Xoá log: "${truncatedForAria}"`}
+          aria-label={`Xoá log: "${truncatedForAria}"`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(log);
+          }}
+        >
+          <Trash2 className="icon" size={13} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+export function LogsBlock({
+  style,
+  className,
+  rootRef,
+  draggable,
+  onMouseDownCapture,
+  onDragStart,
+  onDragEnd,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+}: LogsBlockProps) {
+  const { state, dispatch } = useAppState();
+  const space = useCurrentSpace();
+  const showConfirm = useConfirm();
+  const currentUserId = useCurrentUserId();
+  const members = useSpaceMembers(space.isShared ? space.sharedSpaceId : undefined);
+
+  const collapsed = state.settings.collapsedBlocks.logs;
+  const [sortBy, setSortBy] = useState<LogSortBy>('newest');
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [composeText, setComposeText] = useState('');
+  const composeInputRef = useRef<HTMLInputElement>(null);
+
+  // Tự thoát chế độ chọn khi đổi Space (mục 5.3) — đổi tab mobile/thu gọn khối trong accordion
+  // đã tự xử lý bằng cách khác: cả 2 sự kiện đó UNMOUNT hẳn LogsBlock trong AppLayout (xem
+  // renderBlock('logs', ...) chỉ được gọi khi tab "Chi tiết" đang mở VÀ khối đang expanded),
+  // nên state cục bộ này tự mất theo vòng đời component — không cần theo dõi thêm 2 dependency
+  // đó ở đây (đơn giản hơn cách nêu ở nhat-ky-nhanh.md mục 5.3, cùng kết quả quan sát được).
+  const spaceIdRef = useRef(space.id);
+  if (spaceIdRef.current !== space.id) {
+    spaceIdRef.current = space.id;
+    if (isSelecting) {
+      setIsSelecting(false);
+      setSelectedIds(new Set());
+    }
+  }
+
+  const list = sortLogsForDisplay(space.logs, sortBy);
+
+  function exitSelection() {
+    setIsSelecting(false);
+    setSelectedIds(new Set());
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function enterSelectWith(id: string) {
+    setIsSelecting(true);
+    setSelectedIds(new Set([id]));
+  }
+
+  function handleDeleteOne(log: LogEntry) {
+    showConfirm('Xoá log này?', 'Xoá log này? Không thể hoàn tác.', () =>
+      dispatch({ type: 'LOG_DELETE', payload: { id: log.id } }),
+    );
+  }
+
+  function handleDeleteSelected() {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    showConfirm(
+      `Xoá ${ids.length} log đã chọn?`,
+      `Xoá ${ids.length} log đã chọn? Không thể hoàn tác.`,
+      () => {
+        dispatch({ type: 'LOG_DELETE_MANY', payload: { ids } });
+        exitSelection();
+      },
+    );
+  }
+
+  // Ô nhập nhanh trên desktop (mục bổ sung sau phản hồi dùng thử — xem
+  // docs/features/nhat-ky-nhanh-progress.md): CHỈ tạo Log, không có tiền tố /task /note
+  // như ô chat mobile — giữ focus tại input sau khi gửi để gõ liên tục nhiều dòng.
+  function handleComposeSubmit() {
+    const raw = composeText.trim();
+    if (!raw) return;
+    dispatch({ type: 'LOG_CREATE', payload: { content: raw, createdBy: currentUserId ?? undefined } });
+    setComposeText('');
+    composeInputRef.current?.focus();
+  }
+
+  function getCreatorInfo(log: LogEntry): { name: string; color: string } | undefined {
+    if (!space.isShared || !log.createdBy || log.createdBy === currentUserId) return undefined;
+    return { name: getMemberDisplayName(log.createdBy, members), color: getMemberColor(log.createdBy, members) };
+  }
+
+  return (
+    <BlockShell
+      domId="block-logs"
+      icon={ScrollText}
+      iconBg="rgba(138,143,152,.14)"
+      iconColor="var(--log-color)"
+      title="Nhật ký nhanh"
+      collapsed={collapsed}
+      onToggleCollapsed={() => dispatch({ type: 'BLOCK_TOGGLE_COLLAPSED', payload: { key: 'logs' } })}
+      style={style}
+      className={`main-block max-sm:min-w-0 ${className ?? ''}`.trim()}
+      rootRef={rootRef}
+      draggable={draggable}
+      onMouseDownCapture={onMouseDownCapture}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+      headerActions={
+        isSelecting ? (
+          <>
+            <span className="text-[0.8125rem] font-semibold text-[var(--text-dim)]">Đã chọn {selectedIds.size}</span>
+            <button
+              type="button"
+              className="rounded-md px-1.5 py-1 text-[0.8438rem] font-semibold text-[var(--text-dim)] transition-colors duration-150 hover:text-[var(--accent)]"
+              aria-label="Huỷ chế độ chọn"
+              onClick={exitSelection}
+            >
+              Huỷ
+            </button>
+            <button
+              type="button"
+              className="flex items-center gap-1 rounded-md px-1.5 py-1 text-[0.8438rem] font-semibold transition-opacity duration-150 disabled:cursor-not-allowed disabled:opacity-40"
+              style={{ color: 'var(--reminder-color)' }}
+              disabled={selectedIds.size === 0}
+              aria-disabled={selectedIds.size === 0}
+              aria-label={`Xoá ${selectedIds.size} log đã chọn`}
+              onClick={handleDeleteSelected}
+            >
+              <Trash2 className="icon" size={13} />
+              Xoá ({selectedIds.size})
+            </button>
+          </>
+        ) : (
+          <>
+            <DropdownMenu.Root>
+              <DropdownMenu.Trigger asChild>
+                <button
+                  className="flex items-center gap-1.5 rounded-lg border border-[color:var(--border)] bg-[var(--raised)]
+                    px-2.5 py-1.5 text-[0.7812rem] font-semibold text-[var(--text)] transition-[border-color,color] duration-150
+                    hover:border-[color:var(--accent)] hover:text-[var(--accent)]"
+                >
+                  <span>{SORT_OPTIONS.find((o) => o.value === sortBy)?.label}</span>
+                  <ChevronDown className="icon h-[11px] w-[11px] text-[var(--text-dim)]" size={11} />
+                </button>
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Portal>
+                <DropdownMenu.Content align="end" sideOffset={8} className="space-menu-surface" style={{ minWidth: 150 }}>
+                  <DropdownMenu.RadioGroup value={sortBy} onValueChange={(v) => setSortBy(v as LogSortBy)}>
+                    {SORT_OPTIONS.map((o) => (
+                      <DropdownMenu.RadioItem
+                        key={o.value}
+                        value={o.value}
+                        className="space-menu-item data-[state=checked]:font-bold data-[state=checked]:text-[var(--accent)]"
+                      >
+                        <span className="overflow-hidden text-ellipsis whitespace-nowrap">{o.label}</span>
+                      </DropdownMenu.RadioItem>
+                    ))}
+                  </DropdownMenu.RadioGroup>
+                </DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Root>
+            <button className="add-link" onClick={() => setIsSelecting(true)}>
+              <ListChecks className="icon" size={13} /> Chọn
+            </button>
+          </>
+        )
+      }
+    >
+      <div className="logs-compose flex items-center gap-2 border-b border-[color:var(--border-hairline)] px-4 py-2.5 max-sm:hidden">
+        <input
+          ref={composeInputRef}
+          type="text"
+          value={composeText}
+          onChange={(e) => setComposeText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleComposeSubmit();
+          }}
+          placeholder="Gõ 1 dòng log rồi nhấn Enter…"
+          aria-label="Nội dung nhật ký mới"
+          className="min-w-0 flex-1 rounded-lg border border-[color:var(--border)] bg-[var(--raised)] px-2.5
+            py-1.5 text-[0.8125rem] text-[var(--text)] transition-[border-color] duration-150
+            hover:border-[color:var(--accent)] focus:border-[color:var(--accent)] focus:outline-none"
+        />
+        <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={handleComposeSubmit}
+          disabled={!composeText.trim()}
+          aria-disabled={!composeText.trim()}
+          title="Gửi log (Enter)"
+          aria-label="Gửi log"
+          className="flex h-[30px] w-[30px] flex-none items-center justify-center rounded-lg bg-[var(--accent)]
+            text-white transition-opacity duration-150 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <SendHorizontal className="icon h-3.5 w-3.5" size={14} />
+        </button>
+      </div>
+      <div className="block-body">
+        {list.length === 0 ? (
+          <EmptyState
+            icon={ScrollText}
+            title="Chưa có log nào"
+            hint="Nhập ở ô phía trên để ghi log (desktop), hoặc gõ nhanh qua tab Trò chuyện trên điện thoại."
+          />
+        ) : (
+          list.map((log) => {
+            const creator = getCreatorInfo(log);
+            return (
+              <LogRow
+                key={log.id}
+                log={log}
+                isSelecting={isSelecting}
+                selected={selectedIds.has(log.id)}
+                onToggleSelect={toggleSelect}
+                onEnterSelectWith={enterSelectWith}
+                onDelete={handleDeleteOne}
+                creatorName={creator?.name}
+                creatorColor={creator?.color}
+              />
+            );
+          })
+        )}
+      </div>
+    </BlockShell>
+  );
+}

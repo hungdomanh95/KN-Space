@@ -51,6 +51,7 @@ function rowToSpace(
     tasks: unknown;
     notes: unknown;
     reminders: unknown;
+    logs: unknown;
     version: number;
   },
   order: number,
@@ -65,12 +66,16 @@ function rowToSpace(
       habits: false,   // habits block ẩn trong shared space (chốt từ schema Q2)
       notes: true,
       reminders: true,
-      today: true,
+      logs: true, // Nhật ký nhanh hiển thị bình thường trong Shared Space (không ẩn như habits)
     },
     tasks: Array.isArray(row.tasks) ? (row.tasks as Space['tasks']) : [],
     reminders: Array.isArray(row.reminders) ? (row.reminders as Space['reminders']) : [],
     habits: [],        // shared space không có habits
     notes: Array.isArray(row.notes) ? (row.notes as Space['notes']) : [],
+    // Cột `logs` (jsonb) thêm bởi docs/features/nhat-ky-nhanh-schema.sql — nếu user chưa chạy
+    // migration này, Supabase trả lỗi "column does not exist" ở bước SELECT (xem loadSharedSpaces/
+    // createSharedSpace), không âm thầm rơi về [] ở đây.
+    logs: Array.isArray(row.logs) ? (row.logs as Space['logs']) : [],
     isShared: true,
     sharedSpaceId: row.id,
     _sharedVersion: row.version,
@@ -99,6 +104,7 @@ export async function loadSharedSpaces(): Promise<Space[]> {
         tasks,
         notes,
         reminders,
+        logs,
         version
       )
     `)
@@ -119,6 +125,7 @@ export async function loadSharedSpaces(): Promise<Space[]> {
       tasks: unknown;
       notes: unknown;
       reminders: unknown;
+      logs: unknown;
       version: number;
     } | null;
     if (!spaceRow) return; // kn_shared_spaces bị xoá nhưng cascade chưa chạy
@@ -158,7 +165,7 @@ export async function getSharedSpaceVersion(sharedSpaceId: string): Promise<numb
  */
 export async function saveSharedSpace(
   spaceId: string,
-  patch: Partial<Pick<Space, 'tasks' | 'notes' | 'reminders' | 'name'>>,
+  patch: Partial<Pick<Space, 'tasks' | 'notes' | 'reminders' | 'logs' | 'name'>>,
   expectedVersion: number,
 ): Promise<{ ok: boolean; conflict: boolean; newVersion?: number }> {
   // Chỉ gửi các field thực sự có trong patch
@@ -166,6 +173,7 @@ export async function saveSharedSpace(
   if (patch.tasks !== undefined) updatePayload.tasks = patch.tasks;
   if (patch.notes !== undefined) updatePayload.notes = patch.notes;
   if (patch.reminders !== undefined) updatePayload.reminders = patch.reminders;
+  if (patch.logs !== undefined) updatePayload.logs = patch.logs;
   if (patch.name !== undefined) updatePayload.name = patch.name;
 
   if (Object.keys(updatePayload).length === 0) {
@@ -360,7 +368,7 @@ export async function createSharedSpace(name: string): Promise<Space> {
   // Fetch lại hàng đầy đủ để có tasks/notes/reminders/version (mặc định rỗng nhưng cần đồng nhất)
   const { data: spaceRow, error: fetchError } = await supabase
     .from('kn_shared_spaces')
-    .select('id, name, tasks, notes, reminders, version')
+    .select('id, name, tasks, notes, reminders, logs, version')
     .eq('id', result.space_id)
     .single<{
       id: string;
@@ -368,6 +376,7 @@ export async function createSharedSpace(name: string): Promise<Space> {
       tasks: unknown;
       notes: unknown;
       reminders: unknown;
+      logs: unknown;
       version: number;
     }>();
 

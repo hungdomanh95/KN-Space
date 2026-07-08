@@ -62,13 +62,29 @@ export interface Note {
   createdAt?: string; // ISO timestamp lúc tạo — dùng hiện giờ gửi trong MobileChatScreen (khác updatedAt vì đó là lần sửa cuối)
 }
 
+/**
+ * Nhật ký nhanh (`docs/features/nhat-ky-nhanh.md`) — record bất biến (chỉ tạo/xoá, không sửa),
+ * không có tiêu đề/ngày-giờ hẹn/trạng thái hoàn thành/`order` thủ công. Sắp xếp CHỈ theo
+ * `createdAt` (ISO timestamp) — nguồn sự thật duy nhất, không có `updatedAt`.
+ */
+export interface LogEntry {
+  id: string;
+  content: string; // nội dung log, bắt buộc không rỗng sau trim() — validate ở client
+  createdBy?: string; // userId — chỉ set trong shared space, giống Task/Note
+  createdAt: string; // ISO timestamp — dùng để sort, KHÔNG có updatedAt (bất biến)
+}
+
 export interface EnabledBlocks {
   tasks: boolean;
   reminder: boolean;
   habits: boolean;
   notes: boolean;
   reminders: boolean;
-  today: boolean;
+  /**
+   * MỚI (2026-07-07, xem docs/features/nhat-ky-nhanh.md) — bật/tắt khối "Nhật ký nhanh" theo
+   * từng Space, giống Task/Note/Habit.
+   */
+  logs: boolean;
 }
 
 export type ThemeMode = 'light' | 'dark';
@@ -94,11 +110,27 @@ export interface HomeBackground {
 }
 
 /**
- * 6 phần tử tham gia layout tự do của Dashboard. `reminder` (số ít) = khối "Nhắc việc";
- * `reminders` = khối "Thông báo" (tên field cũ giữ nguyên để không phải đổi schema
- * EnabledBlocks/CollapsedBlocks ở nơi khác). `settings` = widget điều hướng DashboardCorner.
+ * 7 phần tử tham gia layout tự do của Dashboard (2026-07-08: gộp `today` vào `settings`, xem
+ * docs/requirements.md mục 4.1). `reminder` (số ít) = khối "Nhắc việc"; `reminders` = khối
+ * "Thông báo" (tên field cũ giữ nguyên để không phải đổi schema EnabledBlocks/CollapsedBlocks ở
+ * nơi khác). `logs` = khối "Nhật ký nhanh".
+ *
+ * `settings` = khối gộp "Widget điều hướng + Hôm nay" (`DashboardCornerBlock.tsx`) — trước
+ * 2026-07-08 là 2 phần tử riêng (`settings` = nav, `today` = đồng hồ/ngày/quote). Giữ nguyên tên
+ * key `settings` cho khối gộp (đỡ đổi `HEIGHT_LOCKED_IDS`/`ENABLED_BLOCKS_KEY`/
+ * `MOBILE_VISIBLE_BLOCKS`/`blockRefs` ở nhiều nơi khác — quyết định implementation, xem
+ * docs/requirements.md mục 4.1 change impact #3) — `'today'` đã bị xoá khỏi union này, KHÔNG
+ * còn là 1 `LayoutBlockKey` độc lập. Layout đã lưu từ trước còn `id:'today'` được tự động
+ * migrate 1 lần (xem `normalizeDashboardLayout` trong `storage/normalize.ts`).
  */
-export type LayoutBlockKey = 'tasks' | 'reminder' | 'habits' | 'notes' | 'reminders' | 'settings' | 'today';
+export type LayoutBlockKey =
+  | 'tasks'
+  | 'reminder'
+  | 'habits'
+  | 'notes'
+  | 'reminders'
+  | 'settings'
+  | 'logs';
 
 /**
  * 1 slot xếp dọc trong 1 cột — `single` chiếm cả chiều rộng cột, `row` ghép 2 khối nằm
@@ -145,6 +177,16 @@ export interface Space {
   reminders: ReminderDefinition[];
   habits: Habit[];
   notes: Note[];
+  /**
+   * MỚI (2026-07-07, xem docs/features/nhat-ky-nhanh.md) — item-level, giống `tasks`/`notes`.
+   * Ở Shared Space (`kn_shared_spaces`), field này cần thêm cột `logs` mới trong DB (xem
+   * `docs/features/nhat-ky-nhanh-schema.sql`) — bảng đó lưu từng mảng thành CỘT RIÊNG
+   * (`tasks`/`notes`/`reminders`), KHÔNG phải 1 cột `spaces` jsonb gộp chung như
+   * `kn_space_state` (Space cá nhân). Đọc/ghi cột này qua Supabase là việc của Phần 2
+   * (storage functions), CHƯA làm ở Phần 1 — hiện `sharedSpaceStore.rowToSpace()` tạm trả về
+   * `logs: []` cho mọi Shared Space bất kể DB có dữ liệu gì.
+   */
+  logs: LogEntry[];
   /** true nếu là shared space (lưu trong kn_shared_spaces) */
   isShared?: boolean;
   /** uuid của hàng trong kn_shared_spaces (= id trong bảng đó) */
@@ -159,6 +201,8 @@ export interface CollapsedBlocks {
   habits: boolean;
   notes: boolean;
   reminders: boolean;
+  /** MỚI (2026-07-07) — trạng thái icon mắt ẩn/hiện nội dung khối "Nhật ký nhanh". */
+  logs: boolean;
 }
 
 export type TaskFilter = 'all' | 'pending' | 'done';

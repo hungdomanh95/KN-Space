@@ -1,8 +1,10 @@
 import type { AppState, ExportPayload, NoteSortBy, Screen, Settings, Space, TaskFilter } from '../types';
-import { buildUiInitialState, normalizeSettings, findLegacyDashboardLayout } from '../storage/normalize';
+import { buildUiInitialState, normalizeSettings, findLegacyDashboardLayout, normalizeLogEntries } from '../storage/normalize';
 import { dayIndex, epochDay } from '../features/home/homeContent';
 import type { HabitAction } from './reducers/habits';
 import { habitsReducer } from './reducers/habits';
+import type { LogAction } from './reducers/logs';
+import { logsReducer } from './reducers/logs';
 import type { NoteAction } from './reducers/notes';
 import { notesReducer } from './reducers/notes';
 import type { ReminderAction } from './reducers/reminders';
@@ -21,6 +23,7 @@ export type AppAction =
   | ReminderAction
   | HabitAction
   | NoteAction
+  | LogAction
   | SpacesAction
   | SettingsAction
   | { type: 'TASK_SET_FILTER'; payload: { filter: TaskFilter } }
@@ -50,6 +53,9 @@ const SPACE_DOMAIN_ACTION_TYPES = new Set([
   'NOTE_REORDER',
   'NOTE_TOGGLE_EXPANDED',
   'NOTE_TOGGLE_CONTENT_HIDDEN',
+  'LOG_CREATE',
+  'LOG_DELETE',
+  'LOG_DELETE_MANY',
 ]);
 
 const SETTINGS_ACTION_TYPES = new Set([
@@ -135,6 +141,10 @@ function applySpaceDomainAction(spaces: Space[], currentSpaceId: string, action:
       case 'NOTE_TOGGLE_EXPANDED':
       case 'NOTE_TOGGLE_CONTENT_HIDDEN':
         return notesReducer(space, action);
+      case 'LOG_CREATE':
+      case 'LOG_DELETE':
+      case 'LOG_DELETE_MANY':
+        return logsReducer(space, action);
       default:
         return space;
     }
@@ -153,7 +163,9 @@ function normalizeImportedSpace(raw: Partial<Space> & { id?: string }): Space {
       notes: raw.enabledBlocks?.notes ?? true,
       // Khối Thông báo không có cấu hình tắt theo Space — luôn `true`, bất kể data import.
       reminders: true,
-      today: raw.enabledBlocks?.today ?? true,
+      // Import cũ (trước khi có Nhật ký nhanh, xem docs/features/nhat-ky-nhanh.md) không có
+      // field này -> mặc định hiện, không tự ẩn khối của user cũ.
+      logs: raw.enabledBlocks?.logs ?? true,
     },
     tasks: Array.isArray(raw.tasks)
       ? raw.tasks.map((t, idx) => ({ ...t, content: t.content ?? '', order: t.order ?? idx }))
@@ -172,6 +184,7 @@ function normalizeImportedSpace(raw: Partial<Space> & { id?: string }): Space {
         }))
       : [],
     notes: Array.isArray(raw.notes) ? raw.notes.map((n) => ({ ...n, expanded: n.expanded ?? false, hidden: n.hidden ?? false })) : [],
+    logs: normalizeLogEntries(raw.logs),
   };
 }
 

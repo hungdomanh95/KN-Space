@@ -1,5 +1,12 @@
 -- KN-Space — schema Supabase cho Bước 1 (Phase 2: web app cá nhân, KHÔNG chia sẻ/membership).
 -- Chạy nguyên file này trong Supabase Dashboard > SQL Editor (1 lần, trên project mới).
+--
+-- Lưu ý (2026-07-07, Nhật ký nhanh — xem docs/features/nhat-ky-nhanh.md): field `logs[]` mới
+-- của Space KHÔNG cần đổi gì ở bảng `kn_space_state` bên dưới — toàn bộ mảng Space (gồm cả
+-- `logs[]`) nằm trong cột `spaces jsonb` sẵn có, schema-less. Nếu dùng Shared Space, cần chạy
+-- THÊM file `docs/features/nhat-ky-nhanh-schema.sql` (thêm 1 cột `logs` vào bảng
+-- `kn_shared_spaces` — bảng đó lưu tasks/notes/reminders thành cột riêng, không phải 1 cột
+-- jsonb gộp chung).
 
 create table if not exists public.kn_space_state (
   user_id uuid primary key references auth.users (id) on delete cascade,

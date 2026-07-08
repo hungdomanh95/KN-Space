@@ -18,7 +18,7 @@ function forceRemindersEnabled(blocks: EnabledBlocks): EnabledBlocks {
 }
 
 export function defaultEnabledBlocks(): EnabledBlocks {
-  return { tasks: true, reminder: true, habits: true, notes: true, reminders: true, today: true };
+  return { tasks: true, reminder: true, habits: true, notes: true, reminders: true, logs: true };
 }
 
 function emptySpace(name: string, order: number, enabledBlocks: EnabledBlocks): Space {
@@ -31,6 +31,7 @@ function emptySpace(name: string, order: number, enabledBlocks: EnabledBlocks): 
     reminders: [],
     habits: [],
     notes: [],
+    logs: [],
   };
 }
 

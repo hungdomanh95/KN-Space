@@ -29,6 +29,10 @@
   --recurring-color: #0f9e8e;
   --habit-color: #e8873d;
   --reminder-color: #e2566f;
+  /* Nhật ký nhanh (Log) — neutral slate, khác 5 màu khối còn lại (docs/features/nhat-ky-nhanh.md
+     mục 5.1). Chỉ định nghĩa 1 lần ở :root, không override riêng theo [data-theme="dark"], đúng
+     pattern hiện có của --note-color/--habit-color/--reminder-color. */
+  --log-color: #8a8f98;
   --done: #2fa86b;
   --shadow: 0 2px 8px rgba(30,28,20,.04), 0 1px 2px rgba(30,28,20,.03);
   --note-card-bg: #f8f7f4;

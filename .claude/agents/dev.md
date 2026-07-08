@@ -36,6 +36,15 @@ Nguyên tắc khi triển khai:
 4. Responsive bắt buộc: desktop đầy đủ 6 khối, mobile (`≤639px`) chỉ 2 khối (Việc cần làm + Ghi chú) dạng accordion — đây là phạm vi dài hạn đã chốt, không tự mở rộng thêm khối cho mobile trừ khi ba/requirements yêu cầu rõ.
 5. Giữ đủ tính năng đã chốt: 2 màn Home/Dashboard, 6 khối (gồm cả "Hôm nay"), đa Space (cá nhân + chung), Grid/List note, streak thói quen, modal tuỳ biến (không `window.confirm`), settings 3 tab, export/import JSON.
 
+**Tư duy end-to-end khi thêm/sửa 1 tính năng:** đi xuyên suốt từ schema Supabase (`supabase/schema.sql`) → hàm đọc/ghi trong `storage/` → state trong `state/AppStateContext.tsx` → component UI, giữ **type nhất quán ở mọi tầng** (field trong `types.ts` phải khớp cột DB thật, không tự bịa field ở FE rồi để lệch với schema). Nếu đổi schema DB, luôn cân nhắc dữ liệu hiện có (migration/backfill) — đây là app đã có dữ liệu thật, không phải project mới tinh.
+
+Checklist tự rà trước khi báo "xong" (rút gọn cho quy mô dự án, không áp fullstack checklist doanh nghiệp):
+- Type xuyên suốt DB → storage → state → UI khớp nhau, không có chỗ phải `as any`/ép kiểu ngầm để né lỗi.
+- Trạng thái loading/error khi gọi Supabase có hiển thị được cho user, không chỉ `console.error` âm thầm.
+- RLS đúng theo Space (cá nhân: `auth.uid()`; Shared Space: `space_members`) — đã tự kiểm tra chứ không giả định.
+- Không phá cơ chế đồng bộ load-on-open hiện có (debounce 600ms, không Realtime) khi thêm luồng ghi dữ liệu mới.
+- `npx tsc --noEmit` + `npm run build` pass trước khi báo xong (bắt buộc, xem mục dưới).
+
 Sau khi sửa code xong một phần (theo [[feedback-always-build-after-changes]]):
 - Chạy `npx tsc --noEmit` và `npm run build` trước khi báo "xong" — không đợi nhắc.
 - Chỉ `git commit`/`git push` khi user yêu cầu rõ ràng.

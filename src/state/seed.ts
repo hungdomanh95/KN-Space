@@ -6,9 +6,14 @@ import { DEFAULT_HOME_IMAGES, HOME_QUOTES, dayIndex, epochDay } from '../feature
  * đổi vị trí khối Thói quen: gộp cùng cột với Việc cần làm + Nhắc việc (xếp dưới Việc cần làm)
  * thay vì tách riêng sang cột Thông báo như demo gốc — đúng yêu cầu thực tế đã chốt (Thói quen
  * và Nhắc việc phải nằm dưới Việc cần làm, không lẫn sang cột khác):
- * - Cột 1 (32%): today (h=18) + notes (h=82)
+ * - Cột 1 (32%): notes (h=62) + logs/"Nhật ký nhanh" (h=20) — không đổi so với trước
+ *   2026-07-08 ngoài việc mất khối `today` cũ (đã gộp vào `settings`, xem cột 3 dưới đây).
  * - Cột 2 (36%): tasks (h=45) + reminder/"Nhắc việc" (h=28) + habits/"Thói quen" (h=27)
- * - Cột 3 (32%): settings (h=14, cố định theo nội dung) + reminders/"Thông báo" (h=86)
+ * - Cột 3 (32%): settings (h=22, MỚI 2026-07-08 — khối gộp "Widget điều hướng + Hôm nay", xem
+ *   docs/requirements.md mục 4.1: hàng nav khoá cứng theo nội dung + hàng ambient đồng hồ/ngày/
+ *   quote resize tự do bên trong, KHÔNG còn khoá cứng toàn khối ở cấp layout-engine — `h` chỉ là
+ *   điểm khởi tạo, user resize được bình thường qua splitter) + reminders/"Thông báo" (h=68,
+ *   giảm từ 86 để nhường chỗ cho hàng ambient mới của khối gộp).
  * Lưu ý mapping id: demo dùng `reminders`/`noti` cho 2 khối khác field-naming trong code thật —
  * demo.reminders = "Nhắc việc" = field `reminder` (số ít) ở đây; demo.noti = "Thông báo" =
  * field `reminders` (số nhiều) ở đây (xem comment LayoutBlockKey trong types.ts).
@@ -18,8 +23,8 @@ export function defaultDashboardLayout(): DashboardLayout {
     colWidths: [32, 36, 32],
     cols: [
       [
-        { type: 'single', id: 'today', h: 18 },
-        { type: 'single', id: 'notes', h: 82 },
+        { type: 'single', id: 'notes', h: 62 },
+        { type: 'single', id: 'logs', h: 20 },
       ],
       [
         { type: 'single', id: 'tasks', h: 45 },
@@ -27,8 +32,8 @@ export function defaultDashboardLayout(): DashboardLayout {
         { type: 'single', id: 'habits', h: 27 },
       ],
       [
-        { type: 'single', id: 'settings', h: 14 },
-        { type: 'single', id: 'reminders', h: 86 },
+        { type: 'single', id: 'settings', h: 22 },
+        { type: 'single', id: 'reminders', h: 68 },
       ],
     ],
   };
@@ -51,7 +56,7 @@ export function defaultSettings(): Settings {
       index: dayIndex(HOME_QUOTES.length),
       rotateMode: 'daily',
     },
-    collapsedBlocks: { tasks: false, reminder: false, habits: false, notes: false, reminders: false },
+    collapsedBlocks: { tasks: false, reminder: false, habits: false, notes: false, reminders: false, logs: false },
     noteView: 'grid',
     lastScreen: 'home',
     // Đã snap theo dayIndex ngay trên — đánh dấu hôm nay đã "sync" để HYDRATE đầu tiên
@@ -68,11 +73,12 @@ export function createSeedSpaces(): Space[] {
     id: crypto.randomUUID(),
     name: 'Cá nhân',
     order: 0,
-    enabledBlocks: { tasks: true, reminder: true, habits: true, notes: true, reminders: true, today: true },
+    enabledBlocks: { tasks: true, reminder: true, habits: true, notes: true, reminders: true, logs: true },
     tasks: [],
     reminders: [],
     habits: [],
     notes: [],
+    logs: [],
   };
 
   return [space];

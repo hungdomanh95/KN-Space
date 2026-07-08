@@ -142,21 +142,32 @@ interface SpaceSwitcherProps {
    * DashboardCorner đã tính sẵn, không tự gọi `useMobileLayout()` riêng (tránh 2 instance hook
    * lệch pha do hysteresis nội bộ mỗi hook độc lập). */
   compact?: boolean;
+  /** Truyền từ `DashboardCornerNav` khi hàng nav nổi trực tiếp trên ảnh nền (desktop
+   * DashboardCornerBlock) — đổi trigger sang "ghost control" cùng bảng token với 2 nút
+   * Home/Settings (xem `DashboardCornerNavProps.onPhoto`), trừ 2 khác biệt: (1) không scale() khi
+   * hover vì đây là thanh ngang rộng `w-full`, scale gây giật layout; (2) giữ nền sáng khi popover
+   * đang mở (`aria-expanded`), không tắt ngay khi rời chuột. */
+  onPhoto?: boolean;
 }
 
-export function SpaceSwitcher({ compact }: SpaceSwitcherProps) {
+export function SpaceSwitcher({ compact, onPhoto }: SpaceSwitcherProps) {
   const { state, dispatch } = useAppState();
   const showConfirm = useConfirm();
   const [open, setOpen] = useState(false);
   const [formSpace, setFormSpace] = useState<Space | null | 'new'>(null);
   const [showSharedForm, setShowSharedForm] = useState(false);
   const [inviteModalSpaceId, setInviteModalSpaceId] = useState<string | null>(null);
-  // Virtual anchor cho Popover: đo trực tiếp khối #dashboard-corner (Home + switcher + Settings,
-  // xem DashboardCorner.tsx) mỗi lần Radix cần định vị lại — không lưu rect tĩnh nên luôn đúng dù
-  // layout đổi (resize, kéo-thả khối). SpaceSwitcher không có ref sẵn tới div cha đó nên tra qua id.
+  // Virtual anchor cho Popover: đo trực tiếp hàng nav (Home + switcher + Settings) mỗi lần Radix
+  // cần định vị lại — không lưu rect tĩnh nên luôn đúng dù layout đổi (resize, kéo-thả khối).
+  // SpaceSwitcher không có ref sẵn tới div cha đó nên tra qua id.
+  // Ưu tiên #dashboard-corner-nav (chỉ đúng hàng nav, bên trong DashboardCornerBlock.tsx trên
+  // desktop — khối gộp 2 hàng nav+ambient, xem docs/requirements.md mục 4.1). Fallback
+  // #dashboard-corner cho thanh compact mobile (DashboardCorner.tsx) — nơi đó chỉ có 1 hàng nav
+  // nên id đó vẫn đúng, không có id -nav riêng.
   const cornerAnchorRef = useRef({
     getBoundingClientRect: () =>
-      document.getElementById('dashboard-corner')?.getBoundingClientRect() ?? new DOMRect(),
+      (document.getElementById('dashboard-corner-nav') ?? document.getElementById('dashboard-corner'))
+        ?.getBoundingClientRect() ?? new DOMRect(),
   });
 
   const currentSpace = state.spaces.find((s) => s.id === state.currentSpaceId);
@@ -211,35 +222,63 @@ export function SpaceSwitcher({ compact }: SpaceSwitcherProps) {
   }
 
   return (
-    <div className="min-w-0 flex-1">
+    <div className="min-w-0">
       <Popover.Root open={open} onOpenChange={setOpen}>
-        {/* Anchor "ảo" trỏ tới cả khối #dashboard-corner (Home + switcher + Settings) — dropdown
-            cần khớp độ rộng cả khối điều hướng này, không chỉ riêng nút trigger hẹp hơn bên trong. */}
+        {/* Anchor "ảo" trỏ tới hàng nav (Home + switcher + Settings) — dropdown cần khớp độ rộng cả
+            hàng nav này, không chỉ riêng nút trigger hẹp hơn bên trong. */}
         <Popover.Anchor virtualRef={cornerAnchorRef} />
         <Popover.Trigger asChild>
           <button
-            className="flex w-full items-center justify-center gap-1.5 rounded-[9px] border border-[color:var(--border)] bg-[var(--raised)]
-              px-3 py-[7px] text-[0.8125rem] font-semibold text-[var(--text)] transition-[border-color,color] duration-150
-              hover:border-[color:var(--accent)] hover:text-[var(--accent)] max-sm:[&_span]:inline-block max-sm:[&_span]:max-w-[90px]
-              max-sm:[&_span]:overflow-hidden max-sm:[&_span]:text-ellipsis max-sm:[&_span]:whitespace-nowrap"
+            className={
+              onPhoto
+                ? `flex w-full max-w-[200px] items-center justify-center gap-1.5 rounded-[10px] bg-transparent px-3 py-[7px]
+                   text-[0.8125rem] font-semibold text-white outline-none
+                   transition-[background-color] duration-150 [transition-timing-function:var(--ease-standard)]
+                   hover:bg-[rgba(0,0,0,.22)] hover:[backdrop-filter:blur(6px)_saturate(1.1)]
+                   active:bg-[rgba(0,0,0,.30)]
+                   aria-expanded:bg-[rgba(0,0,0,.22)] aria-expanded:[backdrop-filter:blur(6px)_saturate(1.1)]
+                   focus-visible:bg-[rgba(0,0,0,.22)] focus-visible:[backdrop-filter:blur(6px)_saturate(1.1)]
+                   focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[rgba(255,255,255,.92)]
+                   focus-visible:shadow-[0_0_0_4px_rgba(0,0,0,.28)]
+                   max-sm:[&_span]:inline-block max-sm:[&_span]:max-w-[90px] max-sm:[&_span]:overflow-hidden
+                   max-sm:[&_span]:text-ellipsis max-sm:[&_span]:whitespace-nowrap`
+                : `flex w-full max-w-[200px] items-center justify-center gap-1.5 rounded-[9px] border border-[color:var(--border)] bg-[var(--raised)]
+                   px-3 py-[7px] text-[0.8125rem] font-semibold text-[var(--text)] transition-[border-color,color] duration-150
+                   hover:border-[color:var(--accent)] hover:text-[var(--accent)] max-sm:[&_span]:inline-block max-sm:[&_span]:max-w-[90px]
+                   max-sm:[&_span]:overflow-hidden max-sm:[&_span]:text-ellipsis max-sm:[&_span]:whitespace-nowrap`
+            }
             title="Đổi space"
             aria-label="Đổi space hiện tại"
             aria-haspopup="true"
             aria-expanded={open}
           >
             {currentSpace?.isShared ? (
-              <Share2 className="icon h-3 w-3 flex-none text-[var(--accent)]" size={12} aria-hidden="true" />
+              <Share2
+                className={`icon h-3 w-3 flex-none text-[var(--accent)] ${onPhoto ? '[filter:drop-shadow(0_1px_1px_rgba(0,0,0,.65))_drop-shadow(0_2px_5px_rgba(0,0,0,.35))]' : ''}`}
+                size={12}
+                aria-hidden="true"
+              />
             ) : (
               <span
-                className="h-2 w-2 flex-none rounded-full"
+                className={`h-2 w-2 flex-none rounded-full ${onPhoto ? '[filter:drop-shadow(0_1px_1px_rgba(0,0,0,.65))_drop-shadow(0_2px_5px_rgba(0,0,0,.35))]' : ''}`}
                 aria-hidden="true"
                 style={{ background: spaceDotColor(currentIdx) }}
               />
             )}
-            <span id="space-switcher-label" className="overflow-hidden text-ellipsis whitespace-nowrap">
+            <span
+              id="space-switcher-label"
+              className={
+                onPhoto
+                  ? 'overflow-hidden text-ellipsis whitespace-nowrap [text-shadow:0_1px_1px_rgba(0,0,0,.65),0_2px_5px_rgba(0,0,0,.35)]'
+                  : 'overflow-hidden text-ellipsis whitespace-nowrap'
+              }
+            >
               {currentSpace?.name ?? ''}
             </span>
-            <ChevronDown className="icon h-3 w-3 text-[var(--text-dim)]" size={12} />
+            <ChevronDown
+              className={`icon h-3 w-3 ${onPhoto ? 'text-[rgba(255,255,255,.75)] [filter:drop-shadow(0_1px_1px_rgba(0,0,0,.65))_drop-shadow(0_2px_5px_rgba(0,0,0,.35))]' : 'text-[var(--text-dim)]'}`}
+              size={12}
+            />
           </button>
         </Popover.Trigger>
 

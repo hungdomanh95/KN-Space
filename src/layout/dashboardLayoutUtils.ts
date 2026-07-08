@@ -8,8 +8,15 @@ import type { DashboardLayout, LayoutBlockKey, LayoutSlot } from '../types';
  * mutate tham số) để tương thích với React state immutability.
  */
 
-/** Khối có chiều cao LUÔN cố định theo nội dung thật (flex: 0 0 auto), không theo trọng số `h`. */
-export const HEIGHT_LOCKED_IDS = new Set<LayoutBlockKey>(['settings']);
+/**
+ * Khối có chiều cao LUÔN cố định theo nội dung thật (flex: 0 0 auto) ở cấp LAYOUT-ENGINE, không
+ * theo trọng số `h`. Rỗng kể từ 2026-07-08 (gộp "Hôm nay"+"Widget điều hướng", xem
+ * docs/requirements.md mục 4.1 change impact #4) — trước đó chứa `'settings'` (widget điều
+ * hướng khoá cứng toàn khối). Khối gộp mới (`'settings'`) resize được bình thường như 1 khối dữ
+ * liệu (tham gia trọng số `h`), chỉ HÀNG NAV bên trong nó khoá cứng — khoá cứng đó nằm ở cấp CSS
+ * nội bộ component (`DashboardCornerBlock.tsx`), không phải ở tập hợp này.
+ */
+export const HEIGHT_LOCKED_IDS = new Set<LayoutBlockKey>([]);
 
 export type DragZone = 'top' | 'bottom' | 'left' | 'right';
 

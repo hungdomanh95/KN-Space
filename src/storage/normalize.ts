@@ -1,5 +1,24 @@
-import type { DashboardLayout, HomeBackground, HomeQuotes, QuoteRotateMode, Settings, Space, UiState } from '../types';
+import type { DashboardLayout, HomeBackground, HomeQuotes, LogEntry, QuoteRotateMode, Settings, Space, UiState } from '../types';
 import { defaultDashboardLayout, defaultSettings } from '../state/seed';
+
+/**
+ * Chuẩn hoá `logs[]` (Nhật ký nhanh, MỚI 2026-07-07 — xem docs/features/nhat-ky-nhanh.md).
+ * Data cũ (trước khi có tính năng này) không có field `logs` -> fallback `[]`, không crash.
+ * Mỗi entry bất biến (chỉ tạo/xoá) nên chỉ cần đủ `id`/`content`/`createdAt` hợp lệ, không có
+ * `updatedAt`/`order` để normalize như Task/Note.
+ */
+export function normalizeLogEntries(raw: unknown): LogEntry[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((l): l is Record<string, unknown> => !!l && typeof l === 'object')
+    .filter((l) => typeof l.id === 'string' && typeof l.content === 'string')
+    .map((l) => ({
+      id: l.id as string,
+      content: l.content as string,
+      createdAt: typeof l.createdAt === 'string' && l.createdAt ? l.createdAt : new Date().toISOString(),
+      ...(typeof l.createdBy === 'string' && l.createdBy ? { createdBy: l.createdBy } : {}),
+    }));
+}
 
 /** Đảm bảo field thiếu (do import cũ/schema cũ) có giá trị mặc định hợp lệ, không crash. */
 export function normalizeSpace(space: Space): Space {
@@ -14,8 +33,8 @@ export function normalizeSpace(space: Space): Space {
       notes: space.enabledBlocks?.notes ?? true,
       // Khối Thông báo không có cấu hình tắt theo Space — luôn `true`, không đọc từ data cũ.
       reminders: true,
-      // Space lưu TRƯỚC khi có field `today` -> mặc định hiện, không tự ẩn khối của user cũ.
-      today: space.enabledBlocks?.today ?? true,
+      // Space lưu TRƯỚC khi có field `logs` (Nhật ký nhanh) -> mặc định hiện, không tự ẩn.
+      logs: space.enabledBlocks?.logs ?? true,
     },
     tasks: Array.isArray(space.tasks)
       ? space.tasks.map((t, idx) => ({
@@ -41,6 +60,7 @@ export function normalizeSpace(space: Space): Space {
         }))
       : [],
     notes: Array.isArray(space.notes) ? space.notes.map((n) => ({ ...n, expanded: n.expanded ?? false, hidden: n.hidden ?? false })) : [],
+    logs: normalizeLogEntries(space.logs),
     ...(space.isShared ? { isShared: true as const, sharedSpaceId: space.sharedSpaceId, _sharedVersion: space._sharedVersion } : {}),
   };
 }
@@ -107,15 +127,94 @@ export function findLegacyDashboardLayout(rawSpaces: unknown[]): DashboardLayout
 }
 
 /**
+ * Migration khối gộp "Hôm nay" + "Widget điều hướng" (2026-07-08, xem docs/requirements.md mục
+ * 4.1). Layout cũ (trước khi gộp) có 2 slot ĐỘC LẬP: `id:'today'` (đồng hồ/ngày/quote) và
+ * `id:'settings'` (nav) — `'today'` đã bị xoá khỏi `LayoutBlockKey` nên không còn hợp lệ về
+ * type, phải dùng `as string`/cast cục bộ để đọc dữ liệu LEGACY (runtime JSON không được
+ * TypeScript xác nhận đúng type khai báo).
+ *
+ * Quy tắc (change impact #2, docs/requirements.md mục 4.1):
+ * - Neo vị trí theo slot `settings` cũ (nav ổn định hơn, ít khả năng đã bị kéo đi chỗ khác).
+ * - Nếu `today` đã bị kéo sang vị trí khác/ghép ngang với khối khác — vị trí đó bị BỎ HẲN sau
+ *   migrate (không giữ được 2 vị trí cho 1 khối gộp); slot/row chứa nó được rút gọn giống hệt
+ *   logic `removeIdFromLayout` (viết tay lại ở đây vì hàm gốc trong `dashboardLayoutUtils.ts`
+ *   thao tác trên `LayoutBlockKey` đã không còn chấp nhận `'today'`).
+ * - Chiều cao slot gộp = `max(h cũ của 'today', h cũ của 'settings')` — không cộng dồn (dễ ra
+ *   quá cao so với mặc định mới ~20-24, xem `defaultDashboardLayout()`), chỉ cần đủ chỗ hiển thị
+ *   thêm hàng ambient so với khi `settings` còn đứng 1 mình, không cần khớp tuyệt đối.
+ *
+ * Chạy tự động, 1 chiều, không cần UI/thông báo riêng (thay đổi visual nhỏ, không mất dữ liệu
+ * nghiệp vụ) — bỏ qua ngay nếu layout đã ở schema mới (không còn `'today'`).
+ *
+ * **Fallback an toàn nếu dữ liệu bất thường:** giả định "luôn có sẵn slot `settings` để neo vị
+ * trí" có thể sai với dữ liệu hỏng/import cũ bất thường (dù UI hiện tại không có cách xoá khối
+ * này) — nếu sau bước gộp vẫn không tìm thấy `settings` trong layout, tự chèn thêm 1 slot mới
+ * (không để Dashboard mất hẳn cách về Home/đổi Space/mở Settings — vi phạm AC3).
+ */
+function migrateTodaySettingsMerge(layout: DashboardLayout): DashboardLayout {
+  const ids = collectLayoutBlockIds(layout);
+  if (!ids.has('today')) return layout; // đã ở schema mới hoặc cài đặt mới hoàn toàn (chưa từng có 'today')
+
+  // 1. Tìm `h` của slot 'today' cũ (nếu có) để nội suy chiều cao slot gộp.
+  let todayH: number | undefined;
+  layout.cols.forEach((col) =>
+    col.forEach((slot) => {
+      if (slot.type === 'single' && (slot.id as string) === 'today') todayH = slot.h;
+      else if (slot.type === 'row' && slot.items.some((it) => (it.id as string) === 'today')) todayH = slot.h;
+    }),
+  );
+
+  // 2. Xoá slot/khối 'today' khỏi layout (deep-clone trước khi sửa, giống removeIdFromLayout).
+  let cols = layout.cols.map((col) => col.map((slot) => (slot.type === 'row' ? { ...slot, items: [...slot.items] } : { ...slot })));
+  for (const col of cols) {
+    for (let si = 0; si < col.length; si++) {
+      const slot = col[si];
+      if (slot.type === 'single' && (slot.id as string) === 'today') {
+        col.splice(si, 1);
+        si--;
+      } else if (slot.type === 'row') {
+        const idx = slot.items.findIndex((it) => (it.id as string) === 'today');
+        if (idx !== -1) {
+          slot.items.splice(idx, 1);
+          if (slot.items.length === 1) col[si] = { type: 'single', id: slot.items[0].id, h: slot.h };
+        }
+      }
+    }
+  }
+
+  // 3. Tăng `h` của slot 'settings' (nếu tìm thấy) lên max(h cũ, todayH cũ) — neo đúng vị trí cũ.
+  let foundSettings = false;
+  cols = cols.map((col) =>
+    col.map((slot) => {
+      if (slot.type === 'single' && slot.id === 'settings') {
+        foundSettings = true;
+        return { ...slot, h: todayH != null ? Math.max(slot.h, todayH) : slot.h };
+      }
+      return slot;
+    }),
+  );
+
+  // 4. Fallback an toàn: không tìm thấy 'settings' ở bước trên (dữ liệu bất thường) -> chèn mới,
+  //    không để Dashboard mất hẳn khối điều hướng (vi phạm AC3).
+  if (!foundSettings) {
+    cols = cols.map((col, i) => (i === 0 ? [{ type: 'single', id: 'settings', h: todayH ?? 22 } as DashboardLayout['cols'][number][number], ...col] : col));
+  }
+
+  return { ...layout, cols };
+}
+
+/**
  * Chuẩn hoá `dashboardLayout` DÙNG CHUNG (xem `Settings.dashboardLayout`). Không viết migration
  * phức tạp từ schema cứng cũ (layoutSizes/mainBlockOrder, dự án giai đoạn cá nhân, quy mô nhỏ),
- * nhưng vẫn cần vá 2 trường hợp thực tế đã gặp với layout đã lưu HỢP LỆ về cấu trúc nhưng sai
+ * nhưng vẫn cần vá các trường hợp thực tế đã gặp với layout đã lưu HỢP LỆ về cấu trúc nhưng sai
  * dữ liệu:
  *
- * 1. Layout lưu TRƯỚC khi khối mới (`today`) ra đời — cấu trúc vẫn hợp lệ nên không rơi về
- *    default, nhưng thiếu hẳn khối đó. Vá bằng cách chèn nó vào đầu cột chứa `notes` (đúng vị
- *    trí mặc định đã chốt) nếu chưa có, không reset toàn bộ layout người dùng đã tự sắp xếp.
- * 2. `colWidths` bị lệch quá xa 100% (vd do bug resize cộng-dồn-delta cũ trước khi sửa, đã có
+ * 1. Layout còn slot `today` cũ (trước khi gộp vào `settings`, 2026-07-08) — xem
+ *    `migrateTodaySettingsMerge()` phía trên.
+ * 2. Layout lưu TRƯỚC khi khối "Nhật ký nhanh" (`logs`) ra đời — cấu trúc vẫn hợp lệ nên không
+ *    rơi về default, nhưng thiếu hẳn khối đó. Vá bằng cách chèn vào cuối cột chứa `notes` (đúng
+ *    vị trí mặc định đã chốt) nếu chưa có, không reset toàn bộ layout người dùng đã tự sắp xếp.
+ * 3. `colWidths` bị lệch quá xa 100% (vd do bug resize cộng-dồn-delta cũ trước khi sửa, đã có
  *    người dùng lưu lại layout với 1 cột emoji rộng hàng trăm %) — vì cột dùng `flex-shrink:0`,
  *    tổng vượt 100% làm cột cuối tràn ra ngoài viewport, sát mép phải dù vẫn còn padding.
  *    KHÔNG rescale-giữ-tỉ-lệ ở đây — vì giá trị đã méo (vd 1 cột bị bug đẩy lên 900%, cột
@@ -141,12 +240,15 @@ export function normalizeDashboardLayout(raw: DashboardLayout | undefined): Dash
     };
   }
 
-  const ids = collectLayoutBlockIds(layout);
-  if (!ids.has('today')) {
+  layout = migrateTodaySettingsMerge(layout);
+
+  // Layout lưu TRƯỚC khi khối "Nhật ký nhanh" ra đời (2026-07-08, xem docs/features/nhat-ky-nhanh.md)
+  // -> vá bằng cách chèn vào CUỐI cột chứa `notes` (vị trí mặc định đã chốt ở `defaultDashboardLayout()`).
+  if (!collectLayoutBlockIds(layout).has('logs')) {
     const cols = layout.cols.map((col) => col.slice());
     const notesColIdx = cols.findIndex((col) => col.some((slot) => slot.type === 'single' && slot.id === 'notes'));
     const targetCi = notesColIdx !== -1 ? notesColIdx : 0;
-    cols[targetCi] = [{ type: 'single', id: 'today', h: 18 } as DashboardLayout['cols'][number][number], ...cols[targetCi]];
+    cols[targetCi] = [...cols[targetCi], { type: 'single', id: 'logs', h: 20 } as DashboardLayout['cols'][number][number]];
     layout = { ...layout, cols };
   }
 

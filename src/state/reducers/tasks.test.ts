@@ -7,11 +7,12 @@ function emptySpace(): Space {
     id: 's1',
     name: 'Test',
     order: 0,
-    enabledBlocks: { tasks: true, reminder: true, habits: true, notes: true, reminders: true, today: true },
+    enabledBlocks: { tasks: true, reminder: true, habits: true, notes: true, reminders: true, logs: true },
     tasks: [],
     reminders: [],
     habits: [],
     notes: [],
+    logs: [],
   };
 }
 
