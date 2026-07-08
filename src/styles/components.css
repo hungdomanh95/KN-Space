@@ -169,6 +169,9 @@
     @apply m-0 text-[0.7812rem] leading-[1.5] text-[var(--text-dim)];
   }
 
+  /* `.field label` (specificity cao hơn, dùng cho label thường như "Tên space") ép display:block —
+     cần selector 2-class cụ thể hơn để thắng, không thì checkbox/chữ bị đẩy xuống 2 dòng. */
+  .field .block-check-row,
   .block-check-row {
     @apply flex cursor-pointer select-none items-center gap-[9px] text-[0.875rem];
   }
