@@ -117,7 +117,7 @@ function SpaceMenuItem({
         />
       )}
       <span className="flex min-w-0 flex-1 flex-col gap-px py-px">
-        <span className="overflow-hidden text-ellipsis whitespace-nowrap">{space.name}</span>
+        <span className="overflow-hidden text-ellipsis whitespace-nowrap" title={space.name}>{space.name}</span>
         {space.isShared ? (
           <span className="text-[0.6875rem] font-medium leading-snug text-[var(--text-dim)] opacity-[.85]">
             {taskCount} việc hôm nay · {noteCount} note · {members.length} thành viên
@@ -231,7 +231,7 @@ export function SpaceSwitcher({ compact, onPhoto }: SpaceSwitcherProps) {
           <button
             className={
               onPhoto
-                ? `flex w-full max-w-[200px] items-center justify-center gap-1.5 rounded-[10px] bg-transparent px-3 py-[7px]
+                ? `flex w-full max-w-[280px] items-center justify-center gap-1.5 rounded-[10px] bg-transparent px-3 py-[7px]
                    text-[0.8125rem] font-semibold text-white outline-none
                    transition-[background-color] duration-150 [transition-timing-function:var(--ease-standard)]
                    hover:bg-[rgba(0,0,0,.22)] hover:[backdrop-filter:blur(6px)_saturate(1.1)]
@@ -240,11 +240,11 @@ export function SpaceSwitcher({ compact, onPhoto }: SpaceSwitcherProps) {
                    focus-visible:bg-[rgba(0,0,0,.22)] focus-visible:[backdrop-filter:blur(6px)_saturate(1.1)]
                    focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[rgba(255,255,255,.92)]
                    focus-visible:shadow-[0_0_0_4px_rgba(0,0,0,.28)]
-                   max-sm:[&_span]:inline-block max-sm:[&_span]:max-w-[90px] max-sm:[&_span]:overflow-hidden
+                   max-sm:[&_span]:inline-block max-sm:[&_span]:max-w-[180px] max-sm:[&_span]:overflow-hidden
                    max-sm:[&_span]:text-ellipsis max-sm:[&_span]:whitespace-nowrap`
-                : `flex w-full max-w-[200px] items-center justify-center gap-1.5 rounded-[9px] border border-[color:var(--border)] bg-[var(--raised)]
+                : `flex w-full max-w-[280px] items-center justify-center gap-1.5 rounded-[9px] border border-[color:var(--border)] bg-[var(--raised)]
                    px-3 py-[7px] text-[0.8125rem] font-semibold text-[var(--text)] transition-[border-color,color] duration-150
-                   hover:border-[color:var(--accent)] hover:text-[var(--accent)] max-sm:[&_span]:inline-block max-sm:[&_span]:max-w-[90px]
+                   hover:border-[color:var(--accent)] hover:text-[var(--accent)] max-sm:[&_span]:inline-block max-sm:[&_span]:max-w-[180px]
                    max-sm:[&_span]:overflow-hidden max-sm:[&_span]:text-ellipsis max-sm:[&_span]:whitespace-nowrap`
             }
             title="Đổi space"
@@ -254,7 +254,7 @@ export function SpaceSwitcher({ compact, onPhoto }: SpaceSwitcherProps) {
           >
             {currentSpace?.isShared ? (
               <Share2
-                className={`icon h-3 w-3 flex-none text-[var(--accent)] ${onPhoto ? '[filter:drop-shadow(0_1px_1px_rgba(0,0,0,.65))_drop-shadow(0_2px_5px_rgba(0,0,0,.35))]' : ''}`}
+                className={`icon h-3 w-3 flex-none ${onPhoto ? 'text-white [filter:drop-shadow(0_1px_1px_rgba(0,0,0,.65))_drop-shadow(0_2px_5px_rgba(0,0,0,.35))]' : 'text-[var(--accent)]'}`}
                 size={12}
                 aria-hidden="true"
               />
@@ -272,6 +272,7 @@ export function SpaceSwitcher({ compact, onPhoto }: SpaceSwitcherProps) {
                   ? 'overflow-hidden text-ellipsis whitespace-nowrap [text-shadow:0_1px_1px_rgba(0,0,0,.65),0_2px_5px_rgba(0,0,0,.35)]'
                   : 'overflow-hidden text-ellipsis whitespace-nowrap'
               }
+              title={currentSpace?.name ?? ''}
             >
               {currentSpace?.name ?? ''}
             </span>
@@ -292,7 +293,18 @@ export function SpaceSwitcher({ compact, onPhoto }: SpaceSwitcherProps) {
           <Popover.Content
             align="start"
             sideOffset={compact ? 8 : 12}
-            collisionPadding={8}
+            // Mobile compact: anchor (#dashboard-corner) LÀ chính thanh top-bar full-width, rộng
+            // đúng bằng viewport — width dropdown ăn theo anchor này (size middleware trong Radix
+            // Popper). collisionPadding={8} áp cho CẢ 4 cạnh sẽ khiến Radix coi "vùng khả dụng"
+            // chỉ còn viewport-16px, hẹp hơn width dropdown (=viewport) → shift middleware đẩy
+            // dropdown dịch phải +8px để né padding trái, nhưng width không co theo nên tràn
+            // +8px ra ngoài mép phải màn hình (đã đo thật bằng harness Playwright + floating-ui
+            // thật, 2026-07-08: content.left lệch từ 0→8, content.right tràn 398 > viewport 390).
+            // Fix: bỏ padding NGANG (trái/phải=0) cho compact — anchor vốn đã luôn nằm trọn trong
+            // viewport (chính là thanh top-bar đang hiển thị) nên không cần né mép ngang; vẫn giữ
+            // padding DỌC=8 để middleware flip còn hoạt động khi thiếu chỗ bên dưới. Desktop giữ
+            // nguyên collisionPadding=8 đều 4 cạnh (anchor hẹp hơn viewport nhiều, không gặp bug này).
+            collisionPadding={compact ? { top: 8, bottom: 8, left: 0, right: 0 } : 8}
             className="space-menu-surface"
             style={{ width: 'var(--radix-popover-trigger-width)' }}
           >

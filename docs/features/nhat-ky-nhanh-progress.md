@@ -860,6 +860,58 @@ screenshot từng case A–F) trong thư mục scratchpad phiên làm việc.
 6. Test cả mobile viewport (≤639px, compact top-bar) — hàng nav dùng `justify-center`, xác nhận
    không có gì bất thường (không thuộc diện sửa lần này nhưng nên soi qua vì dùng chung component).
 
+**Đợt 1b — Icon Share2 lạc tông + tăng max-width tên Space (2026-07-08, ✅ Xong).** Sau khi lên
+bản thật với Space chung "Chi tiêu gia đình Kino", user chụp ảnh phát hiện 2 vấn đề còn sót từ Đợt
+1:
+
+1. **Icon `Share2` (đánh dấu space chung) lạc tông màu** — đúng câu hỏi mở `uiux` từng nêu lúc
+   thiết kế "ghost control" (Đợt 1, biến thể lần 3): icon này vẫn giữ `text-[var(--accent)]` (tím
+   brand) trong khi Home/Settings/chevron/tên Space đã đổi trắng + double drop-shadow. Nhìn ảnh
+   thật, icon tím nổi trên nền ảnh trông lạc quẻ. Fix: trong `src/features/spaces/SpaceSwitcher.tsx`,
+   icon `Share2` của TRIGGER button (dòng hiển thị space hiện tại, không phải icon trong từng dòng
+   dropdown — dropdown luôn nằm trên `space-menu-surface` themed, không lỗi tông) đổi màu theo
+   `onPhoto`: `onPhoto` → `text-white` + double drop-shadow y hệt Home/Settings; mặc định (không
+   ảnh nền) → giữ nguyên `text-[var(--accent)]` như cũ (đúng, không lỗi tông ở biến thể này).
+2. **Tên Space bị cắt quá sớm** — `max-w-[200px]` (thêm ở Đợt 1, bước "verify lại bố cục cụm
+   Home+Switcher") quá chật cho tên dài thật ("Chi tiêu gia đình Kino" = 22 ký tự). Tăng lên
+   `max-w-[280px]` ở CẢ 2 nhánh class trigger (`onPhoto` và mặc định) — giữ nguyên cơ chế `w-full`
+   đi kèm (đã verify đúng ở Đợt 1, không đổi).
+
+**Verify bằng mockup Playwright** (tái tạo đúng markup/class thật, dùng đúng tên "Chi tiêu gia đình
+Kino", scratchpad phiên làm việc, không commit) — đo `getBoundingClientRect` + `scrollWidth` 3 case:
+- **Case A** (onPhoto, nav row ≈420px — xấp xỉ cột `settings` mặc định 32% ở viewport desktop
+  1440px, xem tính toán bên dưới): trigger rộng 194.3px (hugs-content, dưới trần 280px), label
+  không bị ellipsis (`scrollWidth === clientWidth`) — tên hiện đủ. Icon `Share2` màu trắng, đồng
+  tông Home/Settings.
+- **Case B** (onPhoto, nav row 210px — resize hẹp): trigger co xuống 106px, label ellipsis đúng
+  (hiện "Chi tiê..." — không tràn, không đè icon Settings).
+- **Case C** (mặc định, không ảnh nền, nav row 420px): trigger 196.3px, không ellipsis, icon
+  `Share2` vẫn giữ `--accent` (đúng, biến thể này không lỗi tông).
+
+**Số đo cột nav thật (để user hiểu giới hạn thực tế):** cột `settings` (chứa hàng nav) mặc định
+rộng 32% (`colWidths: [32, 36, 32]`, `src/state/seed.ts`). Với `#dashboard` có `p-3.5` (14px mỗi
+bên) và `#cols-wrap` có `gap-3` (12px × 2 khoảng giữa 3 cột, cộng thêm ngoài basis% — xem comment
+trong `AppLayout.tsx` — nên cột co lại theo tỉ lệ để bù phần gap tràn), ở viewport desktop 1440px:
+cột settings ≈ 444px → trừ padding hàng nav `px-[9px]` (`DashboardCornerBlock.tsx`) ≈ 426px nav-row
+width — gần khớp Case A (420px). Ở độ rộng này, tên "Chi tiêu gia đình Kino" hiện đủ, KHÔNG bị cắt
+(còn dư ~230px chưa dùng tới trần 280px). Chỉ khi user tự kéo resize cột nav xuống rất hẹp
+(~210px trở xuống, như Case B) mới thấy ellipsis — đúng hành vi mong muốn, không phải bug.
+
+**File mockup/script (scratchpad, không commit):** `nav-mockup2/mockup.html` + `nav-mockup2/shot.mjs`
++ `nav-mockup2/zoom.mjs` trong thư mục scratchpad phiên làm việc.
+
+**Cách test (thủ công trên UI thật):**
+1. `npm run dev`, mở app, đăng nhập, chuyển sang Space chung tên dài (vd "Chi tiêu gia đình Kino").
+2. Ở độ rộng cửa sổ desktop bình thường (chưa resize cột): quan sát icon `Share2` cạnh tên Space
+   trong hàng nav (nổi trên ảnh nền Home) — phải màu TRẮNG, cùng tông Home/Settings/chevron, không
+   còn tím lạc quẻ. Tên Space hiện đủ "Chi tiêu gia đình Kino", không có `...`.
+3. Kéo resize cột chứa khối điều hướng xuống hẹp (~200-220px): tên Space tự ellipsis, không tràn
+   đè icon Settings bên phải (không tái diễn bug cũ).
+4. Đổi sang Space cá nhân/không ảnh nền (widget không nổi trên ảnh) hoặc mở Settings modal xem
+   card thường: icon `Share2` (nếu có space chung trong dropdown) vẫn giữ tím `--accent` — đúng,
+   không phải diện sửa lần này.
+5. `npx tsc --noEmit`, `npm run build`, `npx vitest run` (79/79) — đã chạy lại, pass toàn bộ.
+
 ---
 
 ## Đợt 2 — Ô nhập log nhanh trên desktop (2026-07-08, ✅ Xong)
@@ -935,6 +987,213 @@ nên coi là 1 hạng mục hạ tầng test riêng (cài `@testing-library/reac
    - Thu nhỏ trình duyệt xuống viewport mobile (≤639px) hoặc mở DevTools responsive mode → xác nhận
      KHÔNG thấy ô nhập này ở khối Nhật ký trong tab "Chi tiết" (mobile vẫn dùng đúng tab "Trò
      chuyện" để nhập log như trước, không đổi gì).
+
+---
+
+## Đợt 3 — Sửa mobile compact top-bar: tên Space vẫn bị cắt + dropdown lệch vị trí (2026-07-08, ✅ Xong)
+
+User chụp ảnh thật trên điện thoại (mobile compact top-bar, Space chung "Chi tiêu gia đình Kino"),
+báo 2 vấn đề còn sót lại từ chuỗi tinh chỉnh "Đợt 1/1b" ở trên (chuỗi đó chỉ sửa nhánh desktop
+`max-w-[200px]→[280px]`, KHÔNG đụng tới rule riêng cho mobile compact `max-sm:[&_span]:max-w-*`).
+
+### Vấn đề 1 — Tên Space vẫn bị cắt trên mobile
+
+**Root cause:** `SpaceSwitcher.tsx` có 1 rule CSS riêng chỉ áp dụng ở breakpoint `max-sm`
+(`max-sm:[&_span]:max-w-[90px]`, xuất hiện ở cả 2 nhánh class trigger — `onPhoto` và mặc định).
+Rule này giới hạn cứng `<span>` chứa tên Space chỉ 90px trên mobile, thấp hơn nhiều so với
+`max-w-[280px]` chung (áp cho cả trigger BUTTON, không phải riêng span) mà Đợt 1b mới tăng —
+`max-sm:` override ghi đè giới hạn chặt hơn ở đúng breakpoint mobile mà lượt sửa trước không đụng
+tới.
+
+**Đo thật bằng harness Playwright** (mockup HTML tái tạo đúng DOM `DashboardCorner`/
+`DashboardCornerNav`/`SpaceSwitcher` thật + CSS build thật, viewport 390×844 — iPhone 12/13/14 CSS
+px thật, không đoán): tên "Chi tiêu gia đình Kino" ở đúng font trigger (`0.8125rem font-semibold`)
+rộng tự nhiên **134.3px** khi không giới hạn. Ở `max-w-90px` cũ, tên bị cắt còn ~"Chi tiêu gia
+đình Ki...". Test `max-w-180px`: tên hiện đủ (134.3 < 180, không ellipsis), trigger button rộng
+193.3px, vẫn nằm gọn trong bar (group Switcher+Settings căn giữa nhờ `justify-center`, không tràn/
+đè Settings, còn dư margin 2 bên ~77px mỗi bên).
+
+**Fix:** tăng `max-sm:[&_span]:max-w-[90px]` → `max-sm:[&_span]:max-w-[180px]` ở CẢ 2 nhánh class
+trigger trong `src/features/spaces/SpaceSwitcher.tsx`. Chọn 180px (không phải 200px) vì đã đủ dư
+~46px so với tên thật đo được (134px), không cần rộng hơn để tránh trigger quá to trên bar hẹp
+390px cạnh nút Settings 34px.
+
+### Vấn đề 2 — Dropdown Space-switcher lệch vị trí trên mobile
+
+**Điều tra loại trừ trước khi tìm đúng root cause:**
+- `id="dashboard-corner-nav"` (thêm cho `DashboardCornerBlock.tsx`, desktop) KHÔNG tồn tại trong
+  DOM ở nhánh mobile — `AppLayout.tsx` dùng 1 `return` duy nhất theo `isMobileBlocksOnly`
+  (`if (isMobileBlocksOnly) { return <DashboardCorner compact /> ... } return <desktop tree>`),
+  không render đồng thời 2 nhánh, nên fallback `getElementById('dashboard-corner-nav') ??
+  getElementById('dashboard-corner')` trong `SpaceSwitcher.tsx` luôn đúng, trỏ về
+  `#dashboard-corner` (thanh top-bar mobile) — KHÔNG phải nguyên nhân.
+- Wrapper mới `<div className="flex min-w-0 items-center gap-1.5">` (từ Phần 5/Đợt 1, bọc
+  Home+Switcher) không đổi kích thước/rect của `#dashboard-corner` (root bar) — đã đo xác nhận rect
+  bar vẫn `x:0 width:390` (đúng bằng viewport) như thiết kế cũ, KHÔNG phải nguyên nhân.
+- `justify-center` trên `#dashboard-corner` (mobile compact) đã tồn tại từ TRƯỚC cả Phần 5/Đợt 1
+  (xác nhận qua `git show 9c7baa1 -- src/components/DashboardCorner.tsx`, code cũ đã có
+  `compact ? 'w-full justify-center ...' : ...`) — không phải thay đổi mới, không phải root cause
+  của bug lệch.
+
+**Root cause thật (đo bằng floating-ui thật — cùng engine Radix Popper dùng bên dưới, load qua UMD
+local trong harness, không đoán math tay):** `Popover.Content` truyền `collisionPadding={8}` cố
+định (không phân biệt `compact`). Trên mobile, anchor định vị dropdown là `#dashboard-corner` —
+chính thanh top-bar, rộng ĐÚNG BẰNG viewport (390px ở iPhone 390px). `size` middleware của Radix set
+width dropdown = width anchor = 390px (full-bleed, đúng ý đồ thiết kế). Nhưng `collisionPadding={8}`
+áp cho cả 4 cạnh khiến `shift` middleware (mặc định `avoidCollisions=true`) coi "vùng khả dụng" chỉ
+còn `390 - 16 = 374px`, hẹp hơn width dropdown (390px) → shift đẩy dropdown dịch phải
+**+8px** (từ `x:0` → `x:8`) để né padding trái, nhưng width KHÔNG co theo → dropdown tràn
+**+8px** ra ngoài mép phải màn hình (`right: 398 > viewport 390`). Kết quả: dropdown không còn
+flush 2 mép với thanh top-bar (vốn full-bleed thật) — lệch phải 8px, mép trái hở, mép phải bị cắt.
+Đã verify bằng screenshot Playwright thật (trước/sau fix) — trước fix card dropdown rõ ràng lệch
+phải, mép phải bị viewport cắt mất góc bo; sau fix card flush khít 2 mép, đúng bằng thanh top-bar.
+
+**Fix:** đổi `collisionPadding={8}` → `collisionPadding={compact ? { top: 8, bottom: 8, left: 0,
+right: 0 } : 8}` trong `src/features/spaces/SpaceSwitcher.tsx`. Lý do zero padding NGANG riêng cho
+compact: anchor mobile vốn LUÔN nằm trọn trong viewport (chính là bar đang hiển thị thật), không có
+tình huống cần né mép ngang — giữ padding DỌC=8 để middleware `flip` vẫn hoạt động (đổi sang mở lên
+trên nếu thiếu chỗ bên dưới). Desktop giữ nguyên `collisionPadding={8}` đều 4 cạnh (anchor hẹp hơn
+viewport nhiều ở mọi trường hợp thực tế, không gặp bug này).
+
+**Kết luận về nguồn gốc bug:** CẢ 2 vấn đề đều KHÔNG phải regression mới từ lượt "gộp cụm
+Home+Switcher" (Phần 5) — đã xác minh qua `git show`/đọc code trước-sau: rule `max-w-[90px]` và
+`collisionPadding={8}` cố định đều có từ thời Radix migration (2026-07-07), chỉ đơn giản là chưa
+từng được kiểm ở đúng viewport điện thoại thật (390px) nên chưa lộ ra.
+
+**File mockup/harness dùng để verify (scratchpad phiên làm việc, không commit):** HTML tái tạo
+đúng DOM `DashboardCorner`/`DashboardCornerNav`/`SpaceSwitcher` (mobile compact) + CSS build thật
+(`dist/assets/index-*.css`) + `@floating-ui/core`+`@floating-ui/dom` UMD thật (load local từ
+`node_modules`, đúng engine Radix Popper dùng) để `computePosition` y hệt runtime thật — không dùng
+công thức tay. Đo bằng Playwright ở viewport 390×844 (iPhone), screenshot trước/sau fix.
+
+### Cách test Đợt 3 (cho user)
+
+1. `npx tsc --noEmit`, `npm run build`, `npx vitest run` (79/79) — đã chạy lại, pass toàn bộ.
+2. `npm run dev`, mở app trên điện thoại thật (hoặc DevTools responsive mode, chọn preset iPhone
+   12/13/14 — 390px width, KHÔNG dùng cửa sổ desktop resize hẹp vì layout có thể khác đôi chút),
+   đăng nhập, chuyển sang Space chung tên dài (vd "Chi tiêu gia đình Kino").
+3. Quan sát top-bar mobile: tên Space hiện đủ "Chi tiêu gia đình Kino", KHÔNG còn bị cắt thành
+   "Chi tiêu gia đình Ki...".
+4. Bấm vào nút Space-switcher để mở dropdown — quan sát dropdown card mở ra khít 2 mép trái/phải
+   với chính thanh top-bar phía trên (full-bleed, không lệch phải, không bị cắt góc bo bên phải).
+5. Thử lặp lại ở tên Space rất dài (>180px khi render) — xác nhận vẫn ellipsis đúng (không tràn đè
+   icon Settings), dropdown vẫn mở khít 2 mép như bước 4 (không phụ thuộc độ dài tên, vì dropdown
+   luôn ăn theo width thanh top-bar, không theo width trigger button).
+6. Test lại cả desktop (không ảnh nền + có ảnh nền `onPhoto`) — xác nhận dropdown Space-switcher vẫn
+   định vị đúng như trước (không bị ảnh hưởng bởi thay đổi `collisionPadding` chỉ áp riêng
+   `compact`).
+
+---
+
+## Đợt 4 — Audit toàn app: text bị cắt cứng theo ký tự JS thay vì theo chỗ trống thật (2026-07-08, ✅ Xong)
+
+User chụp ảnh khối "Nhật ký nhanh" trên desktop — badge tên người tạo bị cắt thành "Thao An Le
+Nguy..." dù khối còn nhiều chỗ trống, đặt nguyên tắc áp dụng toàn app: **chỉ cắt khi khung chứa
+thật sự không đủ chỗ, không bao giờ cắt cứng bằng số ký tự cố định bất kể ngữ cảnh.**
+
+### Root cause (đúng khối bị báo)
+
+`src/utils/memberColors.ts` → `getMemberDisplayName(userId, members, maxLen = 15)` cắt chuỗi
+**bằng JavaScript** (`name.slice(0, maxLen)`), không phải CSS `text-overflow: ellipsis` — cắt cứng
+đúng `maxLen` ký tự bất kể khối đang rộng hay hẹp thật. `LogsBlock.tsx` (`getCreatorInfo()`) gọi
+hàm này **không truyền `maxLen`** → dùng mặc định 15 (giá trị dành cho chỗ chật như dot
+tooltip/meta note nhỏ), trong khi badge tên người tạo nằm trong 1 hàng flex khá rộng, thừa chỗ hiện
+đủ tên. Đây đúng là kiểu bug "cắt cứng theo ký tự, không biết ngữ cảnh" mà user mô tả.
+
+### Audit toàn bộ (grep `getMemberDisplayName`, `.slice(0,`/`.substring(0,`, `max-w-[...]` gắn
+text hiển thị, rà lại các file đụng trong phiên hôm nay)
+
+**Đã sửa (10 chỗ):**
+
+1. `LogsBlock.tsx` (`getCreatorInfo`) — bỏ cắt cứng (`maxLen: Infinity`), badge creator đổi sang
+   CSS-based: bỏ `flex-none`, thêm `min-w-0 max-w-[45%] overflow-hidden text-ellipsis
+   whitespace-nowrap` + `title={creatorName}`. Giờ chỉ ellipsis khi tên thật sự vượt 45% hàng.
+2. `NotesBlock.tsx` (`getNoteCreatorInfo`) — cùng bug (không truyền `maxLen`, mặc định 15). Bỏ cắt
+   cứng.
+3. `NoteCard.tsx` (footer tên người tạo) — đổi span sang `min-w-0 flex-1 truncate` +
+   `title={creatorInfo.name}` (footer chỉ có avatar+tên, không cạnh tranh chỗ với nội dung khác
+   nên cho chiếm hết phần dư của hàng thay vì cap %).
+4. `TasksBlock.tsx` (`memberDotName` badge, hiển thị "việc do người khác tạo") — trước dùng
+   `maxLen=40` (cắt cứng, chỉ đỡ hơn 15 chứ vẫn sai nguyên tắc). Đổi `Infinity` + CSS
+   `max-w-[45%] overflow-hidden text-ellipsis whitespace-nowrap` + `title`.
+5. `TasksBlock.tsx` (`assignees` — tên hiển thị qua `MemberAvatar`, chỉ dùng làm initial-letter +
+   `title` tooltip gốc trình duyệt, KHÔNG có giới hạn bề rộng thật nào) — `maxLen=20` không có lý
+   do tồn tại, đổi `Infinity`.
+6. `TaskFormModal.tsx` (`AssigneeMemberRow`, dòng member trong popover) — `maxLen=40` redundant vì
+   dòng hiển thị ĐÃ có CSS `truncate` riêng (dòng dưới) xử lý overflow thật; JS cắt trước chỉ làm
+   hẹp thêm không cần thiết. Đổi `Infinity`, thêm `title={name}` còn thiếu trên span truncate.
+7. `TaskFormModal.tsx` (`StackedAvatar` trên nút trigger) — cũng chỉ dùng cho initial+tooltip, không
+   có bề rộng thật. Đổi `maxLen=40` → `Infinity`.
+8. `MobileChatScreen.tsx` (chip tên người gửi trong bubble chat) — trước `maxLen=40` (JS cắt cứng,
+   không CSS, không `title`). Đổi `Infinity` + thêm `max-w-full overflow-hidden text-ellipsis
+   whitespace-nowrap` (ăn theo `max-w-[80%]` có sẵn của bubble cha) + `title={memberName}`.
+9. `SpaceInviteModal.tsx` (danh sách thành viên, tab Members) — **bug khác nhưng cùng họ:** span
+   tên đã CSS-ellipsis đúng cách từ trước, nhưng `title` lại trỏ vào `m.userId` (UUID nội bộ) thay
+   vì `label` (tên/email hiển thị) — hover vào tên bị cắt thấy UUID vô nghĩa thay vì tên đầy đủ.
+   Sửa `title={label}`.
+10. `SpaceSwitcher.tsx` (2 chỗ: label tên Space trên nút trigger + tên Space trong dropdown item) —
+    CSS ellipsis đã đúng từ trước nhưng thiếu hẳn `title`, hover không thấy được tên đầy đủ khi bị
+    cắt. Thêm `title={currentSpace?.name}` và `title={space.name}`.
+11. `HabitsBlock.tsx` (`habit-title` span) — CSS ellipsis đúng nhưng thiếu `title`. Thêm
+    `title={habit.title}`.
+
+**Đã kiểm tra, xác nhận KHÔNG cần sửa (kèm lý do):**
+
+- `SpaceSwitcher.tsx` — rule `max-sm:[&_span]:max-w-[180px]` (Đợt 3 vừa sửa hôm nay): CHỈ áp dụng
+  ở breakpoint `max-sm` (≤639px, đúng "width thực sự nhỏ" mà user cho phép cắt), desktop không bị
+  giới hạn gì thêm — đúng nguyên tắc, giữ nguyên.
+- `DashboardCornerBlock.tsx` (quote động lực, `line-clamp-2`) — text trang trí do app tạo (không
+  phải danh tính/dữ liệu người dùng cần đọc đầy đủ để thao tác), `line-clamp` co giãn thật theo
+  chiều rộng khối (không phải số ký tự cố định) — đúng nguyên tắc CSS-based, không cần `title` cho
+  1 câu quote trang trí.
+- `AppLayout.tsx` (label khối trong accordion mobile, vd "Việc cần làm"/"Ghi chú"/"Nhật ký") — đã
+  có `truncate` CSS sẵn, nhưng đây là 3 chuỗi **cố định do app định nghĩa** (`MOBILE_ACCORDION_DEFS`,
+  không phải dữ liệu người dùng nhập), độ dài luôn ngắn/biết trước, không có rủi ro thực tế bị cắt —
+  không thêm `title` để tránh phình thêm boilerplate không cần thiết.
+- `TaskFormModal.tsx` (preview dòng đầu nội dung note, `min-w-0 flex-1 truncate`) — đây là "peek"
+  1 dòng để gợi ý đã có nội dung, không phải nơi duy nhất xem được nội dung đầy đủ (bấm vào mở
+  ngay textarea đầy đủ ngay bên dưới) — không cần `title` vì có cách xem đầy đủ khác rõ ràng hơn.
+- `LogsBlock.tsx` (hàm `truncate()` cục bộ cắt `log.content` cho `aria-label`/`title` của nút
+  xoá/checkbox) — mục đích khác hẳn (rút gọn text cho screen-reader/tooltip mô tả HÀNH ĐỘNG, không
+  phải hiển thị chính nội dung cho mắt đọc), giữ nguyên.
+- Mọi `.slice(0, N)` khác tìm được qua grep (`toISOString().slice(0,10)` lấy ngày, cắt `userId` làm
+  fallback label, giới hạn 30/75 bubble hiển thị, `TRIGGER_MAX_AVATARS`...) — không phải cắt TEXT
+  hiển thị cho người dùng đọc, không thuộc phạm vi bug này.
+
+### Nguyên tắc rút ra, áp dụng khi thêm chỗ hiển thị tên người mới trong tương lai
+
+`getMemberDisplayName()` vẫn giữ tham số `maxLen` mặc định 15 (không đổi signature) — nhưng giờ
+**không còn call site nào trong app dùng số cắt cứng nữa**, toàn bộ đã chuyển sang: hoặc `Infinity`
+(chỗ chỉ dùng cho avatar-initial/tooltip gốc trình duyệt, không có bề rộng thật để cắt) hoặc
+`Infinity` + CSS `truncate`/`text-ellipsis` thật (chỗ hiển thị text nhìn thấy được, để trình duyệt
+tự quyết định cắt hay không dựa trên khung chứa thật). Chỗ nào thêm mới sau này nên theo đúng 2
+nhánh này, không quay lại truyền số ký tự cố định.
+
+### Cách test Đợt 4 (cho user)
+
+1. `npx tsc --noEmit`, `npm run build`, `npx vitest run` — đã chạy lại, pass hết (79/79 test, không
+   đổi số lượng — đây thuần là sửa CSS/text-truncate, không có logic reducer mới cần test).
+2. `npm run dev`, đăng nhập, vào 1 Space chung có ≥1 thành viên khác có tên dài (vd "Thao An Le
+   Nguyen ABC..."):
+   - Khối **Nhật ký nhanh**: gõ 1 log qua tab Trò chuyện (mobile) từ tài khoản đó, mở lại desktop →
+     badge tên người tạo hiện ĐẦY ĐỦ tên (không còn "Thao An Le Nguy..."), trừ khi thật sự resize
+     khối rất hẹp mới thấy dấu "…" — hover vào badge thấy tooltip tên đầy đủ.
+   - Khối **Ghi chú**: note do người khác tạo → góc dưới card hiện đầy đủ tên tương tự, hover thấy
+     tooltip.
+   - Khối **Việc cần làm**: việc do người khác tạo → badge tên hiện đầy đủ; việc có gán nhiều
+     người (assignee) → hover vào avatar tròn thấy tooltip tên đầy đủ (không bị cắt ở 20 ký tự như
+     trước).
+   - Tab **Trò chuyện** mobile: bubble của người khác → tên phía trên bubble hiện đầy đủ, hover
+     (hoặc long-press trên mobile thật nếu trình duyệt hỗ trợ) thấy tooltip.
+   - Modal **Sửa việc** → mở popover "Giao cho" → danh sách thành viên hiện tên đầy đủ, không bị
+     cắt ở 40 ký tự như trước với tên rất dài.
+3. **Space-switcher**: đổi tên 1 Space thành tên dài (vd "Chi tiêu gia đình Kino mở rộng thêm chữ
+   cho dài") → hover vào tên trên nút trigger (góc trên) và trong dropdown item → thấy tooltip tên
+   đầy đủ dù phần hiển thị bị ellipsis.
+4. **Thói quen**: đặt 1 thói quen tên dài, thu hẹp khối lại (kéo cột hẹp trên desktop) → tên bị
+   ellipsis đúng lúc thật sự hẹp, hover thấy tooltip tên đầy đủ.
+5. **Thành viên Space chung** (Settings Space → tab Members): hover vào tên/email 1 thành viên bị
+   cắt → xác nhận tooltip hiện đúng tên/email đầy đủ (KHÔNG còn hiện UUID nội bộ như trước).
 
 ---
 

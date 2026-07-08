@@ -58,7 +58,9 @@ function AssigneeMemberRow({
   isCurrentUser: boolean;
   onToggle: () => void;
 }) {
-  const name = getMemberDisplayName(member.userId, members, 40);
+  // Không cắt cứng — dòng bên dưới đã tự ellipsis bằng CSS (`truncate`), avatar chỉ cần tên đầy đủ
+  // cho initial + title tooltip.
+  const name = getMemberDisplayName(member.userId, members, Infinity);
   return (
     <label
       className="flex min-h-[32px] cursor-pointer items-center gap-2 rounded-[8px] px-1.5 py-1 text-[0.875rem]
@@ -76,7 +78,7 @@ function AssigneeMemberRow({
         </Checkbox.Indicator>
       </Checkbox.Root>
       <MemberAvatar name={name} color={getMemberColor(member.userId, members)} size={isMobile ? 22 : 18} />
-      <span className="min-w-0 flex-1 truncate">
+      <span className="min-w-0 flex-1 truncate" title={name}>
         {name}
         {isCurrentUser ? ' (bạn)' : ''}
       </span>
@@ -148,7 +150,7 @@ function AssigneePicker({
                 {selectedMembers.slice(0, TRIGGER_MAX_AVATARS).map((m, i) => (
                   <StackedAvatar
                     key={m.userId}
-                    name={getMemberDisplayName(m.userId, members, 40)}
+                    name={getMemberDisplayName(m.userId, members, Infinity)}
                     color={getMemberColor(m.userId, members)}
                     size={isMobile ? 22 : 20}
                     isFirst={i === 0}

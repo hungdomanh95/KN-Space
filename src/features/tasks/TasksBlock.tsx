@@ -159,8 +159,9 @@ function TaskRow({ task, draggedId, onDragStartId, onDragEndAll, onEdit, onDelet
             )}
             {memberDotName && (
               <span
-                className="inline-flex items-center gap-1 rounded-md px-[7px] py-0.5 text-[0.7188rem] font-semibold max-md:order-3 max-sm:hidden"
+                className="inline-flex min-w-0 max-w-[45%] items-center gap-1 overflow-hidden text-ellipsis whitespace-nowrap rounded-md px-[7px] py-0.5 text-[0.7188rem] font-semibold max-md:order-3 max-sm:hidden"
                 style={{ color: memberDotColor, background: `color-mix(in srgb, ${memberDotColor} 14%, var(--raised))` }}
+                title={memberDotName}
               >
                 {memberDotName}
               </span>
@@ -298,10 +299,12 @@ export function TasksBlock({
         ) : (
           list.map((task) => {
             const isOther = space.isShared && task.createdBy && task.createdBy !== currentUserId;
+            // maxLen: Infinity — 2 chỗ dưới chỉ dùng cho avatar (initial + title tooltip qua
+            // MemberAvatar) hoặc badge tự ellipsis bằng CSS, không có lý do cắt cứng theo ký tự.
             const assignees =
               space.isShared && task.assigneeIds.length > 0
                 ? task.assigneeIds.map((uid) => ({
-                    name: getMemberDisplayName(uid, members, 20),
+                    name: getMemberDisplayName(uid, members, Infinity),
                     color: getMemberColor(uid, members),
                   }))
                 : undefined;
@@ -315,7 +318,7 @@ export function TasksBlock({
                 onEdit={setEditingTask}
                 onDelete={handleDelete}
                 memberDotColor={isOther ? getMemberColor(task.createdBy!, members) : undefined}
-                memberDotName={isOther ? getMemberDisplayName(task.createdBy!, members, 40) : undefined}
+                memberDotName={isOther ? getMemberDisplayName(task.createdBy!, members, Infinity) : undefined}
                 assignees={assignees}
               />
             );

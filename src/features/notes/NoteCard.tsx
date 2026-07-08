@@ -155,7 +155,9 @@ export function NoteCard({
       {creatorInfo && (
         <div className="mt-1.5 flex items-center gap-1.5 border-t border-[color:var(--border)] pt-1.5" onClick={(e) => e.stopPropagation()}>
           <MemberAvatar name={creatorInfo.name} color={creatorInfo.color} size={16} />
-          <span className="text-[0.6875rem] text-[var(--text-dim)]">{creatorInfo.name}</span>
+          <span className="min-w-0 flex-1 truncate text-[0.6875rem] text-[var(--text-dim)]" title={creatorInfo.name}>
+            {creatorInfo.name}
+          </span>
         </div>
       )}
     </div>

@@ -126,8 +126,9 @@ function LogRow({ log, isSelecting, selected, onToggleSelect, onEnterSelectWith,
       <span className="line-clamp-2 flex-1 text-[0.875rem] text-[var(--text)]">{log.content}</span>
       {creatorName && (
         <span
-          className="flex-none rounded-md px-[7px] py-0.5 text-[0.7188rem] font-semibold max-sm:hidden"
+          className="min-w-0 max-w-[45%] overflow-hidden text-ellipsis whitespace-nowrap rounded-md px-[7px] py-0.5 text-[0.7188rem] font-semibold max-sm:hidden"
           style={{ color: creatorColor, background: `color-mix(in srgb, ${creatorColor} 14%, var(--raised))` }}
+          title={creatorName}
         >
           {creatorName}
         </span>
@@ -241,7 +242,8 @@ export function LogsBlock({
 
   function getCreatorInfo(log: LogEntry): { name: string; color: string } | undefined {
     if (!space.isShared || !log.createdBy || log.createdBy === currentUserId) return undefined;
-    return { name: getMemberDisplayName(log.createdBy, members), color: getMemberColor(log.createdBy, members) };
+    // Không cắt cứng theo ký tự — badge dưới đây tự ellipsis bằng CSS theo chỗ trống thật của hàng.
+    return { name: getMemberDisplayName(log.createdBy, members, Infinity), color: getMemberColor(log.createdBy, members) };
   }
 
   return (

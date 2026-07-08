@@ -122,7 +122,7 @@ export function HabitsBlock({
                         <Check className="icon h-[11px] w-[11px] text-white" size={11} strokeWidth={3} />
                       </Checkbox.Indicator>
                     </span>
-                    <span className="habit-title overflow-hidden text-ellipsis whitespace-nowrap">{habit.title}</span>
+                    <span className="habit-title overflow-hidden text-ellipsis whitespace-nowrap" title={habit.title}>{habit.title}</span>
                   </Checkbox.Root>
                   <span className="flex flex-none items-center gap-1.5">
                     <span className="inline-flex flex-none items-center gap-1.5 whitespace-nowrap rounded-[20px] bg-[rgba(255,138,61,.12)] px-[9px] py-1 text-[0.7812rem] font-bold text-[var(--habit-color)]">

@@ -98,8 +98,9 @@ export function NotesBlock({
 
   function getNoteCreatorInfo(note: Note): { name: string; color: string } | undefined {
     if (!space.isShared || !note.createdBy || note.createdBy === currentUserId) return undefined;
+    // Không cắt cứng theo ký tự — NoteCard tự ellipsis bằng CSS theo chỗ trống thật của card.
     return {
-      name: getMemberDisplayName(note.createdBy, members),
+      name: getMemberDisplayName(note.createdBy, members, Infinity),
       color: getMemberColor(note.createdBy, members),
     };
   }

@@ -253,7 +253,7 @@ export function SpaceInviteModal({ spaceId, spaceName, onClose }: SpaceInviteMod
                 {/* Email / label */}
                 <span
                   className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[0.875rem]"
-                  title={m.userId}
+                  title={label}
                 >
                   {label}
                   {isSelf && (

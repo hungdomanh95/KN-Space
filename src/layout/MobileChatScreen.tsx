@@ -120,8 +120,8 @@ export function MobileChatScreen() {
               const mine = isMine(b);
               const prevBubble = bubbles[idx - 1];
               const samePersonAsPrev = prevBubble && !isMine(prevBubble) && !mine && prevBubble.createdBy === b.createdBy;
-              // maxLen lớn — dòng tên nằm riêng, có nhiều chỗ hơn khung 15 ký tự mặc định (dành cho chỗ chật như dot tooltip/meta note)
-              const memberName = (!mine && b.createdBy) ? getMemberDisplayName(b.createdBy, members, 40) : '';
+              // Không cắt cứng theo ký tự — chip tên bên dưới tự ellipsis bằng CSS theo chỗ trống thật.
+              const memberName = (!mine && b.createdBy) ? getMemberDisplayName(b.createdBy, members, Infinity) : '';
               const memberColor = (!mine && b.createdBy) ? getMemberColor(b.createdBy, members) : '';
 
               return (
@@ -140,11 +140,12 @@ export function MobileChatScreen() {
                         thấu ảnh) để luôn đọc được, dù span này nằm ngoài bubble chính. */}
                     {!mine && !samePersonAsPrev && memberName && (
                       <span
-                        className="mb-0.5 rounded px-1.5 py-0.5 text-[0.75rem] font-semibold"
+                        className="mb-0.5 max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded px-1.5 py-0.5 text-[0.75rem] font-semibold"
                         style={{
                           color: memberColor || 'var(--text-dim)',
                           background: `color-mix(in srgb, ${memberColor || 'var(--text-dim)'} 14%, var(--raised))`,
                         }}
+                        title={memberName}
                       >
                         {memberName}
                       </span>
