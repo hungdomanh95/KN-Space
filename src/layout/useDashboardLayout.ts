@@ -8,6 +8,7 @@ import {
   resizeColSplitter,
   resizeRowSplitter,
   resizeSubColSplitter,
+  slotHeightIfContains,
 } from './dashboardLayoutUtils';
 import type { DragZone } from './dashboardLayoutUtils';
 
@@ -59,6 +60,15 @@ export type ActiveSplitter =
  *    bọc `useMemo` — nhánh fallback sâu nhất `defaultDashboardLayout()` là factory (trả object
  *    MỚI mỗi lần gọi dù nội dung giống hệt); nếu không memo, effect đồng bộ lại `layout` (dep
  *    `[persistedLayout]`, so sánh reference) sẽ chạy lại ở MỌI re-render dù dữ liệu không đổi.
+ * 4. Ngoại lệ mục 11.10 (chiều cao khối `settings` dùng CHUNG mọi Space, `settings.
+ *    dashboardCornerHeight`, khác `h` mọi khối khác vẫn riêng theo Space): `resolveDashboardCols()`
+ *    đã tự OVERRIDE giá trị này khi ĐỌC (xem storage/normalize.ts) nên `persistedCols`/`layout`
+ *    local ở hook này luôn phản ánh đúng, không cần xử lý gì thêm ở phần đọc. Phần GHI mới cần
+ *    thêm ở đây: khi kết thúc splitter DỌC (`row`, đổi `h`) liền kề khối `settings`, `endResize`
+ *    dispatch THÊM `SETTINGS_SET_CORNER_HEIGHT` (không kèm `spaceId`) SONG SONG với
+ *    `SETTINGS_SET_DASHBOARD_COLS` bình thường (đã ghi đúng `h` của khối CÒN LẠI theo Space) — 1
+ *    thao tác kéo, 2 đích lưu trữ khác nhau. `subcol` (đổi `w`, không đổi `h`) không liên quan
+ *    ngoại lệ này dù khối `settings` có thể tham gia ghép ngang.
  */
 export function useDashboardLayout() {
   const { state, dispatch } = useAppState();
@@ -70,7 +80,10 @@ export function useDashboardLayout() {
   // rủi ro #3 ở comment trên).
   const persistedCols = useMemo(
     () => resolveDashboardCols(state.settings, currentSpaceId),
-    [state.settings.dashboardCols, currentSpaceId],
+    // `dashboardCornerHeight` PHẢI có trong deps — `resolveDashboardCols()` override `h` của
+    // khối `settings` bằng giá trị này (mục 11.10); thiếu dep sẽ khiến đổi chiều cao khối
+    // `settings` ở nơi khác (vd sau reload/từ máy khác) không kích hoạt tính lại `persistedCols`.
+    [state.settings.dashboardCols, state.settings.dashboardCornerHeight, currentSpaceId],
   );
   const persistedLayout = useMemo<DashboardLayout>(
     () => ({ colWidths: persistedColWidths, cols: persistedCols }),
@@ -96,9 +109,12 @@ export function useDashboardLayout() {
   // spaceId chốt tại thời điểm BẮT ĐẦU 1 thao tác đổi `cols` (kéo dọc/kéo-thả ghép ngang/kéo-thả
   // đổi vị trí khối) — xem rủi ro #1 ở comment đầu file.
   const pendingColsSpaceIdRef = useRef(currentSpaceId);
-  // loại splitter đang active, chốt qua ref cùng thời điểm với `setActiveSplitter` — xem rủi ro
-  // #2 ở comment đầu file (KHÔNG đọc state `activeSplitter` trong `endResize`).
-  const activeKindRef = useRef<ActiveSplitter['kind'] | null>(null);
+  // Splitter đang active (kind + ci/si), chốt qua ref cùng thời điểm với `setActiveSplitter` —
+  // xem rủi ro #2 ở comment đầu file (KHÔNG đọc state `activeSplitter` trong `endResize`, có thể
+  // là closure "cũ" trước khi state kịp cập nhật). Lưu cả `ci`/`si` (không chỉ `kind` như bản
+  // trước tính năng 11.10) — cần để xác định 2 slot bị resize khi kết thúc splitter DỌC (`row`),
+  // phục vụ ngoại lệ mục 11.10 (xem `endResize` bên dưới).
+  const activeSplitterRef = useRef<ActiveSplitter | null>(null);
 
   const commitCols = useCallback(
     (nextCols: DashboardLayout['cols'], spaceId: string) => {
@@ -132,18 +148,18 @@ export function useDashboardLayout() {
   function beginRowResize(ci: number, si: number) {
     draggingRef.current = true;
     pendingColsSpaceIdRef.current = currentSpaceId;
-    activeKindRef.current = 'row';
+    activeSplitterRef.current = { kind: 'row', ci, si };
     setActiveSplitter({ kind: 'row', ci, si });
   }
   function beginColResize(ci: number) {
     draggingRef.current = true;
-    activeKindRef.current = 'col';
+    activeSplitterRef.current = { kind: 'col', ci };
     setActiveSplitter({ kind: 'col', ci });
   }
   function beginSubColResize(ci: number, si: number) {
     draggingRef.current = true;
     pendingColsSpaceIdRef.current = currentSpaceId;
-    activeKindRef.current = 'subcol';
+    activeSplitterRef.current = { kind: 'subcol', ci, si };
     setActiveSplitter({ kind: 'subcol', ci, si });
   }
 
@@ -161,20 +177,41 @@ export function useDashboardLayout() {
 
   function endResize() {
     draggingRef.current = false;
-    const kind = activeKindRef.current;
-    activeKindRef.current = null;
+    const active = activeSplitterRef.current;
+    activeSplitterRef.current = null;
     setActiveSplitter(null);
+    if (!active) return;
+
     // Commit giá trị local (đã cập nhật mượt trong lúc kéo, đọc qua ref để tránh dispatch bên
     // trong updater của setState — gây warning "Cannot update a component while rendering a
     // different component") xuống đúng field tương ứng.
-    if (kind === 'col') {
+    if (active.kind === 'col') {
       dispatch({ type: 'SETTINGS_SET_COL_WIDTHS', payload: { colWidths: layoutRef.current.colWidths } });
-    } else if (kind === 'row' || kind === 'subcol') {
-      // Dùng spaceId đã chốt lúc begin*Resize — KHÔNG đọc `currentSpaceId` sống ở đây (rủi ro #1).
-      dispatch({
-        type: 'SETTINGS_SET_DASHBOARD_COLS',
-        payload: { spaceId: pendingColsSpaceIdRef.current, cols: layoutRef.current.cols },
-      });
+      return;
+    }
+
+    // row hoặc subcol -> cols riêng theo Space, dùng spaceId đã chốt lúc begin*Resize — KHÔNG đọc
+    // `currentSpaceId` sống ở đây (rủi ro #1). Đúng ngay cả khi 1 trong 2 slot resize là
+    // `settings` — VỊ TRÍ khối này vẫn riêng theo Space (mục 11.10.3), chỉ `h` là ngoại lệ dùng
+    // chung. `h` của slot `settings` lưu trong entry này có thể tạm thời khác
+    // `dashboardCornerHeight` — vô hại, luôn bị override khi đọc (`resolveDashboardCols`).
+    dispatch({
+      type: 'SETTINGS_SET_DASHBOARD_COLS',
+      payload: { spaceId: pendingColsSpaceIdRef.current, cols: layoutRef.current.cols },
+    });
+
+    // Ngoại lệ mục 11.10 — splitter DỌC (row, đổi `h`) liền kề khối `settings`: ghi THÊM `h` mới
+    // vào field DÙNG CHUNG `dashboardCornerHeight`, tách biệt khỏi entry per-Space vừa ghi ở
+    // trên (1 thao tác kéo -> 2 đích lưu trữ khác nhau, xem comment đầu file điểm 4). `subcol`
+    // đổi `w` (không đổi `h`) nên không liên quan tới ngoại lệ này dù `settings` có thể tham gia
+    // ghép ngang.
+    if (active.kind === 'row') {
+      const col = layoutRef.current.cols[active.ci];
+      const cornerH =
+        slotHeightIfContains(col?.[active.si], 'settings') ?? slotHeightIfContains(col?.[active.si + 1], 'settings');
+      if (cornerH != null) {
+        dispatch({ type: 'SETTINGS_SET_CORNER_HEIGHT', payload: { h: cornerH } });
+      }
     }
   }
 

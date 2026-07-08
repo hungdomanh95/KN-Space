@@ -273,6 +273,22 @@ export interface Settings {
    * sắp layout riêng" đã chốt.
    */
   dashboardCols: Record<string, LayoutSlot[][]>;
+  /**
+   * Ngoại lệ mục 11.10 (docs/features/layout-theo-space.md, chốt 2026-07-08): trọng số `h` của
+   * ĐÚNG 1 slot có `id === 'settings'` (khối gộp "Điều hướng + Hôm nay", luôn hiển thị mọi Space,
+   * không thuộc `enabledBlocks`) — DÙNG CHUNG mọi Space, cùng nhóm với `dashboardColWidths` phía
+   * trên, KHÔNG theo `spaceId` như phần còn lại của `dashboardCols`. Lý do: nội dung khối này
+   * giống hệt nhau ở mọi Space (nav + đồng hồ/ngày/quote), không có ý nghĩa gì khi mỗi Space có 1
+   * chiều cao khác nhau cho cùng 1 nội dung tĩnh — khác các khối dữ liệu thật (Task/Note/Log/...)
+   * vẫn `h` riêng theo Space bình thường, không đổi.
+   *
+   * Giá trị `h` lưu SẴN cho slot `settings` bên trong `dashboardCols[spaceId]`/
+   * `defaultDashboardLayout().cols` bị BỎ QUA khi hiển thị — luôn override bằng field này (xem
+   * `resolveDashboardCols()` trong `storage/normalize.ts`). **Vị trí** của khối `settings` (cột
+   * nào, đứng trước/sau khối nào) vẫn tiếp tục riêng theo Space như bình thường — chỉ `h` là
+   * ngoại lệ, phạm vi hẹp, không suy rộng sang khối khác.
+   */
+  dashboardCornerHeight: number;
   /** Bật/tắt thông báo push cho sự kiện Shared Space (giao việc/hoàn thành) — độc lập với thông báo đến hạn. */
   pushNotifySharedSpaceEvents: boolean;
 }

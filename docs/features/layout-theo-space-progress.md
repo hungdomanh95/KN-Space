@@ -360,6 +360,126 @@ bình thường.
   test file/case trong `normalize.test.ts` tăng do viết thêm test case (b)/(c) rõ ràng hơn, nhưng
   gộp lại tổng vẫn 98 vì một vài test cũ bị thay thế/hợp nhất chứ không phải thêm ròng).
 
+## Mục 11.10 — Ngoại lệ: chiều cao khối `settings` dùng chung mọi Space
+
+Trạng thái: ✅ Xong (2026-07-08)
+
+Việc nhỏ, làm gọn trong 1 lượt (không tách Phần riêng) — spec đầy đủ ở
+`docs/features/layout-theo-space.md` mục 11.10.
+
+### Đã làm
+
+- **`src/types.ts`** — thêm `Settings.dashboardCornerHeight: number` (giữ đúng tên đề xuất trong
+  spec) — cùng nhóm "dùng chung mọi Space" với `dashboardColWidths`, comment giải thích rõ chỉ
+  override `h` của slot `id === 'settings'`, không đụng vị trí/khối khác.
+- **`src/state/seed.ts`** — thêm hàm `findSettingsCornerHeight(cols, fallback = 22)` (export) tìm
+  `h` của slot `settings` trong 1 mảng `cols` bất kỳ — dùng cho `defaultSettings()` (khởi tạo từ
+  `defaultDashboardLayout().cols`) và tái dùng ở `normalize.ts`. Viết thành hàm thay vì hard-code
+  lại `22` để không lệch pha nếu default sau này đổi.
+- **`src/storage/normalize.ts`**:
+  - `normalizeCornerHeight(raw, fallback)` — validate 1 số dương hữu hạn, fallback nếu không hợp
+    lệ.
+  - `overrideCornerHeight(cols, cornerHeight)` — override `h` của MỌI slot mang khối `settings`
+    (single hoặc ghép ngang) bằng `cornerHeight`; giữ nguyên REFERENCE gốc của `cols` nếu không có
+    gì cần đổi (referential-stability cho `useMemo` ở hook, đúng tinh thần rủi ro #3 đã xử lý
+    trước đó cho `dashboardCols`).
+  - `resolveDashboardCols()` — sau khi resolve `cols` theo đúng fallback đã có (Phần 1/Phương án
+    A), gọi thêm `overrideCornerHeight()` trước khi trả về — áp dụng cho MỌI Space (cả khi có entry
+    riêng lẫn khi rơi vào fallback default).
+  - `normalizeSettings()` — tính thêm `dashboardCornerHeight` bằng `normalizeCornerHeight(settings.dashboardCornerHeight, findSettingsCornerHeight(defaultLayout.cols))`.
+- **`src/state/reducers/settings.ts`** — thêm action `SETTINGS_SET_CORNER_HEIGHT` (payload `{ h }`,
+  KHÔNG kèm `spaceId`, cùng pattern `SETTINGS_SET_COL_WIDTHS`).
+- **`src/state/appReducer.ts`** — thêm `SETTINGS_SET_CORNER_HEIGHT` vào `SETTINGS_ACTION_TYPES`.
+- **`src/layout/dashboardLayoutUtils.ts`** — thêm helper `slotHeightIfContains(slot, id)` (trả `h`
+  nếu slot chứa khối `id`, single hoặc ghép ngang, `null` nếu không) — dùng ở cả
+  `useDashboardLayout.ts` (ghi) lẫn `AppLayout.tsx` (tooltip).
+- **`src/layout/useDashboardLayout.ts`** — phần ĐỌC không cần đổi gì (`resolveDashboardCols()` đã
+  tự override). Phần GHI (2 đích lưu trữ, mục 11.10.2):
+  - Đổi `activeKindRef` (chỉ lưu `kind`) thành `activeSplitterRef` (lưu cả `ActiveSplitter` đầy đủ
+    — `kind`+`ci`+`si`) — cần `ci`/`si` để tra 2 slot bị resize lúc `endResize`.
+  - `endResize`: giữ nguyên dispatch `SETTINGS_SET_DASHBOARD_COLS` như cũ (ghi `h` của khối CÒN
+    LẠI theo đúng Space — giá trị `h` của `settings` lưu trong entry này có thể tạm khác
+    `dashboardCornerHeight`, vô hại vì luôn bị override khi đọc). THÊM: nếu `active.kind === 'row'`
+    và 1 trong 2 slot bị resize chứa khối `settings` (`slotHeightIfContains`) → dispatch thêm
+    `SETTINGS_SET_CORNER_HEIGHT` với `h` mới của `settings`. `subcol` (đổi `w`) không liên quan vì
+    không đổi `h`.
+  - `persistedCols` useMemo: thêm `state.settings.dashboardCornerHeight` vào dependency array (bị
+    thiếu sẽ khiến đổi chiều cao `settings` từ nơi khác — reload/máy khác — không kích hoạt tính
+    lại).
+- **`src/layout/AppLayout.tsx`** — splitter DỌC (`row`) liền kề khối `settings` giờ hiển thị title
+  khác splitter dọc thường: tra theo layout GỐC (`layout.cols[rs.origCi]`, không phải
+  `visibleLayout`) qua `slotHeightIfContains`, nếu đúng thì `title` = `Đổi kích thước khối "Điều
+  hướng + Hôm nay" — áp dụng cho mọi Space của bạn`, khác `Đổi kích thước khối — chỉ áp dụng cho
+  Space này` của mọi splitter dọc khác. Splitter cột lớn (`onColSplitterMouseDown`) và splitter
+  ghép-ngang-trong-cột (`onSubColSplitterMouseDown`) giữ nguyên, không đổi (không liên quan `h`
+  của `settings`).
+- Test mới: `src/__tests__/normalize.test.ts` (2 describe mới — `dashboardCornerHeight` cho
+  `normalizeSettings`, và override `h` trong `resolveDashboardCols`, tổng 8 test case, phủ cả 2 vế
+  AC-11.10.1/AC-11.10.3) + `src/state/reducers/settings.test.ts` (describe
+  `SETTINGS_SET_CORNER_HEIGHT`, 2 test case).
+- `npx tsc --noEmit`, `npm run build`, `npx vitest run` — pass hết (108 test, 9 file — tăng 10 so
+  với 98 trước đó).
+
+### Quyết định lệch khỏi spec gốc mục 11.10.4 (ghi rõ, không im lặng đổi) — 2026-07-08
+
+Spec mục 11.10.4 đề xuất migrate `dashboardCornerHeight` từ `h` của slot `settings` trong
+`dashboardLayout.cols` (field đơn LỊCH SỬ). **Đã KHÔNG làm theo đúng như vậy** — áp dụng lại
+nguyên xi bài học "Phương án A" (bug 2026-07-08 đã ghi ở trên): field `dashboardLayout` là dữ liệu
+ĐÓNG BĂNG tại 1 thời điểm cũ, không có cách phân biệt "cũ nhưng hợp lệ" với "cũ và bất thường" (vd
+do bug resize cộng-dồn-delta đã sửa trước đây) chỉ bằng kiểm tra kiểu số. Với field NÀY, rủi ro còn
+LỚN HƠN `cols`/`colWidths` per-Space: vì `dashboardCornerHeight` DÙNG CHUNG mọi Space, đọc phải 1
+giá trị bất thường từ dữ liệu đóng băng sẽ làm khối `settings` SAI NGAY LẬP TỨC ở TẤT CẢ Space cùng
+lúc (không phải chỉ 1 Space "may rủi" như trường hợp `cols`). Vì vậy `normalizeCornerHeight()`
+fallback THẲNG `findSettingsCornerHeight(defaultDashboardLayout().cols)` (= 22 hiện tại), giống hệt
+cách `dashboardColWidths` đã được sửa để KHÔNG đọc `dashboardLayout` nữa. Đánh đổi: user cũ đã có
+`dashboardLayout.cols` với `h` khối `settings` khác 22 (rất ít khả năng vì UI trước tính năng
+11.10 luôn cho phép resize slot này, nhưng vẫn có thể) sẽ thấy khối `settings` reset về `22` thay vì
+giữ đúng giá trị cũ họ từng chỉnh — chấp nhận được, resize lại 1 lần bằng tay (thao tác rất nhanh,
+splitter vẫn hoạt động bình thường) là đủ, an toàn hơn hẳn rủi ro lây lan sang mọi Space.
+
+**Đây là quyết định kỹ thuật tự đưa ra khi code, chưa hỏi lại chủ dự án trước khi làm** (theo tinh
+thần "việc nhỏ, làm xong 1 lượt, dừng lại báo cáo" đã giao) — nêu rõ ở đây + trong báo cáo cuối
+cùng để chủ dự án biết và có thể yêu cầu đổi lại nếu không đồng ý.
+
+### Cách test Phần 11.10 (tay, trên trình duyệt)
+
+1. **Tự động trước (đủ để tin phần data-layer đúng):**
+   ```
+   npx tsc --noEmit
+   npm run build
+   npx vitest run
+   ```
+   Kỳ vọng: pass hết, `vitest run` báo `108 tests passed`.
+
+2. **(a) Đổi Space → khối `settings` luôn cao giống nhau:** mở Space A, kéo splitter DỌC giữa khối
+   "Điều hướng + Hôm nay" và khối "Thông báo" (đổi chiều cao 2 khối này) → chuyển sang Space B (kể
+   cả Space B có bố cục/vị trí khối `settings` khác hẳn A, hoặc chưa từng tự chỉnh riêng) → xác
+   nhận khối "Điều hướng + Hôm nay" ở Space B hiện đúng **chiều cao mới giống Space A** (không phải
+   giữ nguyên chiều cao cũ riêng của B).
+3. **(b) Khối "Thông báo" của Space B KHÔNG bị đổi theo tỉ lệ của Space A:** sau bước 2, mở
+   Settings > Tab Chung, hoặc quan sát trực tiếp — khối "Thông báo" ở Space B vẫn giữ đúng SỐ `h`
+   đã lưu riêng cho Space B từ trước (không nhảy theo đúng tỉ lệ mà Space A đang có). Lưu ý: vì `h`
+   là trọng số flex TƯƠNG ĐỐI trong cột (không phải % tuyệt đối), khối "Thông báo" ở Space B có thể
+   trông cao/thấp hơi khác trước (vì khối `settings` cạnh nó giờ chiếm tỉ trọng khác) dù SỐ lưu trữ
+   không đổi — đây là hành vi ĐÚNG theo thiết kế (đã nêu ở mục 11.10.3 tài liệu spec), không phải
+   bug.
+4. **Vị trí khối `settings` vẫn riêng theo Space:** kéo-thả khối "Điều hướng + Hôm nay" sang cột/vị
+   trí khác ở Space A → chuyển sang Space B → xác nhận vị trí khối này ở Space B **không đổi theo**
+   A (chỉ chiều cao dùng chung, vị trí vẫn riêng — đúng AC-11.10.2).
+5. **Hover tooltip:** hover (không cần kéo) vào đường kẻ ẩn giữa khối "Điều hướng + Hôm nay" và khối
+   liền kề (thường là "Thông báo") → tooltip hiện đúng `Đổi kích thước khối "Điều hướng + Hôm nay"
+   — áp dụng cho mọi Space của bạn` (khác các splitter dọc khác vẫn hiện `chỉ áp dụng cho Space
+   này`).
+6. **Reload (F5)** sau bước 2 — mở lại đúng Space đang mở lúc F5 → xác nhận chiều cao khối
+   `settings` vẫn đúng giá trị chung đã chỉnh (không mất). Có thể xác nhận thêm qua Supabase Table
+   Editor: bảng `kn_space_state` → cột `settings` (jsonb) → thấy `dashboardCornerHeight` xuất hiện
+   với giá trị đúng (1 số, KHÔNG khoá theo `spaceId`).
+7. **Nút "Khôi phục bố cục mặc định"** (Settings > Tab Chung) — bấm cho 1 Space bất kỳ → xác nhận
+   chiều cao khối `settings` ở Space đó KHÔNG bị reset về 22 nếu trước đó đã chỉnh khác (đúng vì
+   `dashboardCornerHeight` không thuộc phạm vi nút này, giống `dashboardColWidths`).
+
+---
+
 ### Cách test tay bug này (đã sửa)
 
 1. **Space "MAFC" (Space bị lỗi trong ảnh chụp màn hình user gửi):**

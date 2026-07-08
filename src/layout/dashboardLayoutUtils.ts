@@ -30,6 +30,19 @@ export function isHeightLocked(slot: LayoutSlot): boolean {
   return slot.type === 'single' && HEIGHT_LOCKED_IDS.has(slot.id);
 }
 
+/**
+ * `h` của 1 slot NẾU nó chứa khối `id` (single hoặc ghép ngang) — dùng để phát hiện resize liền
+ * kề khối `settings` (ngoại lệ mục 11.10, docs/features/layout-theo-space.md: `h` của khối này
+ * dùng CHUNG mọi Space, cần rẽ nhánh đích ghi khác trong `useDashboardLayout.ts`/`AppLayout.tsx`).
+ * Trả `null` nếu slot không tồn tại hoặc không chứa khối đó.
+ */
+export function slotHeightIfContains(slot: LayoutSlot | undefined, id: LayoutBlockKey): number | null {
+  if (!slot) return null;
+  if (slot.type === 'single' && slot.id === id) return slot.h;
+  if (slot.type === 'row' && slot.items.some((it) => it.id === id)) return slot.h;
+  return null;
+}
+
 export function defaultHFor(id: LayoutBlockKey): number {
   return HEIGHT_LOCKED_IDS.has(id) ? 14 : 30;
 }

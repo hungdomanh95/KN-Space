@@ -1,4 +1,4 @@
-import type { DashboardLayout, HomeBgSlot, Settings, Space } from '../types';
+import type { DashboardLayout, HomeBgSlot, LayoutSlot, Settings, Space } from '../types';
 import { DEFAULT_HOME_IMAGES, HOME_QUOTES, dayIndex, epochDay } from '../features/home/homeContent';
 
 /**
@@ -39,6 +39,23 @@ export function defaultDashboardLayout(): DashboardLayout {
   };
 }
 
+/**
+ * `h` hiện tại của slot `id === 'settings'` trong 1 mảng `cols` — dùng làm giá trị khởi tạo/
+ * migrate cho `Settings.dashboardCornerHeight` (mục 11.10, docs/features/layout-theo-space.md).
+ * Viết thành hàm thay vì hard-code lại số `22` để không lệch pha nếu `defaultDashboardLayout()`
+ * sau này đổi giá trị mặc định. Trả `fallback` nếu không tìm thấy slot nào chứa khối này (lưới
+ * an toàn — không nên xảy ra với dữ liệu hợp lệ, khối `settings` luôn có mặt).
+ */
+export function findSettingsCornerHeight(cols: LayoutSlot[][], fallback = 22): number {
+  for (const col of cols) {
+    for (const slot of col) {
+      if (slot.type === 'single' && slot.id === 'settings') return slot.h;
+      if (slot.type === 'row' && slot.items.some((it) => it.id === 'settings')) return slot.h;
+    }
+  }
+  return fallback;
+}
+
 export function defaultSettings(): Settings {
   return {
     theme: 'light',
@@ -68,6 +85,9 @@ export function defaultSettings(): Settings {
     // Space fallback qua `resolveDashboardCols()` về `defaultDashboardLayout().cols`).
     dashboardColWidths: defaultDashboardLayout().colWidths,
     dashboardCols: {},
+    // MỚI (2026-07-08, mục 11.10) — ngoại lệ dùng chung: h của khối 'settings', cùng nhóm khởi
+    // tạo với dashboardColWidths phía trên.
+    dashboardCornerHeight: findSettingsCornerHeight(defaultDashboardLayout().cols),
     pushNotifySharedSpaceEvents: true,
   };
 }

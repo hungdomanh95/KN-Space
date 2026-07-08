@@ -48,6 +48,22 @@ describe('settingsReducer — SETTINGS_SET_DASHBOARD_COLS', () => {
   });
 });
 
+describe('settingsReducer — SETTINGS_SET_CORNER_HEIGHT (mục 11.10, ngoại lệ h khối settings)', () => {
+  it('ghi thẳng dashboardCornerHeight, không kèm spaceId, không đụng dashboardCols/colWidths', () => {
+    const initial = defaultSettings();
+    const next = settingsReducer(initial, { type: 'SETTINGS_SET_CORNER_HEIGHT', payload: { h: 40 } });
+    expect(next.dashboardCornerHeight).toBe(40);
+    expect(next.dashboardCols).toBe(initial.dashboardCols);
+    expect(next.dashboardColWidths).toBe(initial.dashboardColWidths);
+  });
+
+  it('đổi dashboardCornerHeight không phụ thuộc Space nào — 1 giá trị duy nhất, ghi đè lần sau thắng lần trước', () => {
+    let state = settingsReducer(defaultSettings(), { type: 'SETTINGS_SET_CORNER_HEIGHT', payload: { h: 30 } });
+    state = settingsReducer(state, { type: 'SETTINGS_SET_CORNER_HEIGHT', payload: { h: 50 } });
+    expect(state.dashboardCornerHeight).toBe(50);
+  });
+});
+
 describe('settingsReducer — SETTINGS_RESET_DASHBOARD_COLS', () => {
   it('chỉ reset dashboardCols[spaceId] về default, không đụng colWidths lẫn Space khác (AC-11.9)', () => {
     const customCols: LayoutSlot[][] = [[{ type: 'single', id: 'notes', h: 99 }], [], []];

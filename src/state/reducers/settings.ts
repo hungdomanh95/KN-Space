@@ -39,6 +39,9 @@ export type SettingsAction =
   | { type: 'SETTINGS_SET_COL_WIDTHS'; payload: { colWidths: number[] } }
   | { type: 'SETTINGS_SET_DASHBOARD_COLS'; payload: { spaceId: string; cols: LayoutSlot[][] } }
   | { type: 'SETTINGS_RESET_DASHBOARD_COLS'; payload: { spaceId: string } }
+  // MỚI (2026-07-08, mục 11.10 — ngoại lệ chiều cao khối 'settings') — dùng chung mọi Space,
+  // không kèm `spaceId`, cùng nhóm với SETTINGS_SET_COL_WIDTHS.
+  | { type: 'SETTINGS_SET_CORNER_HEIGHT'; payload: { h: number } }
   | { type: 'SETTINGS_SET_PUSH_NOTIFY_SHARED_EVENTS'; payload: { enabled: boolean } };
 
 export function settingsReducer(settings: Settings, action: SettingsAction): Settings {
@@ -124,6 +127,8 @@ export function settingsReducer(settings: Settings, action: SettingsAction): Set
         ...settings,
         dashboardCols: { ...settings.dashboardCols, [action.payload.spaceId]: defaultDashboardLayout().cols },
       };
+    case 'SETTINGS_SET_CORNER_HEIGHT':
+      return { ...settings, dashboardCornerHeight: action.payload.h };
     case 'SETTINGS_SET_PUSH_NOTIFY_SHARED_EVENTS':
       return { ...settings, pushNotifySharedSpaceEvents: action.payload.enabled };
     default:

@@ -4,7 +4,7 @@
 > Cập nhật: 2026-07-08.
 > Input: 3 ảnh chụp Dashboard thật ở 3 Space khác nhau (Chi tiêu gia đình Kino, MAFC, Cá nhân) do chủ dự án cung cấp — mỗi Space có cách dùng khối khác hẳn nhau, đổi layout ở Space này hiện đang làm hỏng layout Space khác.
 
-> **Cập nhật 2026-07-08 (bàn lại):** Mục 1-9 dưới đây là vòng phân tích ĐẦU TIÊN (chỉ đào sâu 1 hướng "layout tự do per-Space", đến cả bước `uiux`/`dev` review) — chủ dự án xem demo, **không hài lòng**, yêu cầu bỏ qua lối mòn này, suy nghĩ rộng hơn từ đầu. Mục **10** là vòng phân tích thứ 2, đặt cạnh **5 phương án khác nhau về bản chất** (không phải biến thể nhỏ của mục 1-9). Mục **11** (cuối file) là **KẾT LUẬN CUỐI**, chốt trực tiếp giữa chủ dự án và phiên làm việc chính — thay thế hoàn toàn mục 10 (A-F), là nguồn spec chính thức duy nhất để `dev` triển khai. Đọc mục 11 trước nếu chỉ cần bức tranh hiện tại; mục 1-10 giữ lại làm lịch sử quá trình bàn bạc, không phải spec để code theo.
+> **Cập nhật 2026-07-08 (bàn lại):** Mục 1-9 dưới đây là vòng phân tích ĐẦU TIÊN (chỉ đào sâu 1 hướng "layout tự do per-Space", đến cả bước `uiux`/`dev` review) — chủ dự án xem demo, **không hài lòng**, yêu cầu bỏ qua lối mòn này, suy nghĩ rộng hơn từ đầu. Mục **10** là vòng phân tích thứ 2, đặt cạnh **5 phương án khác nhau về bản chất** (không phải biến thể nhỏ của mục 1-9). Mục **11** (cuối file) là **KẾT LUẬN CUỐI**, chốt trực tiếp giữa chủ dự án và phiên làm việc chính, thay thế hoàn toàn mục 10 (A-F), là nguồn spec chính thức duy nhất để `dev` triển khai. Đọc mục 11 trước nếu chỉ cần bức tranh hiện tại; mục 1-10 giữ lại làm lịch sử quá trình bàn bạc, không phải spec để code theo.
 
 ---
 
@@ -347,7 +347,7 @@ Dưới đây là 5 phương án khác nhau về bản chất — không phải 
 - Giữ tự do tinh chỉnh pixel-perfect như phương án A, nhưng **không bắt lặp lại thao tác cho mỗi Space mới** — tạo 1 lần, gán nhiều nơi.
 - Sửa 1 hồ sơ tự động cập nhật mọi Space đang gán nó — tiện nếu user chủ đích muốn nhiều Space cùng "phong cách".
 
-**Nhược điểm:**
+**Nhược điểm (quyết định — KHÔNG khuyến nghị):**
 - "Sửa 1 hồ sơ ảnh hưởng mọi Space đang dùng nó" là **con dao 2 lưỡi**, thậm chí có thể **đi ngược đúng pain point gốc** ("chỉnh Space A không được ảnh hưởng Space B") nếu user lỡ gán 2 Space dùng chung 1 hồ sơ rồi quên mất — lại quay về đúng vấn đề ban đầu, chỉ đổi từ "mọi Space" thành "mọi Space cùng gán 1 hồ sơ".
 - Thêm hẳn 1 lớp UI/khái niệm mới (tạo/đặt tên/xoá/gán hồ sơ) tách biệt khỏi Space — tăng learning curve, nhiều bước thao tác hơn hẳn 2 phương án kia.
 - Cần xử lý edge case mới: hồ sơ "mồ côi" (không Space nào gán), xoá hồ sơ đang có Space dùng, đổi tên hồ sơ...
@@ -599,7 +599,9 @@ Tách field `Settings.dashboardLayout` (hiện là `{ colWidths: number[3]; cols
 | Phần | Field mới đề xuất | Phạm vi | Cơ chế |
 |---|---|---|---|
 | `colWidths` (độ rộng 3 cột) | `Settings.dashboardColWidths: [number, number, number]` | **Dùng chung cho MỌI Space** của user — giữ nguyên y hệt cơ chế hiện tại, không đổi gì về hành vi | 1 giá trị duy nhất, không khoá theo `spaceId` |
-| `cols` (khối nào trong cột nào + chiều cao từng khối) | `Settings.dashboardCols: Record<string, LayoutSlot[][]>` | **Riêng theo từng Space** — key = `spaceId` | Map, đúng cơ chế đọc-fallback đã thiết kế ở mục 3.1/3.3/4.3 (áp dụng cho `cols`, không áp dụng cho `colWidths`) |
+| `cols` (khối nào trong cột nào + chiều cao từng khối) | `Settings.dashboardCols: Record<string, LayoutSlot[][]>` | **Riêng theo từng Space** — key = `spaceId`, **TRỪ 1 ngoại lệ** (xem ngay dưới) | Map, đúng cơ chế đọc-fallback đã thiết kế ở mục 3.1/3.3/4.3 (áp dụng cho `cols`, không áp dụng cho `colWidths`) |
+
+> **Ngoại lệ bổ sung (chốt 2026-07-08, xem chi tiết mục 11.10):** chiều cao (`h`) của riêng slot có `id === 'settings'` (khối gộp "Điều hướng + Hôm nay", `LayoutBlockKey` cố định, luôn hiển thị mọi Space, không thuộc `enabledBlocks`) **KHÔNG nằm trong phạm vi "riêng theo Space" của `cols`** như mọi khối khác trong bảng trên — mà thuộc nhóm **DÙNG CHUNG** cùng `colWidths`. Đây là ngoại lệ hẹp, áp dụng đúng 1 `LayoutBlockKey`, không áp dụng cho Task/Note/Log/Reminder/Habits/Notifications hay bất kỳ khối nào khác. **Vị trí** của khối `settings` (cột nào, thứ tự trong cột) vẫn tiếp tục riêng theo Space như bình thường — chỉ `h` là ngoại lệ.
 
 Tên field chính xác (`dashboardColWidths`/`dashboardCols` hay tên khác) — **giao quyền quyết cho `dev`** nếu thấy tên hợp lý hơn khi bắt tay viết code (vd đặt lồng trong 1 object `Settings.dashboard = { colWidths, cols }` thay vì 2 field rời) — không phải câu hỏi mở chặn code, miễn giữ đúng 2 đặc tính: (1) `colWidths` — 1 giá trị, không khoá `spaceId`; (2) `cols` — map khoá `spaceId`.
 
@@ -615,8 +617,8 @@ Field đơn `Settings.dashboardLayout` cũ **giữ nguyên trong schema, không 
 
 ### 11.3 Hệ quả hành vi (đã giải thích và được chủ dự án chấp nhận — không phải rủi ro ẩn)
 
-- **Kéo splitter dọc giữa 2 khối trong cùng 1 cột** (đổi trọng số `h` của `LayoutSlot`) → chỉ ghi vào `dashboardCols[spaceId]` của Space đang mở → **chỉ ảnh hưởng Space đang mở**.
-- **Kéo-thả đổi vị trí khối** (chèn trên/dưới, ghép ngang — đổi cấu trúc `cols`) → cùng ghi vào `dashboardCols[spaceId]` → **chỉ ảnh hưởng Space đang mở**, giống hệt hành vi splitter dọc.
+- **Kéo splitter dọc giữa 2 khối trong cùng 1 cột** (đổi trọng số `h` của `LayoutSlot`) → chỉ ghi vào `dashboardCols[spaceId]` của Space đang mở → **chỉ ảnh hưởng Space đang mở**. **Ngoại lệ:** nếu 1 trong 2 khối đang resize là `settings` → phần `h` liên quan tới `settings` ghi vào field dùng chung mô tả ở mục 11.10, không ghi vào `dashboardCols[spaceId]`.
+- **Kéo-thả đổi vị trí khối** (chèn trên/dưới, ghép ngang — đổi cấu trúc `cols`) → cùng ghi vào `dashboardCols[spaceId]` → **chỉ ảnh hưởng Space đang mở**, giống hệt hành vi splitter dọc — **kể cả khi kéo-thả đổi vị trí khối `settings`** (chỉ `h` là ngoại lệ dùng chung, vị trí luôn riêng Space, xem mục 11.10.1).
 - **Kéo splitter ngang giữa 2 cột** (đổi `colWidths`) → ghi vào `dashboardColWidths` (không khoá `spaceId`) → **ảnh hưởng TẤT CẢ Space của user đó cùng lúc** (kể cả Space chung mà user đang là thành viên) — **nhưng vẫn riêng theo từng USER**, không đồng bộ giữa các thành viên khác trong cùng 1 Shared Space (vì `colWidths` nằm trong `Settings`, cấp user, không phải trong `kn_shared_spaces`).
 - Cần 1 dòng hint UI giải thích rõ 2 phạm vi khác nhau này (kéo dọc/kéo-thả = riêng Space này; kéo ngang giữa cột = áp dụng mọi Space của bạn) — **giao `uiux` thiết kế nội dung/vị trí cụ thể**, không phải việc của `ba`. Gợi ý điểm neo: đoạn hint đã có sẵn trong `SettingsModal.tsx` (mục 9.3 đã sửa 1 lần cho ngữ cảnh Shared Space) là nơi hợp lý để `uiux` cân nhắc bổ sung tiếp, tránh tạo pattern cảnh báo mới.
 
@@ -626,6 +628,7 @@ Field đơn `Settings.dashboardLayout` cũ **giữ nguyên trong schema, không 
 - `dashboardLayout.cols` hiện có của user → trở thành **giá trị khởi đầu (fallback) DUY NHẤT cho MỌI Space đang có** trong `dashboardCols[spaceId]` — dùng đúng cơ chế **đọc-fallback tại chỗ** đã thiết kế ở mục 3.1/3.3/4.3 (không phải eager-write ghi cứng N entry 1 lần — lý do giữ nguyên: thứ tự load Space cá nhân/Shared Space không đồng bộ, xem mục 4.3). Mỗi Space bắt đầu **giống hệt** layout cột cũ, sau đó tự "tách" ra thành entry riêng ngay khi user chỉnh sửa (kéo dọc/kéo-thả) trong Space đó.
 - Field đơn `Settings.dashboardLayout` cũ **giữ nguyên trong schema**, không xoá — vẫn đóng vai trò fallback lịch sử cho `cols` (đọc `.cols`), không còn được ghi mới bởi bất kỳ hành động nào sau khi tính năng lên production. `colWidths` sau migrate không còn đọc từ field cũ này nữa (đã có `dashboardColWidths` riêng, giá trị đã copy xong).
 - User hoàn toàn mới (chưa từng có `dashboardLayout` cũ): `dashboardColWidths` khởi tạo = `defaultDashboardLayout().colWidths`; `dashboardCols` khởi tạo rỗng `{}`, mọi Space fallback về `defaultDashboardLayout().cols` khi chưa có entry riêng — đúng logic đã áp dụng nhất quán trong toàn tài liệu.
+- Migration riêng cho ngoại lệ `settings` (`dashboardCornerHeight`) — xem mục 11.10.3, không lặp lại ở đây.
 
 ### 11.5 Acceptance Criteria
 
@@ -641,6 +644,8 @@ Field đơn `Settings.dashboardLayout` cũ **giữ nguyên trong schema, không 
 - **AC-11.10 (export/import):** Export JSON → Import lại đúng file đó → `dashboardColWidths` và `dashboardCols` (khớp `spaceId`) khôi phục đúng, không trộn/rơi rớt.
 - **AC-11.11 (build):** `npm run build` + `npx tsc --noEmit` pass sau khi tách field — không còn chỗ nào trong code cũ giả định `Settings.dashboardLayout` là nguồn đọc/ghi duy nhất.
 
+> AC riêng cho ngoại lệ chiều cao khối `settings` — xem mục 11.10.4 (AC-11.10.1 đến AC-11.10.3), không lặp lại ở đây.
+
 ### 11.6 Quyết định nhỏ giao quyền cho `dev` (không chặn code, nêu rõ để không bị coi là tự quyết âm thầm)
 
 - **Tên field chính xác** (`dashboardColWidths`/`dashboardCols`, hay gộp `Settings.dashboard = { colWidths, cols }`) — `dev` chọn theo convention sẵn có trong `types.ts`.
@@ -649,13 +654,13 @@ Field đơn `Settings.dashboardLayout` cũ **giữ nguyên trong schema, không 
 
 ### 11.7 Change impact (mức tính năng)
 
-1. **`src/types.ts`** — tách `Settings.dashboardLayout: DashboardLayout` (giữ nguyên, đổi vai trò fallback lịch sử) thành thêm 2 field mới: `dashboardColWidths: [number, number, number]` và `dashboardCols: Record<string, LayoutSlot[][]>`. Cập nhật lại comment (comment hiện tại nói "dùng chung mọi Space" chỉ còn đúng cho `colWidths`, không còn đúng cho `cols`).
+1. **`src/types.ts`** — tách `Settings.dashboardLayout: DashboardLayout` (giữ nguyên, đổi vai trò fallback lịch sử) thành thêm 2 field mới: `dashboardColWidths: [number, number, number]` và `dashboardCols: Record<string, LayoutSlot[][]>`. Cập nhật lại comment (comment hiện tại nói "dùng chung mọi Space" chỉ còn đúng cho `colWidths`, không còn đúng cho `cols`). Thêm field thứ 3 cho ngoại lệ `settings` — xem mục 11.10.2/11.10.5.
 2. **`src/layout/useDashboardLayout.ts`** — hiện đọc thẳng 1 object `DashboardLayout` (gồm cả `colWidths` lẫn `cols`) từ `state.settings.dashboardLayout`. Cần tách làm 2 luồng đọc độc lập: `colWidths` đọc `settings.dashboardColWidths` (fallback `dashboardLayout.colWidths` → `defaultDashboardLayout().colWidths`, KHÔNG phụ thuộc `currentSpaceId`); `cols` đọc theo `currentSpaceId` với đúng thứ tự fallback đã thiết kế ở mục 3.1 (fallback `dashboardLayout.cols` → `defaultDashboardLayout().cols`). 2 luồng set riêng: `setColWidths` (không kèm `spaceId`) và `setCols` (kèm `spaceId`). Áp dụng lại nguyên vẹn 2 rủi ro implementation đã phát hiện ở mục 9.1/9.6 (dev cũ) — nhưng **chỉ cho phần `cols`** (race-condition đổi Space giữa lúc đang kéo dọc/kéo-thả cần chốt `spaceId` vào ref tại thời điểm bắt đầu thao tác; referential-stability của fallback factory cần memo hoá) — phần `colWidths` không có rủi ro race theo `spaceId` vì không phụ thuộc `spaceId`.
 3. **`src/state/reducers/settings.ts`** — tách `SETTINGS_SET_DASHBOARD_LAYOUT`/`SETTINGS_RESET_DASHBOARD_LAYOUT` hiện có (nếu đã tồn tại từ vòng phân tích trước) hoặc tạo mới thành 2 cặp action riêng: `SETTINGS_SET_COL_WIDTHS` (payload: `colWidths`, ghi thẳng `settings.dashboardColWidths`, không có `spaceId`) và `SETTINGS_SET_DASHBOARD_COLS`/`SETTINGS_RESET_DASHBOARD_COLS` (payload: `{ spaceId, cols }`, ghi đúng 1 entry `dashboardCols[spaceId]`, đúng AC-11.9).
 4. **`src/state/seed.ts`** — `defaultDashboardLayout()` giữ nguyên (vẫn trả về cả `colWidths` lẫn `cols` trong 1 object) — dùng làm nguồn default cho cả 2 field mới (`.colWidths` cho `dashboardColWidths`, `.cols` cho fallback cấp cuối của `dashboardCols`). `defaultSettings()` khởi tạo `dashboardColWidths: defaultDashboardLayout().colWidths` và `dashboardCols: {}`.
 5. **`src/storage/normalize.ts`** — `normalizeSettings()` cần tách xử lý: chuẩn hoá `dashboardColWidths` (1 mảng 3 số, validate tổng ~100%/giới hạn min-max như logic hiện có cho `colWidths`), và chuẩn hoá từng entry trong `dashboardCols` (tái dùng phần validate `cols` hiện có trong `normalizeDashboardLayout()`, factor ra thành hàm dùng chung nếu hợp lý). Giữ nguyên `findLegacyDashboardLayout()`/`legacyDashboardLayout` làm fallback sâu nhất (không đổi, vẫn đúng vai trò cũ).
 6. **`src/features/settings/SettingsModal.tsx`** (nút "Khôi phục bố cục mặc định") — dispatch đổi sang `SETTINGS_RESET_DASHBOARD_COLS` kèm `spaceId` hiện tại, đúng AC-11.9 (không đụng `colWidths`). Nội dung hint (đã sửa 1 lần ở mục 9.3 cho ngữ cảnh Shared Space) cần bổ sung thêm câu giải thích phạm vi `colWidths` (chung mọi Space của bạn) vs `cols` (riêng Space này) — nội dung cụ thể giao `uiux` (mục 11.3).
-7. **`AppLayout.tsx`/`Splitter.tsx`/`dashboardLayoutUtils.ts`** — cơ chế phân biệt 2 loại splitter (splitter cột = đổi `colWidths`; splitter hàng/kéo-thả trong cột = đổi `cols`) **đã tồn tại sẵn** trong code hiện tại (đúng bản chất 2 hàm `resizeColSplitter()`/`resizeRowSplitter()` đã nêu ở mục 9.1 cũ) — chỉ cần đổi đích commit: splitter cột → dispatch `SETTINGS_SET_COL_WIDTHS`; splitter hàng + kéo-thả đổi vị trí → dispatch `SETTINGS_SET_DASHBOARD_COLS` kèm `spaceId`.
+7. **`AppLayout.tsx`/`Splitter.tsx`/`dashboardLayoutUtils.ts`** — cơ chế phân biệt 2 loại splitter (splitter cột = đổi `colWidths`; splitter hàng/kéo-thả trong cột = đổi `cols`) **đã tồn tại sẵn** trong code hiện tại (đúng bản chất 2 hàm `resizeColSplitter()`/`resizeRowSplitter()` đã nêu ở mục 9.1 cũ) — chỉ cần đổi đích commit: splitter cột → dispatch `SETTINGS_SET_COL_WIDTHS`; splitter hàng + kéo-thả đổi vị trí → dispatch `SETTINGS_SET_DASHBOARD_COLS` kèm `spaceId`. **Riêng khi 1 trong 2 slot resize là `settings`** — xem rẽ nhánh bổ sung ở mục 11.10.2.
 8. **`src/state/appReducer.ts`** (`IMPORT_DATA`) — đảm bảo `ExportPayload.settings` export/import đúng cả 2 field mới lẫn field đơn cũ — không cần đổi shape `ExportPayload` (đã export nguyên `settings` object).
 9. **Không đụng `src/storage/sharedSpaceStore.ts`, không đụng schema `kn_shared_spaces`** — cả 2 field mới đều nằm trong `Settings` cấp user (đúng phát hiện kỹ thuật 10.9.0, áp dụng lại nguyên vẹn cho quyết định này).
 10. **`SPACE_CREATE`** (`spacesReducer`) — không cần đổi gì thêm cho `colWidths` (không có khái niệm khởi tạo riêng); `cols` của Space mới tiếp tục dùng cơ chế đọc-fallback có sẵn (không cần ghi entry mới ngay lúc tạo Space, entry chỉ xuất hiện khi user thực sự chỉnh).
@@ -664,6 +669,8 @@ Field đơn `Settings.dashboardLayout` cũ **giữ nguyên trong schema, không 
 ### 11.8 Không còn câu hỏi mở nào chặn code
 
 Toàn bộ câu hỏi mở còn lại (mục 8 câu #2-#5 của vòng phân tích trước) đã được thay thế/trả lời trực tiếp bởi quyết định này (AC-11.9 trả lời câu #2 theo phạm vi mới; câu #4 vẫn giữ nguyên đáp án cũ — mục 9.1; câu #3/#5 vẫn là nice-to-die không chặn, xem 11.6). Câu hỏi #1 (Shared Space) đã chốt từ trước (mục 8), áp dụng nguyên vẹn ở mục 11.2/11.3 (colWidths lẫn cols đều private per-user, không đồng bộ giữa thành viên). Toàn bộ mục 10 (A-F) được coi là **đã đóng, không tiếp tục theo đuổi** — không cần `dev`/`uiux` quay lại đánh giá thêm A-F, chỉ triển khai đúng mục 11.
+
+> Ngoại lệ mục 11.10 (chiều cao khối `settings`) có đúng 1 câu hỏi mở nhỏ CHƯA xác nhận — xem mục 11.10.1 — không chặn code phần còn lại của mục 11, chỉ ảnh hưởng đúng phạm vi khối `settings`.
 
 ---
 
@@ -733,3 +740,55 @@ Lý do:
 - `src/layout/Splitter.tsx`: thêm prop `title: string` (bắt buộc hoặc optional-với-default), set `title`/`aria-label` trên `<div>` gốc.
 - `src/layout/AppLayout.tsx`: truyền `title` tường minh tại đúng 3 vị trí gọi `<Splitter>` theo bảng ở 11.9.4 — **không** derive từ `axis`.
 - Không đụng CSS/màu (`splitter-hidden-line`, `--accent`) — giữ nguyên.
+
+---
+
+## 11.10 Ngoại lệ bổ sung: chiều cao khối `settings` (Điều hướng + Hôm nay) dùng chung mọi Space (chốt 2026-07-08)
+
+> Bổ sung nhỏ vào quyết định đã chốt ở mục 11 — không đảo ngược, không mở rộng phạm vi nào khác ngoài đúng field `h` của 1 `LayoutBlockKey` cụ thể. Yêu cầu trực tiếp từ chủ dự án, không qua vòng đề xuất/phản biện lại từ đầu như mục 10.
+
+### 11.10.1 Yêu cầu và lý do
+
+Khối `settings` (`LayoutBlockKey`, gộp "Điều hướng + Hôm nay", render qua `DashboardCornerBlock.tsx`) **luôn hiển thị ở mọi Space** — không thuộc `enabledBlocks`, không tắt được (đã chốt từ trước, xem comment `src/types.ts` dòng 118-123 và `DashboardCornerBlock.tsx` dòng 26). Theo mục 11.1, `h` của mọi slot (kể cả `settings`) thuộc `dashboardCols[spaceId]` — nghĩa là mặc định `h` của `settings` cũng riêng theo từng Space, giống mọi khối khác.
+
+Chủ dự án yêu cầu: **chiều cao (`h`) của riêng khối `settings` cũng dùng CHUNG cho mọi Space** — cùng nhóm với `dashboardColWidths` (mục 11.1), KHÔNG per-Space. Lý do: nội dung khối này (nav + đồng hồ/ngày/quote) **giống hệt nhau ở mọi Space** — không có lý do gì để mỗi Space có 1 chiều cao khác nhau cho cùng 1 nội dung tĩnh, khác hẳn các khối nội dung khác (Nhật ký nhanh, Ghi chú...) là "khối tuỳ nhu cầu dùng thật sự" — chiều cao khác nhau giữa các Space với các khối đó có ý nghĩa thật (Space chi tiêu cần Nhật ký to, Space khác thì không).
+
+**Phạm vi ngoại lệ — chỉ đúng 1 `LayoutBlockKey`:** áp dụng CHÍNH XÁC cho `id === 'settings'`. KHÔNG áp dụng cho bất kỳ `LayoutBlockKey` nào khác (Task/Note/Log/Reminder/Habits/Notifications) — các khối đó tiếp tục `h` riêng theo Space đúng như mục 11.1/11.5 đã chốt, không đổi. Nếu sau này có thêm 1 khối "luôn hiển thị, không tắt được" khác, đây KHÔNG tự động là tiền lệ áp dụng — cần yêu cầu riêng, không suy rộng ngầm.
+
+### 11.10.2 Lưu trữ đề xuất
+
+Thêm 1 field mới, cùng nhóm dùng-chung với `dashboardColWidths`:
+```
+Settings.dashboardCornerHeight: number   // trọng số h của riêng slot 'settings', dùng chung mọi Space
+```
+
+Khi tính layout hiệu lực của 1 Space (đọc `dashboardCols[spaceId]` theo đúng cơ chế mục 3.1/11.1): bất kỳ slot nào trong `cols` có `id === 'settings'` (dạng `{ type: 'single', id: 'settings', h }` — xem `seed.ts` dòng 35), giá trị `h` lưu trong slot đó **bị bỏ qua khi hiển thị**, thay bằng `dashboardCornerHeight` hiện tại. Đây là bước override đọc-thời-điểm-render, tương tự pattern transform-trước-khi-render `deriveVisibleLayout()` đã có sẵn trong `AppLayout.tsx` (dòng 165-169, dùng cho lọc `enabledBlocks`) — tái dùng đúng pattern kỹ thuật đã tồn tại, không tạo cơ chế mới.
+
+Khi user resize (kéo splitter dọc liền kề khối `settings`): giá trị mới cần ghi vào `dashboardCornerHeight` (dùng chung) thay vì ghi vào entry `dashboardCols[spaceId]` như mọi splitter dọc khác.
+
+**Ghi chú kỹ thuật cần `dev` lưu ý khi hiện thực (nêu ra để không bị bỏ sót, không tự giải chi tiết ở đây — đúng phạm vi tài liệu `ba`, không mở rộng thêm theo yêu cầu):** splitter dọc giữa `settings` và khối liền kề trong cùng cột đổi trọng số **cả 2 slot cùng lúc** (khối này to lên thì khối kia nhỏ đi, tổng `h` không đổi trong cột — cơ chế hiện có, `resizeRowSplitter()`). Khi `h` của `settings` giờ dùng chung còn khối liền kề vẫn per-Space, 1 thao tác kéo sẽ cần ghi vào **2 đích lưu trữ khác nhau cùng lúc** (`dashboardCornerHeight` dùng chung cho phần `settings` + `dashboardCols[spaceId]` riêng Space cho phần khối kia). Đây là chi tiết implementation `dev` cần thiết kế khi viết code (đúng tinh thần mục 6/11.7 — `ba` nêu change impact mức tính năng, không giải chi tiết dòng code).
+
+### 11.10.3 Phạm vi hẹp: chỉ `h` đồng bộ — vị trí vẫn riêng theo Space (giới hạn có chủ đích)
+
+Chỉ **chiều cao** (`h`) của khối `settings` dùng chung. **Vị trí** của khối này — nằm ở cột nào trong 3 cột, đứng trước/sau khối nào trong cùng cột — **vẫn tiếp tục lưu trong `dashboardCols[spaceId]` (riêng theo Space)** như quyết định gốc ở mục 11.1, không mở rộng phạm vi đồng bộ sang vị trí. User vẫn kéo-thả được khối `settings` sang cột khác/vị trí khác riêng ở từng Space nếu muốn — chỉ con số `h` đi theo là giá trị dùng chung.
+
+**Đây là giới hạn phạm vi có chủ đích** (đúng đúng yêu cầu chủ dự án nêu, chỉ "height"), không phải thiếu sót của `ba` — không tự mở rộng thêm sang đồng bộ vị trí dù về mặt kỹ thuật cũng khả thi tương tự.
+
+**Câu hỏi mở cần chủ dự án xác nhận sau (không chặn code, nhưng nên hỏi trước khi giao `dev`):** nếu khối `settings` bị kéo sang cột khác ở 1 Space cụ thể (vd Space A đặt nó ở cột 1, Space B đặt ở cột 3) trong khi `h` vẫn là 1 giá trị dùng chung — có tạo cảm giác kỳ lạ không? Về mặt kỹ thuật, `h` là **trọng số flex tương đối** trong cột (`AppLayout.tsx` dòng 381, `flex: ${slot.h} 1 0`, tính theo tỉ lệ `h / tổng h các khối cùng cột`) — KHÔNG phải kích thước pixel/phần trăm màn hình tuyệt đối, và cũng KHÔNG liên quan tới độ rộng cột (`colWidths`, chỉ ảnh hưởng chiều ngang, không ảnh hưởng chiều cao). Nghĩa là dù con số `h` lưu trữ giống hệt nhau giữa các Space, **chiều cao HIỂN THỊ thực tế** của khối `settings` vẫn phụ thuộc luôn cả tập hợp khối khác đang đứng cùng cột với nó — nếu Space A và Space B có số lượng/trọng số khối khác nhau trong cột chứa `settings`, khối này có thể trông cao thấp khác nhau giữa 2 Space dù `h` lưu trữ y hệt. Cần chủ dự án xác nhận: đây có phải hành vi chấp nhận được (đúng đủ với kỳ vọng "đồng bộ chiều cao"), hay kỳ vọng thực ra là "trông cao giống hệt nhau về mặt thị giác" giữa mọi Space — một kỳ vọng khác, không đạt được chỉ bằng cách đồng bộ con số `h`, cần thêm quyết định riêng nếu đúng vậy (vd khoá cứng `h` không co giãn theo khối lân cận — ngoài phạm vi bổ sung nhỏ này).
+
+### 11.10.4 Migration
+
+- Giá trị `h` của slot `settings` hiện có trong `dashboardLayout.cols` (field đơn cũ, đang là fallback lịch sử — mục 11.4) → copy 1:1 làm giá trị khởi đầu cho `dashboardCornerHeight` mới, đúng tinh thần migration `colWidths` (mục 11.4) — không cần đọc-fallback theo Space nhiều tầng (vì đây là giá trị dùng chung, giống `colWidths`, không phải giá trị per-Space).
+- User hoàn toàn mới (chưa từng có `dashboardLayout` cũ): `dashboardCornerHeight` khởi tạo = `h` của slot `settings` trong `defaultDashboardLayout().cols` (hiện là `22`, xem `seed.ts` dòng 35).
+
+### 11.10.5 Acceptance Criteria
+
+- **AC-11.10.1 (h dùng chung):** Ở Space A, kéo splitter dọc đổi chiều cao khối `settings` → chuyển sang Space B → chiều cao khối `settings` ở Space B **đổi theo giống Space A** (không phải giữ nguyên riêng) — kể cả khi vị trí khối `settings` ở 2 Space khác cột nhau.
+- **AC-11.10.2 (vị trí vẫn riêng Space):** Ở Space A, kéo-thả khối `settings` sang cột/vị trí khác → chuyển sang Space B → vị trí khối `settings` ở Space B **không đổi** theo Space A (đúng nguyên tắc `cols` riêng theo Space, mục 11.1) — chỉ `h` bị chia sẻ, vị trí không.
+- **AC-11.10.3 (không lan sang khối khác):** Đổi `h` của khối `settings` ở 1 Space → `h` của các khối nội dung khác (Task/Note/Log/...) trong `dashboardCols` của MỌI Space **không tự động đổi theo** (ngoại lệ chỉ áp dụng đúng 1 `LayoutBlockKey`, không lan sang khối khác).
+
+### 11.10.6 Change impact bổ sung (không lặp lại mục 11.7)
+
+- Thêm field `Settings.dashboardCornerHeight: number` — cùng nhóm khởi tạo/migrate/normalize/export-import với `dashboardColWidths` (tham chiếu mục 11.7 điểm 1, 4, 5, 8, áp dụng tương tự cho field mới này).
+- `useDashboardLayout.ts`/`AppLayout.tsx`: thêm bước override `h` của slot `id === 'settings'` khi tính layout hiệu lực (đọc), và rẽ nhánh đích ghi khi resize splitter liền kề khối `settings` (ghi) — xem ghi chú kỹ thuật mục 11.10.2.
+- `SettingsModal.tsx` hint (mục 11.9.2) — có thể cần bổ sung 1 câu ngắn giải thích khối "Điều hướng + Hôm nay" luôn cùng chiều cao mọi Space — giao `uiux` quyết định có cần thêm câu hay hint hiện có đã đủ dùng, không phải việc `ba` viết copy cụ thể.

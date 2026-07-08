@@ -12,7 +12,7 @@ import { NotificationsBlock } from '../features/notifications/NotificationsBlock
 import { DashboardCorner } from '../components/DashboardCorner';
 import { DashboardCornerBlock } from '../components/DashboardCornerBlock';
 import { useDashboardLayout } from './useDashboardLayout';
-import { deriveVisibleLayout, getZone, isHeightLocked } from './dashboardLayoutUtils';
+import { deriveVisibleLayout, getZone, isHeightLocked, slotHeightIfContains } from './dashboardLayoutUtils';
 import { Splitter } from './Splitter';
 import { useMediaQuery } from './useMediaQuery';
 import { useMobileLayout } from './useMobileLayout';
@@ -602,18 +602,32 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
             {/* Splitter chiều cao — render TRONG cột vì `top` được tính tương đối theo colRect.top. */}
             {rowSplitters
               .filter((rs) => rs.ci === ci)
-              .map((rs) => (
-                <Splitter
-                  key={`row-${rs.ci}-${rs.si}`}
-                  axis="row"
-                  position={rs.top}
-                  active={
-                    activeSplitter?.kind === 'row' && activeSplitter.ci === rs.origCi && activeSplitter.si === rs.origSiA
-                  }
-                  onMouseDown={onRowSplitterMouseDown(rs.ci, rs.origCi, rs.origSiA, rs.origSiB)}
-                  title="Đổi kích thước khối — chỉ áp dụng cho Space này"
-                />
-              ))}
+              .map((rs) => {
+                // Ngoại lệ mục 11.10: splitter liền kề khối `settings` đổi `h` DÙNG CHUNG mọi
+                // Space (`dashboardCornerHeight`), khác mọi splitter dọc khác (chỉ Space này) —
+                // tra theo layout GỐC (đầy đủ, không phải `visibleLayout`) qua origCi/origSiA/B,
+                // KHÔNG derive từ `rs.ci`/`rs.si` (chỉ số hiển thị).
+                const origCol = layout.cols[rs.origCi];
+                const touchesCornerHeight =
+                  slotHeightIfContains(origCol?.[rs.origSiA], 'settings') != null ||
+                  slotHeightIfContains(origCol?.[rs.origSiB], 'settings') != null;
+                return (
+                  <Splitter
+                    key={`row-${rs.ci}-${rs.si}`}
+                    axis="row"
+                    position={rs.top}
+                    active={
+                      activeSplitter?.kind === 'row' && activeSplitter.ci === rs.origCi && activeSplitter.si === rs.origSiA
+                    }
+                    onMouseDown={onRowSplitterMouseDown(rs.ci, rs.origCi, rs.origSiA, rs.origSiB)}
+                    title={
+                      touchesCornerHeight
+                        ? 'Đổi kích thước khối "Điều hướng + Hôm nay" — áp dụng cho mọi Space của bạn'
+                        : 'Đổi kích thước khối — chỉ áp dụng cho Space này'
+                    }
+                  />
+                );
+              })}
 
             {/* Splitter chiều rộng ghép ngang — render trong slot-row tương ứng (left tính theo slotRect.left). */}
             {subColSplitters
