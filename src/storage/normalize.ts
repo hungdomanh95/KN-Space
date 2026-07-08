@@ -1,4 +1,4 @@
-import type { DashboardLayout, HomeBackground, HomeQuotes, LogEntry, QuoteRotateMode, Settings, Space, UiState } from '../types';
+import type { DashboardLayout, HomeBackground, HomeQuotes, LayoutSlot, LogEntry, QuoteRotateMode, Settings, Space, UiState } from '../types';
 import { defaultDashboardLayout, defaultSettings } from '../state/seed';
 
 /**
@@ -95,10 +95,10 @@ export function normalizeHomeBackground(raw: HomeBackground | undefined, fallbac
 
 const VALID_QUOTE_ROTATE_MODES = new Set<QuoteRotateMode>(['daily', 'onopen', 'every15m', 'every1h']);
 
-/** Mọi `LayoutBlockKey` từng tồn tại trong 1 slot (đơn hoặc ghép ngang) của layout đã lưu. */
-function collectLayoutBlockIds(layout: DashboardLayout): Set<string> {
+/** Mọi `LayoutBlockKey` từng tồn tại trong 1 slot (đơn hoặc ghép ngang) của `cols` đã lưu. */
+function collectLayoutBlockIds(cols: LayoutSlot[][]): Set<string> {
   const ids = new Set<string>();
-  layout.cols.forEach((col) =>
+  cols.forEach((col) =>
     col.forEach((slot) => {
       if (slot.type === 'single') ids.add(slot.id);
       else slot.items.forEach((it) => ids.add(it.id));
@@ -151,13 +151,13 @@ export function findLegacyDashboardLayout(rawSpaces: unknown[]): DashboardLayout
  * này) — nếu sau bước gộp vẫn không tìm thấy `settings` trong layout, tự chèn thêm 1 slot mới
  * (không để Dashboard mất hẳn cách về Home/đổi Space/mở Settings — vi phạm AC3).
  */
-function migrateTodaySettingsMerge(layout: DashboardLayout): DashboardLayout {
-  const ids = collectLayoutBlockIds(layout);
-  if (!ids.has('today')) return layout; // đã ở schema mới hoặc cài đặt mới hoàn toàn (chưa từng có 'today')
+function migrateTodaySettingsMerge(rawCols: LayoutSlot[][]): LayoutSlot[][] {
+  const ids = collectLayoutBlockIds(rawCols);
+  if (!ids.has('today')) return rawCols; // đã ở schema mới hoặc cài đặt mới hoàn toàn (chưa từng có 'today')
 
   // 1. Tìm `h` của slot 'today' cũ (nếu có) để nội suy chiều cao slot gộp.
   let todayH: number | undefined;
-  layout.cols.forEach((col) =>
+  rawCols.forEach((col) =>
     col.forEach((slot) => {
       if (slot.type === 'single' && (slot.id as string) === 'today') todayH = slot.h;
       else if (slot.type === 'row' && slot.items.some((it) => (it.id as string) === 'today')) todayH = slot.h;
@@ -165,7 +165,7 @@ function migrateTodaySettingsMerge(layout: DashboardLayout): DashboardLayout {
   );
 
   // 2. Xoá slot/khối 'today' khỏi layout (deep-clone trước khi sửa, giống removeIdFromLayout).
-  let cols = layout.cols.map((col) => col.map((slot) => (slot.type === 'row' ? { ...slot, items: [...slot.items] } : { ...slot })));
+  let cols = rawCols.map((col) => col.map((slot) => (slot.type === 'row' ? { ...slot, items: [...slot.items] } : { ...slot })));
   for (const col of cols) {
     for (let si = 0; si < col.length; si++) {
       const slot = col[si];
@@ -197,62 +197,125 @@ function migrateTodaySettingsMerge(layout: DashboardLayout): DashboardLayout {
   // 4. Fallback an toàn: không tìm thấy 'settings' ở bước trên (dữ liệu bất thường) -> chèn mới,
   //    không để Dashboard mất hẳn khối điều hướng (vi phạm AC3).
   if (!foundSettings) {
-    cols = cols.map((col, i) => (i === 0 ? [{ type: 'single', id: 'settings', h: todayH ?? 22 } as DashboardLayout['cols'][number][number], ...col] : col));
+    cols = cols.map((col, i) => (i === 0 ? [{ type: 'single', id: 'settings', h: todayH ?? 22 } as LayoutSlot, ...col] : col));
   }
 
-  return { ...layout, cols };
+  return cols;
 }
 
 /**
- * Chuẩn hoá `dashboardLayout` DÙNG CHUNG (xem `Settings.dashboardLayout`). Không viết migration
- * phức tạp từ schema cứng cũ (layoutSizes/mainBlockOrder, dự án giai đoạn cá nhân, quy mô nhỏ),
- * nhưng vẫn cần vá các trường hợp thực tế đã gặp với layout đã lưu HỢP LỆ về cấu trúc nhưng sai
- * dữ liệu:
+ * Layout lưu TRƯỚC khi khối "Nhật ký nhanh" (`logs`) ra đời (xem docs/features/nhat-ky-nhanh.md)
+ * — cấu trúc vẫn hợp lệ nên không rơi về default, nhưng thiếu hẳn khối đó. Vá bằng cách chèn vào
+ * CUỐI cột chứa `notes` (vị trí mặc định đã chốt ở `defaultDashboardLayout()`) nếu chưa có,
+ * không reset toàn bộ layout người dùng đã tự sắp xếp.
+ */
+function patchMissingLogsBlock(rawCols: LayoutSlot[][]): LayoutSlot[][] {
+  if (collectLayoutBlockIds(rawCols).has('logs')) return rawCols;
+  const cols = rawCols.map((col) => col.slice());
+  const notesColIdx = cols.findIndex((col) => col.some((slot) => slot.type === 'single' && slot.id === 'notes'));
+  const targetCi = notesColIdx !== -1 ? notesColIdx : 0;
+  cols[targetCi] = [...cols[targetCi], { type: 'single', id: 'logs', h: 20 } as LayoutSlot];
+  return cols;
+}
+
+/**
+ * Chuẩn hoá `colWidths` — N số, không lệch quá xa 100% (vd do bug resize cộng-dồn-delta cũ
+ * trước khi sửa, đã có người dùng lưu lại layout với 1 cột rộng hàng trăm %) — vì cột dùng
+ * `flex-shrink:0`, tổng vượt 100% làm cột cuối tràn ra ngoài viewport, sát mép phải dù vẫn còn
+ * padding. KHÔNG rescale-giữ-tỉ-lệ ở đây — vì giá trị đã méo (vd 1 cột bị bug đẩy lên 900%, cột
+ * khác bị kẹp xuống sàn tối thiểu 10%) nên chính TỈ LỆ cũng sai, giữ nguyên tỉ lệ vẫn ra layout
+ * lệch (chỉ đỡ tràn). Phát hiện méo thì RESET THẲNG về `fallback` — an toàn hơn, đúng tinh thần
+ * "không migration phức tạp" của dự án giai đoạn này; người dùng resize lại bằng tay sau đó (đã
+ * sửa hết bug resize) là đủ.
  *
- * 1. Layout còn slot `today` cũ (trước khi gộp vào `settings`, 2026-07-08) — xem
- *    `migrateTodaySettingsMerge()` phía trên.
- * 2. Layout lưu TRƯỚC khi khối "Nhật ký nhanh" (`logs`) ra đời — cấu trúc vẫn hợp lệ nên không
- *    rơi về default, nhưng thiếu hẳn khối đó. Vá bằng cách chèn vào cuối cột chứa `notes` (đúng
- *    vị trí mặc định đã chốt) nếu chưa có, không reset toàn bộ layout người dùng đã tự sắp xếp.
- * 3. `colWidths` bị lệch quá xa 100% (vd do bug resize cộng-dồn-delta cũ trước khi sửa, đã có
- *    người dùng lưu lại layout với 1 cột emoji rộng hàng trăm %) — vì cột dùng `flex-shrink:0`,
- *    tổng vượt 100% làm cột cuối tràn ra ngoài viewport, sát mép phải dù vẫn còn padding.
- *    KHÔNG rescale-giữ-tỉ-lệ ở đây — vì giá trị đã méo (vd 1 cột bị bug đẩy lên 900%, cột
- *    khác bị kẹp xuống sàn tối thiểu 10%) nên chính TỈ LỆ cũng sai, giữ nguyên tỉ lệ vẫn ra
- *    layout lệch (chỉ đỡ tràn). Phát hiện méo thì RESET THẲNG về tỉ lệ mặc định — an toàn hơn,
- *    đúng tinh thần "không migration phức tạp" của dự án giai đoạn này; người dùng resize lại
- *    bằng tay sau đó (đã sửa hết bug resize) là đủ.
+ * Dùng chung cho CẢ 2 nơi (2026-07-08, xem docs/features/layout-theo-space.md mục 11.7.5):
+ * `Settings.dashboardColWidths` (field mới, dùng chung mọi Space) VÀ `DashboardLayout.colWidths`
+ * legacy (field `dashboardLayout` cũ, qua `normalizeDashboardLayout`).
+ */
+function normalizeColWidths(raw: unknown, fallback: number[]): number[] {
+  if (!Array.isArray(raw) || raw.length !== fallback.length) return fallback;
+  const widths = raw as number[];
+  const widthSum = widths.reduce((sum, w) => sum + (Number.isFinite(w) ? w : 0), 0);
+  const hasOutlier = widths.some((w) => !Number.isFinite(w) || w > 90);
+  if (widthSum <= 0 || hasOutlier || Math.abs(widthSum - 100) > 1) {
+    return fallback;
+  }
+  return widths;
+}
+
+/**
+ * Chuẩn hoá 1 mảng `cols` (`LayoutSlot[][]`, đúng `colCount` cột) — chạy đúng 2 bước migration
+ * đã có (`migrateTodaySettingsMerge`/`patchMissingLogsBlock`). Không validate sâu hình dạng từng
+ * `LayoutSlot` (giữ đúng mức độ khoan dung đã có từ trước — dự án giai đoạn nhỏ, không viết
+ * migration phức tạp). Dùng chung cho CẢ 2 nơi: `DashboardLayout.cols` legacy (qua
+ * `normalizeDashboardLayout`) VÀ từng entry trong `Settings.dashboardCols[spaceId]` (field mới).
+ */
+function normalizeCols(raw: unknown, colCount: number): LayoutSlot[][] | undefined {
+  if (!Array.isArray(raw) || raw.length !== colCount) return undefined;
+  let cols = raw as LayoutSlot[][];
+  cols = migrateTodaySettingsMerge(cols);
+  cols = patchMissingLogsBlock(cols);
+  return cols;
+}
+
+/**
+ * Chuẩn hoá `dashboardLayout` — field ĐƠN LỊCH SỬ (xem comment `Settings.dashboardLayout` trong
+ * types.ts), vẫn giữ nguyên vai trò fallback đọc cho `dashboardColWidths`/`dashboardCols` mới
+ * (xem `normalizeSettings`/`resolveDashboardCols` phía dưới).
  */
 export function normalizeDashboardLayout(raw: DashboardLayout | undefined): DashboardLayout {
   if (!raw || !Array.isArray(raw.colWidths) || !Array.isArray(raw.cols) || raw.colWidths.length !== raw.cols.length) {
     return defaultDashboardLayout();
   }
+  const fallback = defaultDashboardLayout();
+  const colWidths = normalizeColWidths(raw.colWidths, fallback.colWidths);
+  const cols = normalizeCols(raw.cols, colWidths.length) ?? fallback.cols;
+  return { colWidths, cols };
+}
 
-  let layout = raw;
-
-  const widthSum = layout.colWidths.reduce((sum, w) => sum + (Number.isFinite(w) ? w : 0), 0);
-  const hasOutlier = layout.colWidths.some((w) => !Number.isFinite(w) || w > 90);
-  if (widthSum <= 0 || hasOutlier || Math.abs(widthSum - 100) > 1) {
-    const fallbackWidths = defaultDashboardLayout().colWidths;
-    layout = {
-      ...layout,
-      colWidths: layout.colWidths.map((_, i) => fallbackWidths[i] ?? 100 / layout.colWidths.length),
-    };
+/**
+ * Chuẩn hoá SHAPE của `Settings.dashboardCols` (map `spaceId -> cols`, MỚI 2026-07-08) — chỉ
+ * validate cấu trúc từng entry (`normalizeCols`), KHÔNG suy luận fallback theo 1 `spaceId` cụ thể
+ * nào ở đây (hàm này không biết `currentSpaceId`). Entry hỏng cấu trúc bị BỎ HẲN (không thay bằng
+ * default) — để `resolveDashboardCols()` tự rơi xuống đúng thứ tự fallback khi đọc, thay vì lưu
+ * cứng 1 giá trị default vào đúng key đó (tránh "khoá cứng" 1 Space vào default sớm hơn cần
+ * thiết).
+ */
+function normalizeDashboardColsMap(raw: unknown, colCount: number): Record<string, LayoutSlot[][]> {
+  if (!raw || typeof raw !== 'object') return {};
+  const result: Record<string, LayoutSlot[][]> = {};
+  for (const [spaceId, cols] of Object.entries(raw as Record<string, unknown>)) {
+    const normalized = normalizeCols(cols, colCount);
+    if (normalized) result[spaceId] = normalized;
   }
+  return result;
+}
 
-  layout = migrateTodaySettingsMerge(layout);
-
-  // Layout lưu TRƯỚC khi khối "Nhật ký nhanh" ra đời (2026-07-08, xem docs/features/nhat-ky-nhanh.md)
-  // -> vá bằng cách chèn vào CUỐI cột chứa `notes` (vị trí mặc định đã chốt ở `defaultDashboardLayout()`).
-  if (!collectLayoutBlockIds(layout).has('logs')) {
-    const cols = layout.cols.map((col) => col.slice());
-    const notesColIdx = cols.findIndex((col) => col.some((slot) => slot.type === 'single' && slot.id === 'notes'));
-    const targetCi = notesColIdx !== -1 ? notesColIdx : 0;
-    cols[targetCi] = [...cols[targetCi], { type: 'single', id: 'logs', h: 20 } as DashboardLayout['cols'][number][number]];
-    layout = { ...layout, cols };
-  }
-
-  return layout;
+/**
+ * Đọc `cols` hiệu lực cho 1 Space cụ thể — đúng thứ tự fallback đã chốt SAU khi sửa bug
+ * 2026-07-08 (xem "Bug phát sinh sau Phần 2" trong docs/features/layout-theo-space-progress.md —
+ * Phương án A):
+ *   1. `settings.dashboardCols[spaceId]` — Space này đã từng bị user tự chỉnh riêng (kéo dọc/
+ *      kéo-thả) kể từ khi tính năng "layout riêng theo Space" lên production.
+ *   2. `defaultDashboardLayout().cols` — MỌI trường hợp còn lại (user hoàn toàn mới, HOẶC Space
+ *      chưa từng tự chỉnh riêng từ Phần 2).
+ *
+ * **KHÔNG còn fallback qua `settings.dashboardLayout.cols`** (đã bỏ hẳn, khác thiết kế gốc ở Phần
+ * 1) — field đó là dữ liệu ĐÓNG BĂNG tại đúng thời điểm Phần 2 lên production, có thể mang cấu
+ * trúc cột CŨ/LẠ (nhóm khối khác bố cục hiện hành, từ nhiều đợt migration trước đó) mà không có
+ * cách nào phân biệt "dữ liệu hợp lệ nhưng cũ" với "dữ liệu hỏng" chỉ bằng validate SHAPE — gây bug
+ * vỡ layout thật (Space "MAFC", báo 2026-07-08: 1 cột chỉ chứa `habits` biến mất khi Space tắt
+ * khối này, làm 2 cột còn lại trông như gộp làm 1). Đánh đổi đã chấp nhận: Space chưa từng tự
+ * chỉnh riêng từ Phần 2 sẽ dùng đúng bố cục mặc định hiện hành (1 lần), thay vì âm thầm dùng dữ
+ * liệu đóng băng có thể sai lệch.
+ *
+ * Hàm THUẦN (không dispatch/side-effect nào) — nhận `settings` đã qua `normalizeSettings()` (nên
+ * `dashboardCols` ở đây đã hợp lệ về cấu trúc, không cần validate lại).
+ */
+export function resolveDashboardCols(settings: Settings, spaceId: string): LayoutSlot[][] {
+  const perSpace = settings.dashboardCols?.[spaceId];
+  if (perSpace) return perSpace;
+  return defaultDashboardLayout().cols;
 }
 
 /** Chuẩn hoá `homeQuotes` — migrate dữ liệu cũ chưa có field này (trước khi có tab "Quote"). */
@@ -279,6 +342,14 @@ export function normalizeSettings(
   legacyDashboardLayout?: DashboardLayout,
 ): Settings {
   const fallback = defaultSettings();
+  const dashboardLayout = normalizeDashboardLayout(settings.dashboardLayout ?? legacyDashboardLayout);
+  // Nguồn colCount/fallback DUY NHẤT cho `dashboardColWidths`/`dashboardCols` bên dưới — KHÔNG
+  // dùng `dashboardLayout` (biến ở trên, field lịch sử đã đóng băng) nữa (Phương án A, xem bug
+  // 2026-07-08 trong docs/features/layout-theo-space-progress.md). `dashboardLayout` vẫn được
+  // tính/giữ trong object trả về để không mất field khi export/import (Settings vẫn khai báo bắt
+  // buộc field này), nhưng từ đây trở đi CHỈ dùng làm dữ liệu đọc thô lịch sử, không tham gia suy
+  // luận colCount/giá trị mặc định cho 2 field mới.
+  const defaultLayout = defaultDashboardLayout();
   return {
     theme: settings.theme ?? fallback.theme,
     accent: settings.accent ?? fallback.accent,
@@ -294,7 +365,21 @@ export function normalizeSettings(
       typeof settings.pushNotifySharedSpaceEvents === 'boolean'
         ? settings.pushNotifySharedSpaceEvents
         : fallback.pushNotifySharedSpaceEvents,
-    dashboardLayout: normalizeDashboardLayout(settings.dashboardLayout ?? legacyDashboardLayout),
+    // Field ĐƠN LỊCH SỬ — giữ nguyên (không xoá khỏi schema, vẫn có giá trị hợp lệ để đọc/export
+    // nếu cần), nhưng KHÔNG còn tham gia tính `dashboardColWidths`/`dashboardCols` bên dưới (xem
+    // comment ở `defaultLayout` phía trên + comment `Settings.dashboardLayout` trong types.ts).
+    dashboardLayout,
+    // MỚI (2026-07-08, xem docs/features/layout-theo-space.md mục 11.4) — `colWidths` dùng
+    // chung mọi Space: copy 1:1 từ giá trị đã lưu, fallback THẲNG `defaultDashboardLayout()`
+    // (Phương án A, KHÔNG còn qua `dashboardLayout` cũ — field đó là dữ liệu đóng băng, có thể
+    // lệch khỏi bố cục mặc định hiện hành). Migration diễn ra NGAY TẠI ĐÂY (khác `cols` bên dưới,
+    // đọc-fallback tại chỗ) vì đây chỉ là 1 giá trị đơn, không có vấn đề thứ tự load nhiều Space.
+    dashboardColWidths: normalizeColWidths(settings.dashboardColWidths, defaultLayout.colWidths),
+    // MỚI — `cols` RIÊNG theo từng Space: chỉ chuẩn hoá SHAPE của map ở đây (từng entry hợp lệ
+    // cấu trúc, colCount chuẩn lấy từ `defaultDashboardLayout()` — Phương án A, không còn từ
+    // `dashboardLayout` cũ); fallback theo 1 `spaceId` cụ thể là việc của `resolveDashboardCols()`
+    // (gọi tại nơi biết `currentSpaceId`, xem Phần 2 docs/features/layout-theo-space-progress.md).
+    dashboardCols: normalizeDashboardColsMap(settings.dashboardCols, defaultLayout.colWidths.length),
   };
 }
 

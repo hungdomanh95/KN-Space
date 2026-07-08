@@ -14,7 +14,7 @@ import {
   User,
 } from 'lucide-react';
 import { Modal } from '../../components/Modal';
-import { useAppState } from '../../state/AppStateContext';
+import { useAppState, useCurrentSpace } from '../../state/AppStateContext';
 import { useAuth } from '../../auth/AuthContext';
 import { useConfirm } from '../../components/ConfirmContext';
 import { buildExportPayload, downloadExportFile, parseImportFile } from './exportImport';
@@ -41,6 +41,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
   const { state, dispatch } = useAppState();
   const { session, signOut } = useAuth();
   const showConfirm = useConfirm();
+  const currentSpace = useCurrentSpace();
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [statusMsg, setStatusMsg] = useState('');
   const [statusError, setStatusError] = useState(false);
@@ -224,9 +225,29 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
             <p className="hint mb-2.5 mt-0">
               Kéo-thả khối bất kỳ vào vị trí khác để sắp xếp lại (thả vào giữa khối khác để
               chèn trên/dưới, thả vào mép trái/phải để ghép 2 khối nằm ngang). Kéo đường kẻ ẩn
-              giữa các khối/cột để đổi kích thước.
+              giữa các khối để đổi kích thước — chỉ áp dụng cho Space này. Kéo đường kẻ ẩn giữa
+              2 cột lớn để đổi độ rộng cột — áp dụng cho <strong>mọi Space</strong> của bạn.
+              {currentSpace.isShared && (
+                <>
+                  {' '}
+                  Những gì bạn sắp xếp ở đây (cả kích thước khối lẫn độ rộng cột) chỉ hiển thị
+                  cho riêng bạn trong "{currentSpace.name}" — không ảnh hưởng cách các thành
+                  viên khác nhìn thấy.
+                </>
+              )}
             </p>
-            <button className="btn-ghost" onClick={() => dispatch({ type: 'SETTINGS_RESET_DASHBOARD_LAYOUT' })}>
+            <button
+              className="btn-ghost"
+              title={`Khôi phục bố cục mặc định cho Space "${currentSpace.name}"`}
+              aria-label={`Khôi phục bố cục mặc định cho Space "${currentSpace.name}"`}
+              onClick={() =>
+                showConfirm(
+                  'Khôi phục bố cục mặc định?',
+                  `Bố cục bạn đã sắp xếp riêng cho Space "${currentSpace.name}" sẽ mất, không thể hoàn tác.`,
+                  () => dispatch({ type: 'SETTINGS_RESET_DASHBOARD_COLS', payload: { spaceId: currentSpace.id } }),
+                )
+              }
+            >
               <Repeat className="icon h-3.5 w-3.5" size={14} /> Khôi phục bố cục mặc định
             </button>
           </div>

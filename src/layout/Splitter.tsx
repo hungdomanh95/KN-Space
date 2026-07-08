@@ -7,6 +7,14 @@ interface SplitterProps {
   position: number;
   active: boolean;
   onMouseDown: (e: React.MouseEvent) => void;
+  /**
+   * MỚI (2026-07-08, xem docs/features/layout-theo-space.md mục 11.9.4) — `title`/`aria-label`
+   * gán TƯỜNG MINH tại từng vị trí gọi `<Splitter>` trong AppLayout.tsx, KHÔNG derive từ `axis`:
+   * splitter `axis="col"` có 2 phạm vi lưu trữ khác nhau (subcol ghép-ngang-trong-cột vs cột lớn
+   * ngoài cùng) render y hệt nhau về mặt hình ảnh nhưng khác hẳn phạm vi ảnh hưởng, xem mục
+   * 11.9.3 — bắt buộc truyền đúng theo từng vị trí gọi.
+   */
+  title: string;
 }
 
 /**
@@ -15,7 +23,7 @@ interface SplitterProps {
  * chỉ sáng lên khi hover/đang kéo — port đúng .col-splitter/.row-splitter trong
  * docs/demo-layout-options/index.html.
  */
-export function Splitter({ axis, position, active, onMouseDown }: SplitterProps) {
+export function Splitter({ axis, position, active, onMouseDown, title }: SplitterProps) {
   const isCol = axis === 'col';
   return (
     <div
@@ -24,6 +32,8 @@ export function Splitter({ axis, position, active, onMouseDown }: SplitterProps)
       }`}
       style={isCol ? { left: `${position}px` } : { top: `${position}px` }}
       onMouseDown={onMouseDown}
+      title={title}
+      aria-label={title}
     >
       <span
         className={`splitter-hidden-line pointer-events-none absolute rounded-full bg-transparent transition-[background-color,width,height] duration-150 ${

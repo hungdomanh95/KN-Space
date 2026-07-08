@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAppState } from '../state/AppStateContext';
+import { resolveDashboardCols } from '../storage/normalize';
 import type { DashboardLayout, LayoutBlockKey } from '../types';
 import {
   dropOnColumnEnd,
@@ -19,69 +20,130 @@ export type ActiveSplitter =
  * State + handlers cho layout Dashboard tự do (kéo-thả chèn trên/dưới/ghép ngang + resize
  * splitter ẩn) — port thuật toán từ docs/demo-layout-options/index.html sang React.
  *
- * Bố cục DÙNG CHUNG cho mọi Space (`settings.dashboardLayout`, xem requirements mục 4: "Lưu tỉ
- * lệ layout + thứ tự khối vào storage, dùng chung cho mọi Space") — không còn lưu riêng theo
- * từng Space, nên không cần đồng bộ lại khi đổi Space như trước.
+ * MỚI (2026-07-08, xem docs/features/layout-theo-space.md mục 11 — thay đổi kiến trúc so với
+ * comment cũ nói "dùng chung mọi Space"): `Settings.dashboardLayout` (1 object đơn) đã tách
+ * thành 2 field phạm vi khác nhau:
+ * - `colWidths` (`settings.dashboardColWidths`) — DÙNG CHUNG mọi Space của user, KHÔNG phụ
+ *   thuộc `currentSpaceId`. Đổi Space không đổi khung 3 cột.
+ * - `cols` (`settings.dashboardCols[spaceId]`) — RIÊNG theo TỪNG Space, đọc qua
+ *   `resolveDashboardCols()` (thứ tự fallback SAU bugfix 2026-07-08: entry riêng -> mặc định hệ
+ *   thống — KHÔNG còn qua `dashboardLayout.cols` cũ, xem docs/features/layout-theo-space-
+ *   progress.md mục "Bug phát sinh sau Phần 2"). Đổi Space đổi nội dung bên trong 3 cột.
+ *
+ * Local state `layout` vẫn giữ dạng `DashboardLayout` gộp (colWidths + cols) vì toàn bộ thuật
+ * toán kéo-thả/resize trong `dashboardLayoutUtils.ts` thao tác trên object gộp này — chỉ tách
+ * ra 2 luồng ĐỌC (persistedColWidths/persistedCols) và 2 luồng GHI (SETTINGS_SET_COL_WIDTHS
+ * cho `colWidths`, SETTINGS_SET_DASHBOARD_COLS cho `cols`) ở biên ngoài cùng của hook.
  *
  * Quyết định kỹ thuật khác demo: demo mutate trực tiếp `colsState` và gọi `renderCols()` mỗi
  * lần `mousemove` (vanilla, không qua reducer). Ở đây dùng 1 state LOCAL `layout` (mirror từ
- * `settings.dashboardLayout`) để cập nhật mượt trong lúc kéo-resize, chỉ DISPATCH xuống reducer
- * toàn cục (kéo theo lưu storage) lúc `mouseup` — tránh dispatch/scheduleSave dồn dập theo từng
+ * dữ liệu đã persist) để cập nhật mượt trong lúc kéo-resize, chỉ DISPATCH xuống reducer toàn
+ * cục (kéo theo lưu storage) lúc `mouseup` — tránh dispatch/scheduleSave dồn dập theo từng
  * pixel di chuyển trong lúc kéo (resize có thể bắn hàng chục lần/giây).
  * Kéo-thả đổi vị trí (dropOnTarget/dropOnColumnEnd) ít tần suất hơn (1 lần/lượt thả) nên
  * dispatch ngay khi drop, không cần đợi mouseup riêng.
+ *
+ * Rủi ro implementation đã xử lý (mục 11.7 spec, kế thừa nguyên vẹn từ phân tích trước khi tách
+ * field — chỉ còn áp dụng cho phần `cols`, KHÔNG áp dụng cho `colWidths` vì không khoá spaceId):
+ * 1. Race đổi Space giữa lúc đang kéo dọc/kéo-thả: `pendingColsSpaceIdRef` chốt `currentSpaceId`
+ *    tại thời điểm BẮT ĐẦU thao tác (`beginRowResize`/`beginSubColResize`/`setDraggedId`), dùng
+ *    ref đó khi commit — không đọc `currentSpaceId` sống lúc dispatch (mousedown có thể xảy ra ở
+ *    Space A, user đổi qua Space B giữa chừng lúc đang kéo trước khi mouseup).
+ * 2. `activeKindRef` (row/col/subcol) cũng chốt qua ref cùng lý do: `endResize` có thể được gọi
+ *    từ 1 closure "cũ" (tạo tại render lúc mousedown, TRƯỚC khi `setActiveSplitter` áp dụng) —
+ *    đọc thẳng state `activeSplitter` trong thân `endResize` sẽ luôn thấy giá trị `null` của
+ *    render cũ đó (state update không đồng bộ ngay trong cùng tick). Dùng ref (luôn là 1 object
+ *    duy nhất, `.current` luôn phản ánh giá trị mới nhất bất kể closure nào đọc nó) để tránh bug
+ *    này — cùng kỹ thuật đã dùng cho `layoutRef` từ trước.
+ * 3. Referential-stability của fallback: `resolveDashboardCols()`/object `persistedLayout` được
+ *    bọc `useMemo` — nhánh fallback sâu nhất `defaultDashboardLayout()` là factory (trả object
+ *    MỚI mỗi lần gọi dù nội dung giống hệt); nếu không memo, effect đồng bộ lại `layout` (dep
+ *    `[persistedLayout]`, so sánh reference) sẽ chạy lại ở MỌI re-render dù dữ liệu không đổi.
  */
 export function useDashboardLayout() {
   const { state, dispatch } = useAppState();
-  const persistedLayout = state.settings.dashboardLayout;
+  const currentSpaceId = state.currentSpaceId;
+
+  // `colWidths` — dùng chung mọi Space, không phụ thuộc currentSpaceId.
+  const persistedColWidths = state.settings.dashboardColWidths;
+  // `cols` — riêng theo Space, useMemo để giữ ổn định reference khi rơi vào fallback (xem
+  // rủi ro #3 ở comment trên).
+  const persistedCols = useMemo(
+    () => resolveDashboardCols(state.settings, currentSpaceId),
+    [state.settings.dashboardCols, currentSpaceId],
+  );
+  const persistedLayout = useMemo<DashboardLayout>(
+    () => ({ colWidths: persistedColWidths, cols: persistedCols }),
+    [persistedColWidths, persistedCols],
+  );
+
   const [layout, setLayout] = useState<DashboardLayout>(persistedLayout);
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
-  const [draggedId, setDraggedId] = useState<LayoutBlockKey | null>(null);
+  const [draggedId, setDraggedIdState] = useState<LayoutBlockKey | null>(null);
   const [dragOverTarget, setDragOverTarget] = useState<{ id: LayoutBlockKey; zone: DragZone } | null>(null);
   const [activeSplitter, setActiveSplitter] = useState<ActiveSplitter | null>(null);
 
-  // Đồng bộ lại từ storage khi đổi từ máy khác (chrome.storage.onChanged -> HYDRATE) hoặc sau
-  // khi reset layout — KHÔNG đồng bộ trong lúc đang kéo-resize (draggingRef true) để tránh giật
-  // ngược giá trị đang kéo mượt ở state local.
+  // Đồng bộ lại từ storage khi đổi Space, đổi từ máy khác (load-on-open), hoặc sau khi reset
+  // layout — KHÔNG đồng bộ trong lúc đang kéo-resize (draggingRef true) để tránh giật ngược giá
+  // trị đang kéo mượt ở state local.
   const draggingRef = useRef(false);
   useEffect(() => {
     if (draggingRef.current) return;
     setLayout(persistedLayout);
   }, [persistedLayout]);
 
-  const commit = useCallback(
-    (next: DashboardLayout) => {
-      setLayout(next);
-      dispatch({ type: 'SETTINGS_SET_DASHBOARD_LAYOUT', payload: { layout: next } });
+  // spaceId chốt tại thời điểm BẮT ĐẦU 1 thao tác đổi `cols` (kéo dọc/kéo-thả ghép ngang/kéo-thả
+  // đổi vị trí khối) — xem rủi ro #1 ở comment đầu file.
+  const pendingColsSpaceIdRef = useRef(currentSpaceId);
+  // loại splitter đang active, chốt qua ref cùng thời điểm với `setActiveSplitter` — xem rủi ro
+  // #2 ở comment đầu file (KHÔNG đọc state `activeSplitter` trong `endResize`).
+  const activeKindRef = useRef<ActiveSplitter['kind'] | null>(null);
+
+  const commitCols = useCallback(
+    (nextCols: DashboardLayout['cols'], spaceId: string) => {
+      setLayout((prev) => ({ ...prev, cols: nextCols }));
+      dispatch({ type: 'SETTINGS_SET_DASHBOARD_COLS', payload: { spaceId, cols: nextCols } });
     },
     [dispatch],
   );
 
+  // Wrapper quanh setState gốc: chốt `pendingColsSpaceIdRef` đúng lúc BẮT ĐẦU kéo-thả (dragstart),
+  // trước khi có bất kỳ khoảng thời gian nào user có thể đổi Space giữa chừng.
+  function setDraggedId(id: LayoutBlockKey | null) {
+    if (id != null) pendingColsSpaceIdRef.current = currentSpaceId;
+    setDraggedIdState(id);
+  }
+
   function handleDrop(targetId: LayoutBlockKey, zone: DragZone) {
     if (!draggedId) return;
-    commit(dropOnTarget(layout, draggedId, targetId, zone));
-    setDraggedId(null);
+    commitCols(dropOnTarget(layout, draggedId, targetId, zone).cols, pendingColsSpaceIdRef.current);
+    setDraggedIdState(null);
     setDragOverTarget(null);
   }
 
   function handleDropOnColumn(ci: number) {
     if (!draggedId) return;
-    commit(dropOnColumnEnd(layout, draggedId, ci));
-    setDraggedId(null);
+    commitCols(dropOnColumnEnd(layout, draggedId, ci).cols, pendingColsSpaceIdRef.current);
+    setDraggedIdState(null);
     setDragOverTarget(null);
   }
 
   function beginRowResize(ci: number, si: number) {
     draggingRef.current = true;
+    pendingColsSpaceIdRef.current = currentSpaceId;
+    activeKindRef.current = 'row';
     setActiveSplitter({ kind: 'row', ci, si });
   }
   function beginColResize(ci: number) {
     draggingRef.current = true;
+    activeKindRef.current = 'col';
     setActiveSplitter({ kind: 'col', ci });
   }
   function beginSubColResize(ci: number, si: number) {
     draggingRef.current = true;
+    pendingColsSpaceIdRef.current = currentSpaceId;
+    activeKindRef.current = 'subcol';
     setActiveSplitter({ kind: 'subcol', ci, si });
   }
 
@@ -99,11 +161,21 @@ export function useDashboardLayout() {
 
   function endResize() {
     draggingRef.current = false;
+    const kind = activeKindRef.current;
+    activeKindRef.current = null;
     setActiveSplitter(null);
-    // Commit giá trị local (đã cập nhật mượt trong lúc kéo, đọc qua ref để tránh dispatch
-    // bên trong updater của setState — gây warning "Cannot update a component while
-    // rendering a different component") xuống reducer toàn cục 1 lần.
-    dispatch({ type: 'SETTINGS_SET_DASHBOARD_LAYOUT', payload: { layout: layoutRef.current } });
+    // Commit giá trị local (đã cập nhật mượt trong lúc kéo, đọc qua ref để tránh dispatch bên
+    // trong updater của setState — gây warning "Cannot update a component while rendering a
+    // different component") xuống đúng field tương ứng.
+    if (kind === 'col') {
+      dispatch({ type: 'SETTINGS_SET_COL_WIDTHS', payload: { colWidths: layoutRef.current.colWidths } });
+    } else if (kind === 'row' || kind === 'subcol') {
+      // Dùng spaceId đã chốt lúc begin*Resize — KHÔNG đọc `currentSpaceId` sống ở đây (rủi ro #1).
+      dispatch({
+        type: 'SETTINGS_SET_DASHBOARD_COLS',
+        payload: { spaceId: pendingColsSpaceIdRef.current, cols: layoutRef.current.cols },
+      });
+    }
   }
 
   return {

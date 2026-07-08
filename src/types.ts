@@ -239,12 +239,40 @@ export interface Settings {
    */
   lastOpenedEpochDay: number;
   /**
-   * Bố cục Dashboard — DÙNG CHUNG cho mọi Space (đúng yêu cầu mục 4 requirements.md: "Lưu tỉ lệ
-   * layout + thứ tự khối vào storage, dùng chung cho mọi Space"). Khối nào 1 Space không bật
-   * (`enabledBlocks`) thì tự ẩn khỏi layout lúc render (xem `deriveVisibleLayout`), không cần
-   * layout riêng từng Space — tránh hẳn việc đồng bộ/copy layout giữa các Space.
+   * Bố cục Dashboard — field ĐƠN LỊCH SỬ (trước 2026-07-08), ĐÃ NGỪNG dùng làm nguồn
+   * đọc/fallback cho `dashboardColWidths`/`dashboardCols` bên dưới kể từ bugfix 2026-07-08 (xem
+   * "Bug phát sinh sau Phần 2" trong docs/features/layout-theo-space-progress.md — Phương án A).
+   * Lý do: đây là dữ liệu ĐÓNG BĂNG tại thời điểm tính năng "layout riêng theo Space" lên
+   * production, có thể mang cấu trúc cột CŨ/LẠ không khớp bố cục mặc định hiện hành, gây vỡ layout
+   * khi dùng làm fallback ngầm. Field này **KHÔNG bị xoá khỏi schema** (dữ liệu cũ trong Postgres
+   * của user vẫn còn cột này, xoá field TS không xoá được data thật) và **vẫn được `normalizeSettings`
+   * tính/giữ nguyên trong object trả về** (để không vi phạm kiểu bắt buộc + không mất dữ liệu khi
+   * export/import) — nhưng không còn action nào ghi mới, và không còn nơi nào đọc chủ động để suy
+   * luận colCount/giá trị mặc định. Coi như field "chết" an toàn.
    */
   dashboardLayout: DashboardLayout;
+  /**
+   * Độ rộng 3 cột lớn của Dashboard (%, không cần cộng đúng 100) — MỚI (2026-07-08, xem
+   * docs/features/layout-theo-space.md mục 11.1). DÙNG CHUNG cho MỌI Space của user. Fallback khi
+   * chưa lưu: THẲNG `defaultDashboardLayout().colWidths` (KHÔNG còn qua `dashboardLayout.colWidths`
+   * cũ, xem bugfix 2026-07-08 ở comment `dashboardLayout` phía trên).
+   */
+  dashboardColWidths: number[];
+  /**
+   * Khối nào nằm cột nào/chiều cao bao nhiêu trong Dashboard — MỚI (2026-07-08), RIÊNG theo
+   * TỪNG Space (key = `spaceId`), khác hẳn `dashboardColWidths` phía trên. Space chưa có entry ở
+   * đây (chưa từng bị user tự chỉnh riêng kể từ khi tính năng này lên production) đọc fallback
+   * qua `resolveDashboardCols()` (storage/normalize.ts): THẲNG `defaultDashboardLayout().cols`
+   * (KHÔNG còn qua `dashboardLayout.cols` cũ, xem bugfix 2026-07-08 ở comment `dashboardLayout`
+   * phía trên). KHÔNG eager-write entry cho mọi Space ngay từ đầu (Space cá nhân/Shared Space load
+   * không đồng bộ — xem mục 4.3/11.4 tài liệu trên).
+   *
+   * Áp dụng đúng bài học `enabledBlocks` (docs/features/shared-space.md) — 2 field này PHẢI nằm
+   * trong `Settings` (cấp user), KHÔNG đặt trong `interface Space` — nếu không sẽ tái tạo bug
+   * "layout dùng chung cho mọi thành viên Shared Space", vi phạm nguyên tắc "mỗi thành viên tự
+   * sắp layout riêng" đã chốt.
+   */
+  dashboardCols: Record<string, LayoutSlot[][]>;
   /** Bật/tắt thông báo push cho sự kiện Shared Space (giao việc/hoàn thành) — độc lập với thông báo đến hạn. */
   pushNotifySharedSpaceEvents: boolean;
 }

@@ -2,6 +2,7 @@ import type {
   CollapsedBlocks,
   DashboardLayout,
   HomeBgAutoRotateMs,
+  LayoutSlot,
   NoteView,
   QuoteRotateMode,
   Settings,
@@ -25,8 +26,19 @@ export type SettingsAction =
   | { type: 'SETTINGS_HOME_QUOTE_ROTATE_NEXT' }
   | { type: 'BLOCK_TOGGLE_COLLAPSED'; payload: { key: keyof CollapsedBlocks } }
   | { type: 'NOTE_SET_VIEW'; payload: { view: NoteView } }
+  // LỊCH SỬ (trước 2026-07-08, xem docs/features/layout-theo-space.md mục 11) — set/reset TOÀN
+  // BỘ `dashboardLayout` (colWidths + cols) trong 1 lần, dùng chung mọi Space. Từ khi Phần 2
+  // (useDashboardLayout.ts/AppLayout.tsx/SettingsModal.tsx) chuyển hẳn sang dùng 2 action mới bên
+  // dưới, KHÔNG còn nơi nào trong UI dispatch 2 action này nữa — giữ lại dead-but-typed (không
+  // xoá) để có đường lùi tạm thời, xem Phần 3 docs/features/layout-theo-space-progress.md.
   | { type: 'SETTINGS_SET_DASHBOARD_LAYOUT'; payload: { layout: DashboardLayout } }
   | { type: 'SETTINGS_RESET_DASHBOARD_LAYOUT' }
+  // MỚI (2026-07-08) — tách theo đúng 2 phạm vi mục 11.1: colWidths (không kèm spaceId, dùng
+  // chung mọi Space) và cols (kèm spaceId, riêng theo Space). Xem AC-11.9: nút "Khôi phục mặc
+  // định" chỉ reset `cols` của Space đang mở, không đụng `colWidths`.
+  | { type: 'SETTINGS_SET_COL_WIDTHS'; payload: { colWidths: number[] } }
+  | { type: 'SETTINGS_SET_DASHBOARD_COLS'; payload: { spaceId: string; cols: LayoutSlot[][] } }
+  | { type: 'SETTINGS_RESET_DASHBOARD_COLS'; payload: { spaceId: string } }
   | { type: 'SETTINGS_SET_PUSH_NOTIFY_SHARED_EVENTS'; payload: { enabled: boolean } };
 
 export function settingsReducer(settings: Settings, action: SettingsAction): Settings {
@@ -100,6 +112,18 @@ export function settingsReducer(settings: Settings, action: SettingsAction): Set
       return { ...settings, dashboardLayout: action.payload.layout };
     case 'SETTINGS_RESET_DASHBOARD_LAYOUT':
       return { ...settings, dashboardLayout: defaultDashboardLayout() };
+    case 'SETTINGS_SET_COL_WIDTHS':
+      return { ...settings, dashboardColWidths: action.payload.colWidths };
+    case 'SETTINGS_SET_DASHBOARD_COLS':
+      return {
+        ...settings,
+        dashboardCols: { ...settings.dashboardCols, [action.payload.spaceId]: action.payload.cols },
+      };
+    case 'SETTINGS_RESET_DASHBOARD_COLS':
+      return {
+        ...settings,
+        dashboardCols: { ...settings.dashboardCols, [action.payload.spaceId]: defaultDashboardLayout().cols },
+      };
     case 'SETTINGS_SET_PUSH_NOTIFY_SHARED_EVENTS':
       return { ...settings, pushNotifySharedSpaceEvents: action.payload.enabled };
     default:

@@ -611,6 +611,7 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
                     activeSplitter?.kind === 'row' && activeSplitter.ci === rs.origCi && activeSplitter.si === rs.origSiA
                   }
                   onMouseDown={onRowSplitterMouseDown(rs.ci, rs.origCi, rs.origSiA, rs.origSiB)}
+                  title="Đổi kích thước khối — chỉ áp dụng cho Space này"
                 />
               ))}
 
@@ -631,6 +632,7 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
                         activeSplitter.si === sc.origSi
                       }
                       onMouseDown={onSubColSplitterMouseDown(sc.ci, sc.si, sc.origCi, sc.origSi)}
+                      title="Đổi kích thước khối — chỉ áp dụng cho Space này"
                     />
                   </SubColSplitterPortal>
                 );
@@ -647,6 +649,7 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
             position={left}
             active={activeSplitter?.kind === 'col' && activeSplitter.ci === origCiA}
             onMouseDown={onColSplitterMouseDown(origCiA, origCiB)}
+            title="Đổi độ rộng cột — áp dụng cho mọi Space của bạn"
           />
         ))}
       </div>

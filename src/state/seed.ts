@@ -63,6 +63,11 @@ export function defaultSettings(): Settings {
     // (ngay sau seed, cùng lượt) không snap lại lần nữa một cách dư thừa.
     lastOpenedEpochDay: epochDay(),
     dashboardLayout: defaultDashboardLayout(),
+    // MỚI (2026-07-08, xem docs/features/layout-theo-space.md mục 11.4): user hoàn toàn mới
+    // (chưa từng có `dashboardLayout` cũ) -> colWidths lấy đúng default, cols khởi tạo RỖNG (mọi
+    // Space fallback qua `resolveDashboardCols()` về `defaultDashboardLayout().cols`).
+    dashboardColWidths: defaultDashboardLayout().colWidths,
+    dashboardCols: {},
     pushNotifySharedSpaceEvents: true,
   };
 }
