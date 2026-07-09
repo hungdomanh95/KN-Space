@@ -60,15 +60,19 @@ export type ActiveSplitter =
  *    bọc `useMemo` — nhánh fallback sâu nhất `defaultDashboardLayout()` là factory (trả object
  *    MỚI mỗi lần gọi dù nội dung giống hệt); nếu không memo, effect đồng bộ lại `layout` (dep
  *    `[persistedLayout]`, so sánh reference) sẽ chạy lại ở MỌI re-render dù dữ liệu không đổi.
- * 4. Ngoại lệ mục 11.10 (chiều cao khối `settings` dùng CHUNG mọi Space, `settings.
- *    dashboardCornerHeight`, khác `h` mọi khối khác vẫn riêng theo Space): `resolveDashboardCols()`
- *    đã tự OVERRIDE giá trị này khi ĐỌC (xem storage/normalize.ts) nên `persistedCols`/`layout`
+ * 4. Ngoại lệ mục 11.10 (chiều cao khối `settings`/`reminders` dùng CHUNG mọi Space —
+ *    `settings.dashboardCornerHeight`/`settings.dashboardReminderHeight`, MỞ RỘNG 2026-07-09 sang
+ *    cả `reminders` — khác `h` mọi khối khác vẫn riêng theo Space): `resolveDashboardCols()` đã tự
+ *    OVERRIDE cả 2 giá trị này khi ĐỌC (xem storage/normalize.ts) nên `persistedCols`/`layout`
  *    local ở hook này luôn phản ánh đúng, không cần xử lý gì thêm ở phần đọc. Phần GHI mới cần
- *    thêm ở đây: khi kết thúc splitter DỌC (`row`, đổi `h`) liền kề khối `settings`, `endResize`
- *    dispatch THÊM `SETTINGS_SET_CORNER_HEIGHT` (không kèm `spaceId`) SONG SONG với
- *    `SETTINGS_SET_DASHBOARD_COLS` bình thường (đã ghi đúng `h` của khối CÒN LẠI theo Space) — 1
- *    thao tác kéo, 2 đích lưu trữ khác nhau. `subcol` (đổi `w`, không đổi `h`) không liên quan
- *    ngoại lệ này dù khối `settings` có thể tham gia ghép ngang.
+ *    thêm ở đây: khi kết thúc splitter DỌC (`row`, đổi `h`) liền kề 1 trong 2 khối này, `endResize`
+ *    dispatch THÊM `SETTINGS_SET_CORNER_HEIGHT`/`SETTINGS_SET_REMINDER_HEIGHT` (không kèm
+ *    `spaceId`, độc lập nhau — 1 slot chỉ khớp đúng 1 trong 2) SONG SONG với
+ *    `SETTINGS_SET_DASHBOARD_COLS` bình thường (vẫn ghi luôn cả `h` của 2 khối này vào entry
+ *    per-Space — vô hại vì luôn bị override khi đọc, chỉ 2 dispatch bổ sung mới là nguồn giá trị
+ *    thật) — 1 thao tác kéo giữa `settings`/`reminders` có thể ra 3 dispatch cùng lúc
+ *    (`SETTINGS_SET_DASHBOARD_COLS` + cả 2 action dùng-chung). `subcol` (đổi `w`, không đổi `h`)
+ *    không liên quan ngoại lệ này dù 2 khối trên có thể tham gia ghép ngang.
  */
 export function useDashboardLayout() {
   const { state, dispatch } = useAppState();
@@ -80,10 +84,11 @@ export function useDashboardLayout() {
   // rủi ro #3 ở comment trên).
   const persistedCols = useMemo(
     () => resolveDashboardCols(state.settings, currentSpaceId),
-    // `dashboardCornerHeight` PHẢI có trong deps — `resolveDashboardCols()` override `h` của
-    // khối `settings` bằng giá trị này (mục 11.10); thiếu dep sẽ khiến đổi chiều cao khối
-    // `settings` ở nơi khác (vd sau reload/từ máy khác) không kích hoạt tính lại `persistedCols`.
-    [state.settings.dashboardCols, state.settings.dashboardCornerHeight, currentSpaceId],
+    // `dashboardCornerHeight`/`dashboardReminderHeight` PHẢI có trong deps — `resolveDashboardCols()`
+    // override `h` của khối `settings`/`reminders` bằng 2 giá trị này (mục 11.10, mở rộng
+    // 2026-07-09); thiếu dep sẽ khiến đổi chiều cao 2 khối này ở nơi khác (vd sau reload/từ máy
+    // khác) không kích hoạt tính lại `persistedCols`.
+    [state.settings.dashboardCols, state.settings.dashboardCornerHeight, state.settings.dashboardReminderHeight, currentSpaceId],
   );
   const persistedLayout = useMemo<DashboardLayout>(
     () => ({ colWidths: persistedColWidths, cols: persistedCols }),
@@ -192,25 +197,33 @@ export function useDashboardLayout() {
 
     // row hoặc subcol -> cols riêng theo Space, dùng spaceId đã chốt lúc begin*Resize — KHÔNG đọc
     // `currentSpaceId` sống ở đây (rủi ro #1). Đúng ngay cả khi 1 trong 2 slot resize là
-    // `settings` — VỊ TRÍ khối này vẫn riêng theo Space (mục 11.10.3), chỉ `h` là ngoại lệ dùng
-    // chung. `h` của slot `settings` lưu trong entry này có thể tạm thời khác
-    // `dashboardCornerHeight` — vô hại, luôn bị override khi đọc (`resolveDashboardCols`).
+    // `settings`/`reminders` — VỊ TRÍ 2 khối này vẫn riêng theo Space (mục 11.10.3), chỉ `h` là
+    // ngoại lệ dùng chung. `h` của 2 slot này lưu trong entry này có thể tạm thời khác
+    // `dashboardCornerHeight`/`dashboardReminderHeight` — vô hại, luôn bị override khi đọc
+    // (`resolveDashboardCols`).
     dispatch({
       type: 'SETTINGS_SET_DASHBOARD_COLS',
       payload: { spaceId: pendingColsSpaceIdRef.current, cols: layoutRef.current.cols },
     });
 
-    // Ngoại lệ mục 11.10 — splitter DỌC (row, đổi `h`) liền kề khối `settings`: ghi THÊM `h` mới
-    // vào field DÙNG CHUNG `dashboardCornerHeight`, tách biệt khỏi entry per-Space vừa ghi ở
-    // trên (1 thao tác kéo -> 2 đích lưu trữ khác nhau, xem comment đầu file điểm 4). `subcol`
-    // đổi `w` (không đổi `h`) nên không liên quan tới ngoại lệ này dù `settings` có thể tham gia
-    // ghép ngang.
+    // Ngoại lệ mục 11.10 (MỞ RỘNG 2026-07-09 — cả 2 khối) — splitter DỌC (row, đổi `h`) liền kề
+    // `settings`/`reminders`: ghi THÊM `h` mới vào field DÙNG CHUNG tương ứng, tách biệt khỏi
+    // entry per-Space vừa ghi ở trên (1 thao tác kéo -> tối đa 3 đích lưu trữ, xem comment đầu file
+    // điểm 4). 2 khối kiểm tra ĐỘC LẬP (không phải else-if) — 1 slot chỉ khớp đúng 1 trong 2 id nên
+    // không xung đột, nhưng viết tách riêng để đúng với khả năng slot A/B đổi vai trò tuỳ layout
+    // thực tế của Space đó. `subcol` đổi `w` (không đổi `h`) nên không liên quan tới ngoại lệ này
+    // dù 2 khối trên có thể tham gia ghép ngang.
     if (active.kind === 'row') {
       const col = layoutRef.current.cols[active.ci];
       const cornerH =
         slotHeightIfContains(col?.[active.si], 'settings') ?? slotHeightIfContains(col?.[active.si + 1], 'settings');
       if (cornerH != null) {
         dispatch({ type: 'SETTINGS_SET_CORNER_HEIGHT', payload: { h: cornerH } });
+      }
+      const reminderH =
+        slotHeightIfContains(col?.[active.si], 'reminders') ?? slotHeightIfContains(col?.[active.si + 1], 'reminders');
+      if (reminderH != null) {
+        dispatch({ type: 'SETTINGS_SET_REMINDER_HEIGHT', payload: { h: reminderH } });
       }
     }
   }

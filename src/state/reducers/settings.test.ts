@@ -64,6 +64,32 @@ describe('settingsReducer — SETTINGS_SET_CORNER_HEIGHT (mục 11.10, ngoại l
   });
 });
 
+// MỚI (2026-07-09, mục 11.10 MỞ RỘNG) — cặp đôi với SETTINGS_SET_CORNER_HEIGHT, cho khối
+// `reminders` (Thông báo) cũng LUÔN hiển thị mọi Space, không tắt được (y hệt lý do `settings`).
+describe('settingsReducer — SETTINGS_SET_REMINDER_HEIGHT (mục 11.10 mở rộng, ngoại lệ h khối reminders)', () => {
+  it('ghi thẳng dashboardReminderHeight, không kèm spaceId, không đụng dashboardCols/colWidths/dashboardCornerHeight', () => {
+    const initial = defaultSettings();
+    const next = settingsReducer(initial, { type: 'SETTINGS_SET_REMINDER_HEIGHT', payload: { h: 80 } });
+    expect(next.dashboardReminderHeight).toBe(80);
+    expect(next.dashboardCols).toBe(initial.dashboardCols);
+    expect(next.dashboardColWidths).toBe(initial.dashboardColWidths);
+    expect(next.dashboardCornerHeight).toBe(initial.dashboardCornerHeight);
+  });
+
+  it('đổi dashboardReminderHeight không phụ thuộc Space nào — 1 giá trị duy nhất, ghi đè lần sau thắng lần trước', () => {
+    let state = settingsReducer(defaultSettings(), { type: 'SETTINGS_SET_REMINDER_HEIGHT', payload: { h: 60 } });
+    state = settingsReducer(state, { type: 'SETTINGS_SET_REMINDER_HEIGHT', payload: { h: 75 } });
+    expect(state.dashboardReminderHeight).toBe(75);
+  });
+
+  it('SETTINGS_SET_CORNER_HEIGHT và SETTINGS_SET_REMINDER_HEIGHT độc lập nhau, không đè lẫn nhau', () => {
+    let state = settingsReducer(defaultSettings(), { type: 'SETTINGS_SET_CORNER_HEIGHT', payload: { h: 30 } });
+    state = settingsReducer(state, { type: 'SETTINGS_SET_REMINDER_HEIGHT', payload: { h: 60 } });
+    expect(state.dashboardCornerHeight).toBe(30);
+    expect(state.dashboardReminderHeight).toBe(60);
+  });
+});
+
 describe('settingsReducer — SETTINGS_RESET_DASHBOARD_COLS', () => {
   it('chỉ reset dashboardCols[spaceId] về default, không đụng colWidths lẫn Space khác (AC-11.9)', () => {
     const customCols: LayoutSlot[][] = [[{ type: 'single', id: 'notes', h: 99 }], [], []];

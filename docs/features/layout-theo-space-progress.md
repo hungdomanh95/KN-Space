@@ -480,6 +480,120 @@ cùng để chủ dự án biết và có thể yêu cầu đổi lại nếu kh
 
 ---
 
+## Mục 11.10 mở rộng — áp dụng thêm cho khối `reminders` (Thông báo) (2026-07-09)
+
+Trạng thái: ✅ Xong (2026-07-09)
+
+**Đây là SỬA LẠI PHẠM VI theo yêu cầu chủ dự án, KHÔNG PHẢI bug fix.** Bản 11.10 gốc (2026-07-08,
+xem mục trên) chỉ áp dụng "chiều cao dùng chung mọi Space" cho đúng 1 khối `settings`. Chủ dự án
+xác nhận lại (2026-07-09): khối `reminders` (Thông báo) **cũng LUÔN hiển thị mọi Space, không tắt
+được** — cùng điều kiện đã dùng để quyết định cho `settings` ở mục 11.10.1 (xem comment gốc trong
+`AppLayout.tsx`: "`reminders` (Thông báo) và `settings` (DashboardCorner) LUÔN hiển thị, không
+tắt") — nên PHẢI áp dụng cơ chế dùng-chung y hệt cho cả 2 khối, không chỉ 1. Bản trước đó hiểu sai
+phạm vi (tưởng chỉ `settings` mới cần), gây thiếu — nay bổ sung. Xem spec đầy đủ tại
+`docs/features/layout-theo-space.md` mục 11.10.7.
+
+### Đã làm
+
+- **`src/types.ts`** — thêm `Settings.dashboardReminderHeight: number`, cặp đôi với
+  `dashboardCornerHeight`, comment giải thích rõ lý do TÁCH 2 field độc lập thay vì suy ra
+  `reminders.h = 100 - dashboardCornerHeight` (xem quyết định kỹ thuật bên dưới).
+- **`src/state/seed.ts`** — generalize `findSettingsCornerHeight(cols, fallback)` thành hàm dùng
+  chung `findSlotHeight(cols, id, fallback)`; `findSettingsCornerHeight`/`findReminderHeight` giờ
+  là 2 wrapper mỏng gọi hàm chung (giữ tên cũ cho các nơi gọi/test đã có, không phá API).
+  `defaultSettings()` khởi tạo thêm `dashboardReminderHeight: findReminderHeight(defaultDashboardLayout().cols)`.
+- **`src/storage/normalize.ts`**:
+  - `normalizeCornerHeight` đổi tên thành `normalizeGlobalSlotHeight(raw, fallback)` (logic validate
+    y hệt, dùng chung cho cả 2 field, không phải viết lại).
+  - `overrideCornerHeight(cols, cornerHeight)` đổi thành `overrideSlotHeights(cols, overrides)` —
+    nhận `Partial<Record<LayoutBlockKey, number>>`, override MỌI slot khớp bất kỳ id nào trong
+    `overrides` trong 1 lượt duyệt `cols` (thay vì gọi hàm riêng 2 lần — đỡ duyệt mảng 2 lượt, và dễ
+    mở rộng thêm khối "luôn hiện" khác sau này nếu có).
+  - `resolveDashboardCols()` gọi `overrideSlotHeights(cols, { settings: ..., reminders: ... })` — cả
+    2 khối cùng bị override khi đọc, áp dụng cho MỌI Space.
+  - `normalizeSettings()` tính thêm `dashboardReminderHeight` — cùng pattern
+    `dashboardCornerHeight` (KHÔNG migrate qua `dashboardLayout` cũ, lý do y hệt — xem comment tại
+    chỗ).
+- **`src/state/reducers/settings.ts`** — thêm action `SETTINGS_SET_REMINDER_HEIGHT` (payload `{ h }`,
+  không kèm `spaceId`), reducer case y hệt `SETTINGS_SET_CORNER_HEIGHT`.
+- **`src/state/appReducer.ts`** — thêm `SETTINGS_SET_REMINDER_HEIGHT` vào `SETTINGS_ACTION_TYPES`
+  (bắt buộc — thiếu sẽ khiến action này không kích hoạt lưu Supabase debounce).
+- **`src/layout/useDashboardLayout.ts`**:
+  - `persistedCols` useMemo — thêm `state.settings.dashboardReminderHeight` vào dependency array
+    (song song `dashboardCornerHeight` đã có).
+  - `endResize` — sau khi kiểm tra slot resize có chứa `settings` (dispatch
+    `SETTINGS_SET_CORNER_HEIGHT`), kiểm tra ĐỘC LẬP thêm slot có chứa `reminders` không (dispatch
+    `SETTINGS_SET_REMINDER_HEIGHT`) — 2 kiểm tra tách rời (không phải else-if) vì 1 slot chỉ khớp
+    đúng 1 trong 2 id, không xung đột; 1 lượt kéo splitter giữa 2 khối này giờ có thể ra tối đa 3
+    dispatch (`SETTINGS_SET_DASHBOARD_COLS` + cả 2 action dùng-chung).
+- **`src/layout/AppLayout.tsx`** — `touchesCornerHeight` đổi tên `touchesGlobalHeight`, kiểm tra
+  thêm slot có chứa `reminders` (ngoài `settings` đã có). Title tooltip đổi từ nhắc tên cụ thể
+  `"Điều hướng + Hôm nay"` sang generic `"Đổi kích thước khối — áp dụng cho mọi Space của bạn"` (vì
+  giờ splitter có thể chỉ liền kề `reminders`, không nhất thiết liền kề `settings`).
+- Test cập nhật: `src/__tests__/normalize.test.ts` — 2 describe cũ (`dashboardCornerHeight` cho
+  `normalizeSettings`, override `h` trong `resolveDashboardCols`) sửa lại assertion (trước đó khẳng
+  định `reminders` "không bị đụng" — nay SAI vì `reminders` giờ CŨNG bị override, đã sửa) + thêm
+  describe mới mirror hệt cho `dashboardReminderHeight`. `src/state/reducers/settings.test.ts` —
+  thêm describe `SETTINGS_SET_REMINDER_HEIGHT` (3 test case, gồm 1 test xác nhận 2 action
+  `CORNER_HEIGHT`/`REMINDER_HEIGHT` độc lập, không đè lẫn nhau).
+- `npx tsc --noEmit`, `npm run build`, `npx vitest run` — pass hết (115 test, 9 file — tăng 7 so
+  với 108 trước đó).
+
+### Quyết định kỹ thuật tự đưa ra khi code (ghi rõ, chưa hỏi lại trước khi làm)
+
+**Tách 2 field độc lập (`dashboardCornerHeight` + `dashboardReminderHeight`) thay vì 1 field duy
+nhất suy-bù (`reminders.h = 100 - dashboardCornerHeight`):** đã cân nhắc theo đúng yêu cầu mục 7 —
+kiểm tra kỹ cách `h` được dùng trong CSS thật trước khi quyết định (`AppLayout.tsx` dòng ~381:
+`flex: ${slot.h} 1 0` — flex-basis 0, `h` chỉ là TRỌNG SỐ FLEX-GROW tương đối giữa các khối cùng
+cột, KHÔNG phải phần trăm tuyệt đối bắt buộc cộng đúng 100). Bằng chứng ngay trong
+`defaultDashboardLayout()` có sẵn: cột 1 (`notes` h=62 + `logs` h=20) tổng = 82, không phải 100, vẫn
+hiển thị đúng vì chỉ là tỉ lệ. Khác hẳn `dashboardColWidths` (dùng `flex: 0 1 W%` — W% là kích thước
+THẬT theo % viewport, cộng lệch 100% từng gây bug tràn/hụt cột thấy rõ, đã phải viết hẳn
+`normalizeColWidths()` để RESET THẲNG về default khi phát hiện méo).
+
+Vì vậy 2 field độc lập **không cần thêm logic chuẩn hoá "đảm bảo tổng luôn ra 100"** như lo ngại nêu
+ở yêu cầu — trôi lệch tổng qua nhiều lần resize (nếu có xảy ra) chỉ đổi TỈ LỆ hiển thị tương đối
+giữa 2 khối, không gây lỗi tràn/mất UI. Hướng 2-field cũng an toàn hơn hướng suy-bù về lâu dài: hướng
+suy-bù (`reminders.h = 100 - dashboardCornerHeight`) ngầm giả định cứng "cột chứa `settings` luôn
+đúng 2 khối" ngay trong logic TÍNH giá trị field — nếu sau này có nhu cầu cho phép kéo-thả thêm khối
+thứ 3 vào cột đó (dù hiện tại UI chưa hỗ trợ), giả định này sẽ sai âm thầm. Hướng 2-field không phụ
+thuộc giả định đó, mỗi field override đúng 1 `LayoutBlockKey` độc lập, nhất quán với chính bản 11.10
+gốc.
+
+**Đây là quyết định tự đưa ra khi code (đúng phạm vi câu hỏi mở mục 7 của yêu cầu, đã có hướng dẫn
+"tự quyết, ghi rõ lý do")** — nêu ở đây để chủ dự án biết, có thể yêu cầu đổi lại nếu không đồng ý.
+
+### Cách test Mục 11.10 mở rộng (tay, trên trình duyệt)
+
+1. **Tự động trước:**
+   ```
+   npx tsc --noEmit
+   npm run build
+   npx vitest run
+   ```
+   Kỳ vọng: pass hết, `vitest run` báo `115 tests passed`.
+
+2. **Đổi Space → CẢ 2 khối (Điều hướng + Hôm nay, VÀ Thông báo) cùng cao giống nhau:** mở Space A,
+   kéo splitter DỌC giữa khối "Điều hướng + Hôm nay" và khối "Thông báo" (đổi chiều cao 2 khối này)
+   → chuyển sang Space B (kể cả Space B có bố cục/vị trí khác hẳn A, hoặc chưa từng tự chỉnh riêng)
+   → xác nhận CẢ 2 khối ở Space B hiện đúng **chiều cao mới giống Space A** — khác bản 11.10 gốc
+   (trước đó chỉ khối "Điều hướng + Hôm nay" đồng bộ, khối "Thông báo" vẫn tính bù riêng theo Space).
+3. **Vị trí vẫn riêng theo Space:** kéo-thả khối "Thông báo" (hoặc "Điều hướng + Hôm nay") sang cột/
+   vị trí khác ở Space A → chuyển sang Space B → xác nhận vị trí khối đó ở Space B **không đổi
+   theo** A (chỉ chiều cao dùng chung, vị trí vẫn riêng).
+4. **Hover tooltip:** hover vào đường kẻ ẩn giữa khối "Điều hướng + Hôm nay" và "Thông báo" → tooltip
+   hiện `Đổi kích thước khối — áp dụng cho mọi Space của bạn` (đổi cách diễn đạt so với bản trước,
+   không còn nhắc tên cụ thể 1 khối, vì giờ splitter có thể liền kề `reminders` mà không liền kề
+   `settings`).
+5. **Reload (F5)** sau bước 2 — mở lại đúng Space đang mở → xác nhận chiều cao CẢ 2 khối vẫn đúng
+   giá trị chung đã chỉnh (không mất). Có thể xác nhận qua Supabase Table Editor: bảng
+   `kn_space_state` → cột `settings` (jsonb) → thấy CẢ `dashboardCornerHeight` LẪN
+   `dashboardReminderHeight` xuất hiện, không khoá theo `spaceId`.
+6. **Nút "Khôi phục bố cục mặc định"** — bấm cho 1 Space bất kỳ → xác nhận chiều cao CẢ 2 khối
+   KHÔNG bị reset (đúng vì cả 2 field không thuộc phạm vi nút này).
+
+---
+
 ### Cách test tay bug này (đã sửa)
 
 1. **Space "MAFC" (Space bị lỗi trong ảnh chụp màn hình user gửi):**

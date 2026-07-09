@@ -1,4 +1,4 @@
-import type { DashboardLayout, HomeBgSlot, LayoutSlot, Settings, Space } from '../types';
+import type { DashboardLayout, HomeBgSlot, LayoutBlockKey, LayoutSlot, Settings, Space } from '../types';
 import { DEFAULT_HOME_IMAGES, HOME_QUOTES, dayIndex, epochDay } from '../features/home/homeContent';
 
 /**
@@ -40,20 +40,31 @@ export function defaultDashboardLayout(): DashboardLayout {
 }
 
 /**
- * `h` hiện tại của slot `id === 'settings'` trong 1 mảng `cols` — dùng làm giá trị khởi tạo/
- * migrate cho `Settings.dashboardCornerHeight` (mục 11.10, docs/features/layout-theo-space.md).
- * Viết thành hàm thay vì hard-code lại số `22` để không lệch pha nếu `defaultDashboardLayout()`
- * sau này đổi giá trị mặc định. Trả `fallback` nếu không tìm thấy slot nào chứa khối này (lưới
- * an toàn — không nên xảy ra với dữ liệu hợp lệ, khối `settings` luôn có mặt).
+ * `h` hiện tại của slot mang khối `id` trong 1 mảng `cols` — dùng làm giá trị khởi tạo/migrate
+ * cho các field "dùng chung mọi Space" của mục 11.10 (`dashboardCornerHeight`/
+ * `dashboardReminderHeight`, docs/features/layout-theo-space.md). Viết thành hàm chung thay vì
+ * hard-code lại số ở nhiều nơi để không lệch pha nếu `defaultDashboardLayout()` sau này đổi giá
+ * trị mặc định. Trả `fallback` nếu không tìm thấy slot nào chứa khối này (lưới an toàn — không
+ * nên xảy ra với dữ liệu hợp lệ, cả 2 khối `settings`/`reminders` luôn có mặt).
  */
-export function findSettingsCornerHeight(cols: LayoutSlot[][], fallback = 22): number {
+export function findSlotHeight(cols: LayoutSlot[][], id: LayoutBlockKey, fallback: number): number {
   for (const col of cols) {
     for (const slot of col) {
-      if (slot.type === 'single' && slot.id === 'settings') return slot.h;
-      if (slot.type === 'row' && slot.items.some((it) => it.id === 'settings')) return slot.h;
+      if (slot.type === 'single' && slot.id === id) return slot.h;
+      if (slot.type === 'row' && slot.items.some((it) => it.id === id)) return slot.h;
     }
   }
   return fallback;
+}
+
+/** Thin wrapper — giữ tên cũ cho các nơi gọi/test đã có, xem `findSlotHeight`. */
+export function findSettingsCornerHeight(cols: LayoutSlot[][], fallback = 22): number {
+  return findSlotHeight(cols, 'settings', fallback);
+}
+
+/** Cặp đôi với `findSettingsCornerHeight` — MỚI (mục 11.10 mở rộng 2026-07-09), xem `findSlotHeight`. */
+export function findReminderHeight(cols: LayoutSlot[][], fallback = 68): number {
+  return findSlotHeight(cols, 'reminders', fallback);
 }
 
 export function defaultSettings(): Settings {
@@ -88,6 +99,9 @@ export function defaultSettings(): Settings {
     // MỚI (2026-07-08, mục 11.10) — ngoại lệ dùng chung: h của khối 'settings', cùng nhóm khởi
     // tạo với dashboardColWidths phía trên.
     dashboardCornerHeight: findSettingsCornerHeight(defaultDashboardLayout().cols),
+    // MỚI (2026-07-09, mục 11.10 mở rộng) — cặp đôi với dashboardCornerHeight: h của khối
+    // 'reminders' (Thông báo, LUÔN hiển thị mọi Space, y hệt lý do settings dùng chung).
+    dashboardReminderHeight: findReminderHeight(defaultDashboardLayout().cols),
     pushNotifySharedSpaceEvents: true,
   };
 }

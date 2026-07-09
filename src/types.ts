@@ -274,10 +274,10 @@ export interface Settings {
    */
   dashboardCols: Record<string, LayoutSlot[][]>;
   /**
-   * Ngoại lệ mục 11.10 (docs/features/layout-theo-space.md, chốt 2026-07-08): trọng số `h` của
-   * ĐÚNG 1 slot có `id === 'settings'` (khối gộp "Điều hướng + Hôm nay", luôn hiển thị mọi Space,
-   * không thuộc `enabledBlocks`) — DÙNG CHUNG mọi Space, cùng nhóm với `dashboardColWidths` phía
-   * trên, KHÔNG theo `spaceId` như phần còn lại của `dashboardCols`. Lý do: nội dung khối này
+   * Ngoại lệ mục 11.10 (docs/features/layout-theo-space.md, chốt 2026-07-08, MỞ RỘNG 2026-07-09):
+   * trọng số `h` của slot `id === 'settings'` (khối gộp "Điều hướng + Hôm nay", luôn hiển thị mọi
+   * Space, không thuộc `enabledBlocks`) — DÙNG CHUNG mọi Space, cùng nhóm với `dashboardColWidths`
+   * phía trên, KHÔNG theo `spaceId` như phần còn lại của `dashboardCols`. Lý do: nội dung khối này
    * giống hệt nhau ở mọi Space (nav + đồng hồ/ngày/quote), không có ý nghĩa gì khi mỗi Space có 1
    * chiều cao khác nhau cho cùng 1 nội dung tĩnh — khác các khối dữ liệu thật (Task/Note/Log/...)
    * vẫn `h` riêng theo Space bình thường, không đổi.
@@ -287,8 +287,32 @@ export interface Settings {
    * `resolveDashboardCols()` trong `storage/normalize.ts`). **Vị trí** của khối `settings` (cột
    * nào, đứng trước/sau khối nào) vẫn tiếp tục riêng theo Space như bình thường — chỉ `h` là
    * ngoại lệ, phạm vi hẹp, không suy rộng sang khối khác.
+   *
+   * MỞ RỘNG 2026-07-09: khối `reminders` (Thông báo) cũng LUÔN hiển thị mọi Space, không tắt
+   * được, y hệt lý do trên — nay dùng field riêng `dashboardReminderHeight` bên dưới (KHÔNG gộp
+   * chung 1 field, xem comment field đó) thay vì tiếp tục là phần bù riêng theo Space như bản đầu
+   * mục 11.10.
    */
   dashboardCornerHeight: number;
+  /**
+   * Ngoại lệ mục 11.10, MỞ RỘNG 2026-07-09 — cặp đôi với `dashboardCornerHeight` ở trên: trọng số
+   * `h` của slot `id === 'reminders'` (khối "Thông báo", `AppLayout.tsx` — LUÔN hiển thị mọi
+   * Space, không thuộc `enabledBlocks`, y hệt lý do đã áp dụng cho `settings`). DÙNG CHUNG mọi
+   * Space, override khi đọc qua `resolveDashboardCols()`, ghi qua action `SETTINGS_SET_REMINDER_
+   * HEIGHT` riêng (không kèm `spaceId`).
+   *
+   * **Vì sao TÁCH 2 field độc lập thay vì suy ra `reminders.h = 100 - dashboardCornerHeight`:**
+   * `h` trong `LayoutSlot` là TRỌNG SỐ FLEX-GROW tương đối (`flex: h 1 0`, xem `AppLayout.tsx`),
+   * KHÔNG phải phần trăm tuyệt đối phải cộng đúng 100 — khác hẳn `dashboardColWidths` (dùng
+   * `flex: 0 1 W%`, W% là kích thước thật, cộng lệch 100% gây tràn/hụt layout thấy rõ bằng mắt).
+   * Bằng chứng ngay trong `defaultDashboardLayout()`: cột khác đã có tổng `h` khác 100 (cột 1:
+   * 62+20=82) mà vẫn hiển thị đúng vì chỉ là TỈ LỆ giữa các khối cùng cột. Vì vậy 2 field độc lập
+   * không cần thêm cơ chế chuẩn hoá "đảm bảo tổng luôn ra 100" — trôi lệch tổng qua nhiều lần
+   * resize (nếu có) chỉ đổi tỉ lệ hiển thị tương đối, không gây lỗi hiển thị/tràn UI như
+   * `colWidths`. Hướng 2-field cũng nhất quán với field liền trước, dễ maintain hơn hướng suy-bù
+   * (tránh phải giả định cứng "cột này luôn đúng 2 khối" ngay trong logic tính field).
+   */
+  dashboardReminderHeight: number;
   /** Bật/tắt thông báo push cho sự kiện Shared Space (giao việc/hoàn thành) — độc lập với thông báo đến hạn. */
   pushNotifySharedSpaceEvents: boolean;
 }

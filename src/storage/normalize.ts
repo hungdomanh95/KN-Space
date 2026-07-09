@@ -1,5 +1,5 @@
-import type { DashboardLayout, HomeBackground, HomeQuotes, LayoutSlot, LogEntry, QuoteRotateMode, Settings, Space, UiState } from '../types';
-import { defaultDashboardLayout, defaultSettings, findSettingsCornerHeight } from '../state/seed';
+import type { DashboardLayout, HomeBackground, HomeQuotes, LayoutBlockKey, LayoutSlot, LogEntry, QuoteRotateMode, Settings, Space, UiState } from '../types';
+import { defaultDashboardLayout, defaultSettings, findReminderHeight, findSettingsCornerHeight } from '../state/seed';
 
 /**
  * Chuẩn hoá `logs[]` (Nhật ký nhanh, MỚI 2026-07-07 — xem docs/features/nhat-ky-nhanh.md).
@@ -292,40 +292,51 @@ function normalizeDashboardColsMap(raw: unknown, colCount: number): Record<strin
 }
 
 /**
- * Chuẩn hoá `Settings.dashboardCornerHeight` (mục 11.10, MỚI 2026-07-08) — 1 số dương hữu hạn,
- * DÙNG CHUNG mọi Space (cùng nhóm `dashboardColWidths`). **Cố ý KHÔNG migrate/fallback qua field
- * `dashboardLayout` cũ** (khác mô tả gốc mục 11.10.4 — xem giải thích trong
- * docs/features/layout-theo-space-progress.md mục 11.10, quyết định lúc code): áp dụng lại đúng
- * bài học Phương án A (bug 2026-07-08) đã dùng cho `dashboardColWidths`/`dashboardCols` — field
- * `dashboardLayout` là dữ liệu ĐÓNG BĂNG tại 1 thời điểm cũ, có thể mang giá trị bất thường (vd
- * do bug resize cộng-dồn-delta đã sửa trước đây). Với field NÀY, rủi ro còn LỚN HƠN cả `cols`
- * per-Space: vì `dashboardCornerHeight` dùng CHUNG mọi Space, 1 giá trị lỗi đọc được từ dữ liệu cũ
- * sẽ làm SAI NGAY LẬP TỨC ở TẤT CẢ Space cùng lúc, thay vì chỉ 1 Space chưa từng chỉnh như trường
- * hợp `cols`. Fallback THẲNG `defaultDashboardLayout()` (qua `findSettingsCornerHeight`, tham số
- * `fallback` truyền vào từ `normalizeSettings`).
+ * Chuẩn hoá `Settings.dashboardCornerHeight`/`dashboardReminderHeight` (mục 11.10, MỚI 2026-07-08,
+ * MỞ RỘNG 2026-07-09) — 1 số dương hữu hạn, DÙNG CHUNG mọi Space (cùng nhóm `dashboardColWidths`).
+ * **Cố ý KHÔNG migrate/fallback qua field `dashboardLayout` cũ** (khác mô tả gốc mục 11.10.4 — xem
+ * giải thích trong docs/features/layout-theo-space-progress.md mục 11.10, quyết định lúc code): áp
+ * dụng lại đúng bài học Phương án A (bug 2026-07-08) đã dùng cho `dashboardColWidths`/
+ * `dashboardCols` — field `dashboardLayout` là dữ liệu ĐÓNG BĂNG tại 1 thời điểm cũ, có thể mang
+ * giá trị bất thường (vd do bug resize cộng-dồn-delta đã sửa trước đây). Với 2 field NÀY, rủi ro
+ * còn LỚN HƠN cả `cols` per-Space: vì dùng CHUNG mọi Space, 1 giá trị lỗi đọc được từ dữ liệu cũ sẽ
+ * làm SAI NGAY LẬP TỨC ở TẤT CẢ Space cùng lúc, thay vì chỉ 1 Space chưa từng chỉnh như trường hợp
+ * `cols`. Fallback THẲNG `defaultDashboardLayout()` (qua `findSettingsCornerHeight`/
+ * `findReminderHeight`, tham số `fallback` truyền vào từ `normalizeSettings`).
  */
-function normalizeCornerHeight(raw: unknown, fallback: number): number {
+function normalizeGlobalSlotHeight(raw: unknown, fallback: number): number {
   return typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? raw : fallback;
 }
 
 /**
- * Ghi đè `h` của MỌI slot mang khối `settings` (single hoặc ghép ngang) bằng `cornerHeight` DÙNG
- * CHUNG (mục 11.10.2) — áp dụng bất kể `dashboardCols[spaceId]`/`defaultDashboardLayout().cols`
- * lưu gì cho slot đó. Chỉ đổi đúng 1 `LayoutBlockKey` ('settings'), giữ nguyên `h` của mọi khối
- * khác. Giữ nguyên REFERENCE gốc của `cols` nếu không có gì cần đổi (referential-stability cho
- * `useMemo` ở `useDashboardLayout.ts` — xem rủi ro #3 mục 11.7/9.6, cùng lý do áp dụng lại ở đây).
+ * Ghi đè `h` của MỌI slot mang khối trong `overrides` (single hoặc ghép ngang) bằng giá trị DÙNG
+ * CHUNG tương ứng (mục 11.10.2, MỞ RỘNG 2026-07-09 — cả `settings` lẫn `reminders`) — áp dụng bất
+ * kể `dashboardCols[spaceId]`/`defaultDashboardLayout().cols` lưu gì cho slot đó. Chỉ đổi đúng các
+ * `LayoutBlockKey` có mặt trong `overrides`, giữ nguyên `h` của mọi khối khác. Giữ nguyên REFERENCE
+ * gốc của `cols` nếu không có gì cần đổi (referential-stability cho `useMemo` ở
+ * `useDashboardLayout.ts` — xem rủi ro #3 mục 11.7/9.6, cùng lý do áp dụng lại ở đây).
  */
-function overrideCornerHeight(cols: LayoutSlot[][], cornerHeight: number): LayoutSlot[][] {
+function overrideSlotHeights(cols: LayoutSlot[][], overrides: Partial<Record<LayoutBlockKey, number>>): LayoutSlot[][] {
   let changed = false;
   const next = cols.map((col) =>
     col.map((slot) => {
-      if (slot.type === 'single' && slot.id === 'settings' && slot.h !== cornerHeight) {
-        changed = true;
-        return { ...slot, h: cornerHeight };
+      if (slot.type === 'single' && slot.id in overrides) {
+        const h = overrides[slot.id]!;
+        if (slot.h !== h) {
+          changed = true;
+          return { ...slot, h };
+        }
+        return slot;
       }
-      if (slot.type === 'row' && slot.h !== cornerHeight && slot.items.some((it) => it.id === 'settings')) {
-        changed = true;
-        return { ...slot, h: cornerHeight };
+      if (slot.type === 'row') {
+        const matched = slot.items.find((it) => it.id in overrides);
+        if (matched) {
+          const h = overrides[matched.id]!;
+          if (slot.h !== h) {
+            changed = true;
+            return { ...slot, h };
+          }
+        }
       }
       return slot;
     }),
@@ -354,16 +365,21 @@ function overrideCornerHeight(cols: LayoutSlot[][], cornerHeight: number): Layou
  * Hàm THUẦN (không dispatch/side-effect nào) — nhận `settings` đã qua `normalizeSettings()` (nên
  * `dashboardCols` ở đây đã hợp lệ về cấu trúc, không cần validate lại).
  *
- * MỚI (2026-07-08, mục 11.10) — sau khi resolve `cols` theo đúng thứ tự fallback trên, override
- * `h` của slot `settings` bằng `settings.dashboardCornerHeight` (dùng chung mọi Space) — bất kể
- * entry per-Space hay default lưu giá trị `h` nào cho slot đó. Đây là bước override ĐỌC-THỜI-
- * ĐIỂM-RENDER duy nhất trong hàm này; ghi ("2 đích lưu trữ" khi resize splitter liền kề khối
- * `settings`) là việc của `useDashboardLayout.ts`, không phải hàm thuần này.
+ * MỚI (2026-07-08, mục 11.10, MỞ RỘNG 2026-07-09) — sau khi resolve `cols` theo đúng thứ tự
+ * fallback trên, override `h` của slot `settings` bằng `settings.dashboardCornerHeight` VÀ `h` của
+ * slot `reminders` bằng `settings.dashboardReminderHeight` (cả 2 dùng chung mọi Space — khối
+ * `reminders`/Thông báo cũng LUÔN hiển thị, không tắt theo Space, y hệt lý do `settings`) — bất kể
+ * entry per-Space hay default lưu giá trị `h` nào cho 2 slot đó. Đây là bước override ĐỌC-THỜI-
+ * ĐIỂM-RENDER duy nhất trong hàm này; ghi ("2 đích lưu trữ" khi resize splitter liền kề 1 trong 2
+ * khối này) là việc của `useDashboardLayout.ts`, không phải hàm thuần này.
  */
 export function resolveDashboardCols(settings: Settings, spaceId: string): LayoutSlot[][] {
   const perSpace = settings.dashboardCols?.[spaceId];
   const cols = perSpace ?? defaultDashboardLayout().cols;
-  return overrideCornerHeight(cols, settings.dashboardCornerHeight);
+  return overrideSlotHeights(cols, {
+    settings: settings.dashboardCornerHeight,
+    reminders: settings.dashboardReminderHeight,
+  });
 }
 
 /** Chuẩn hoá `homeQuotes` — migrate dữ liệu cũ chưa có field này (trước khi có tab "Quote"). */
@@ -429,9 +445,12 @@ export function normalizeSettings(
     // (gọi tại nơi biết `currentSpaceId`, xem Phần 2 docs/features/layout-theo-space-progress.md).
     dashboardCols: normalizeDashboardColsMap(settings.dashboardCols, defaultLayout.colWidths.length),
     // MỚI (2026-07-08, mục 11.10) — ngoại lệ dùng chung: h của khối 'settings'. KHÔNG migrate qua
-    // `dashboardLayout` cũ (xem comment `normalizeCornerHeight` — Phương án A áp dụng lại, rủi ro
-    // cao hơn `colWidths` vì đây cũng dùng chung mọi Space).
-    dashboardCornerHeight: normalizeCornerHeight(settings.dashboardCornerHeight, findSettingsCornerHeight(defaultLayout.cols)),
+    // `dashboardLayout` cũ (xem comment `normalizeGlobalSlotHeight` — Phương án A áp dụng lại, rủi
+    // ro cao hơn `colWidths` vì đây cũng dùng chung mọi Space).
+    dashboardCornerHeight: normalizeGlobalSlotHeight(settings.dashboardCornerHeight, findSettingsCornerHeight(defaultLayout.cols)),
+    // MỚI (2026-07-09, mục 11.10 MỞ RỘNG) — cặp đôi với dashboardCornerHeight: h của khối
+    // 'reminders' (Thông báo), cùng lý do/cách xử lý (KHÔNG migrate qua `dashboardLayout` cũ).
+    dashboardReminderHeight: normalizeGlobalSlotHeight(settings.dashboardReminderHeight, findReminderHeight(defaultLayout.cols)),
   };
 }
 

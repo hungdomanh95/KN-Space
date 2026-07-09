@@ -792,3 +792,17 @@ Chỉ **chiều cao** (`h`) của khối `settings` dùng chung. **Vị trí** c
 - Thêm field `Settings.dashboardCornerHeight: number` — cùng nhóm khởi tạo/migrate/normalize/export-import với `dashboardColWidths` (tham chiếu mục 11.7 điểm 1, 4, 5, 8, áp dụng tương tự cho field mới này).
 - `useDashboardLayout.ts`/`AppLayout.tsx`: thêm bước override `h` của slot `id === 'settings'` khi tính layout hiệu lực (đọc), và rẽ nhánh đích ghi khi resize splitter liền kề khối `settings` (ghi) — xem ghi chú kỹ thuật mục 11.10.2.
 - `SettingsModal.tsx` hint (mục 11.9.2) — có thể cần bổ sung 1 câu ngắn giải thích khối "Điều hướng + Hôm nay" luôn cùng chiều cao mọi Space — giao `uiux` quyết định có cần thêm câu hay hint hiện có đã đủ dùng, không phải việc `ba` viết copy cụ thể.
+
+### 11.10.7 MỞ RỘNG PHẠM VI (chốt 2026-07-09) — áp dụng CẢ khối `reminders` (Thông báo), không chỉ `settings`
+
+> Sửa lại phạm vi sau khi phát hiện hiểu sai lúc code mục 11.10 gốc (2026-07-08) — không phải bug, là làm rõ lại đúng ý chủ dự án đã xác nhận. Không đảo ngược nội dung 11.10.1–11.10.6 ở trên (vẫn đúng cho khối `settings`), chỉ MỞ RỘNG áp dụng đúng cơ chế đó thêm cho khối `reminders`.
+
+**Lý do:** khối `reminders` (Thông báo, `NotificationsBlock`) **cũng LUÔN hiển thị ở mọi Space, không tắt được** — y hệt điều kiện đã dùng để quyết định `settings` dùng chung ở mục 11.10.1 (xem comment gốc `AppLayout.tsx`: "`reminders` (Thông báo) và `settings` (DashboardCorner) LUÔN hiển thị, không tắt"). Bản 11.10 gốc chỉ xử lý `settings`, bỏ sót `reminders` dù cùng điều kiện — nay bổ sung cho khớp đúng lý do đã nêu.
+
+**Thay đổi:**
+- Thêm field cặp đôi `Settings.dashboardReminderHeight: number` (KHÔNG gộp vào 1 field duy nhất với `dashboardCornerHeight` dù 2 khối này luôn đứng cùng cột trong bố cục mặc định — lý do: `h` là trọng số flex-grow tương đối, không phải % tuyệt đối phải cộng đúng 100, xem comment kỹ thuật tại field này trong `types.ts`; giữ 2 field độc lập đơn giản hơn, nhất quán pattern, không cần thêm logic chuẩn hoá tổng).
+- `resolveDashboardCols()` override `h` của CẢ `settings` LẪN `reminders` khi đọc (trước đây chỉ `settings`).
+- Resize splitter dọc liền kề 1 trong 2 khối này → ghi thêm vào field dùng-chung tương ứng (`SETTINGS_SET_CORNER_HEIGHT`/`SETTINGS_SET_REMINDER_HEIGHT`), độc lập nhau.
+- Mọi AC ở mục 11.10.5 áp dụng tương tự cho `reminders` (đổi Space → chiều cao khối `reminders` cũng đồng bộ theo giống `settings`; vị trí khối `reminders` vẫn riêng theo Space).
+
+Chi tiết implementation + quyết định kỹ thuật khi code — xem `docs/features/layout-theo-space-progress.md` mục "11.10 mở rộng".
