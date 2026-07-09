@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type React from 'react';
 import { formatHomeClock, formatHomeDateShort, todayQuote } from '../features/home/homeContent';
 import { useAppState } from '../state/AppStateContext';
@@ -70,6 +70,36 @@ export function DashboardCornerBlock({
   const clock = formatHomeClock(now);
   const quote = todayQuote(state.settings.homeQuotes);
 
+  // Khối này resize tự do (không còn trong HEIGHT_LOCKED_IDS) nên chiều cao dư ra sau khi kéo
+  // cao phải được dùng để hiện thêm quote thay vì bỏ trống — đo trực tiếp chiều cao thật còn lại
+  // của hàng ambient (định (definite) nhờ flex-1) trừ đi hàng ngày, rồi suy ra số dòng quote tối
+  // đa vừa khít, thay vì đoán mù bằng breakpoint cứng.
+  const ambientRowRef = useRef<HTMLDivElement>(null);
+  const dateRowRef = useRef<HTMLDivElement>(null);
+  const quoteRef = useRef<HTMLDivElement>(null);
+  const [quoteMaxLines, setQuoteMaxLines] = useState(2);
+
+  useEffect(() => {
+    const row = ambientRowRef.current;
+    const dateEl = dateRowRef.current;
+    const quoteEl = quoteRef.current;
+    if (!row || !dateEl || !quoteEl) return;
+
+    const recalc = () => {
+      const rowStyle = getComputedStyle(row);
+      const paddingY = parseFloat(rowStyle.paddingTop) + parseFloat(rowStyle.paddingBottom);
+      const available = row.clientHeight - paddingY - dateEl.offsetHeight;
+      const lineHeight = parseFloat(getComputedStyle(quoteEl).lineHeight) || 16;
+      const lines = Math.max(2, Math.min(8, Math.floor(available / lineHeight)));
+      setQuoteMaxLines(lines);
+    };
+
+    recalc();
+    const ro = new ResizeObserver(recalc);
+    ro.observe(row);
+    return () => ro.disconnect();
+  }, []);
+
   return (
     <div
       id="dashboard-corner"
@@ -102,23 +132,40 @@ export function DashboardCornerBlock({
         <DashboardCornerNav onGoHome={onGoHome} onPhoto />
       </div>
 
-      {/* Hàng ambient — resize tự do (flex-1 min-h-0). */}
+      {/* Hàng ambient — resize tự do (flex-1 min-h-0). `items-center` canh cả CỤM nội dung
+          (giờ + vạch chia + ngày/quote, bọc trong 1 div riêng) theo chiều cao khối khi resize.
+          `pt`/`pb` CỐ Ý không bằng nhau (8.5/15.5, tổng vẫn 24px như `py-3` cũ): hàng nav ngay
+          trên đã có sẵn `py-[7px]` riêng của nó, cộng dồn vào phía TRÊN của cụm nội dung — nếu
+          ambient tự canh giữa đối xứng bên trong chính nó (pt=pb) thì tổng khoảng cách thị giác
+          "nav-icon → giờ" (= 7px nav + pt) sẽ luôn LỚN HƠN "quote → đáy thẻ" (= pb) đúng 7px, bất
+          kể resize cao/thấp thế nào. Giảm pt/tăng pb đúng một nửa 7px để triệt tiêu chênh lệch đó
+          — bù cố định 1 lần, không phải số đo riêng cho 1 trường hợp resize cụ thể. */}
       <div
-        className="relative z-[5] flex flex-1 min-h-0 cursor-grab items-center gap-[clamp(8px,3cqw,16px)]
-          overflow-hidden [container-type:inline-size] px-4 py-3 active:cursor-grabbing"
+        ref={ambientRowRef}
+        className="relative z-[5] flex flex-1 min-h-0 cursor-grab items-center
+          overflow-hidden [container-type:inline-size] px-4 pt-[8.5px] pb-[15.5px] active:cursor-grabbing"
       >
-        <div className="relative z-[1] flex flex-none items-baseline gap-1 text-white [text-shadow:0_1px_3px_rgba(0,0,0,.4)]">
-          <span className="text-[clamp(24px,11cqw,52px)] font-semibold leading-none tracking-[-.01em] [font-variant-numeric:tabular-nums]">
-            {clock.hh}:{clock.mm}
-          </span>
-        </div>
-        <div className="relative z-[1] h-[60%] w-px flex-none bg-white/30" aria-hidden="true" />
-        <div className="relative z-[1] min-w-0 flex-1 text-white [text-shadow:0_1px_3px_rgba(0,0,0,.4)]">
-          <div className="whitespace-nowrap text-[clamp(11px,5.2cqw,20px)] font-bold opacity-95">
-            {formatHomeDateShort(now)}
+        {/* Cụm nội dung — `items-stretch` mặc định để vạch chia tự giãn đúng bằng chiều cao
+            THẬT của cụm (không phải % chiều cao khối như trước, gây lệch khi resize); giờ/ngày
+            dùng `self-center` để luôn canh giữa theo đúng chiều cao cụm này. */}
+        <div className="flex w-full min-w-0 gap-[clamp(8px,3cqw,16px)]">
+          <div className="relative z-[1] flex flex-none items-baseline gap-1 self-center text-white [text-shadow:0_1px_3px_rgba(0,0,0,.4)]">
+            <span className="text-[clamp(24px,11cqw,52px)] font-semibold leading-none tracking-[-.01em] [font-variant-numeric:tabular-nums]">
+              {clock.hh}:{clock.mm}
+            </span>
           </div>
-          <div className="line-clamp-2 whitespace-normal text-[clamp(9px,3.6cqw,13.5px)] italic leading-snug opacity-85">
-            {quote}
+          <div className="relative z-[1] w-px flex-none bg-white/30" aria-hidden="true" />
+          <div className="relative z-[1] min-w-0 flex-1 self-center text-white [text-shadow:0_1px_3px_rgba(0,0,0,.4)]">
+            <div ref={dateRowRef} className="whitespace-nowrap text-[clamp(11px,5.2cqw,20px)] font-bold opacity-95">
+              {formatHomeDateShort(now)}
+            </div>
+            <div
+              ref={quoteRef}
+              className="line-clamp-2 whitespace-normal text-[clamp(9px,3.6cqw,13.5px)] italic leading-snug opacity-85"
+              style={{ WebkitLineClamp: quoteMaxLines }}
+            >
+              {quote}
+            </div>
           </div>
         </div>
       </div>

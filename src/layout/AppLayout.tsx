@@ -12,7 +12,7 @@ import { NotificationsBlock } from '../features/notifications/NotificationsBlock
 import { DashboardCorner } from '../components/DashboardCorner';
 import { DashboardCornerBlock } from '../components/DashboardCornerBlock';
 import { useDashboardLayout } from './useDashboardLayout';
-import { deriveVisibleLayout, getZone, isHeightLocked, slotHeightIfContains } from './dashboardLayoutUtils';
+import { deriveVisibleLayout, getZone, isHeightLocked, maxHeightPxIfContains, slotHeightIfContains } from './dashboardLayoutUtils';
 import { Splitter } from './Splitter';
 import { useMediaQuery } from './useMediaQuery';
 import { useMobileLayout } from './useMobileLayout';
@@ -379,6 +379,8 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
 
   function renderSlot(slot: LayoutSlot, ci: number, si: number): React.ReactNode {
     const flexStyle: React.CSSProperties = isHeightLocked(slot) ? { flex: '0 0 auto' } : { flex: `${slot.h} 1 0`, minHeight: 0 };
+    const maxHeight = maxHeightPxIfContains(slot);
+    if (maxHeight != null) flexStyle.maxHeight = maxHeight;
 
     if (slot.type === 'single') {
       return (
@@ -603,14 +605,17 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
             {rowSplitters
               .filter((rs) => rs.ci === ci)
               .map((rs) => {
-                // Ngoại lệ mục 11.10: splitter liền kề khối `settings` đổi `h` DÙNG CHUNG mọi
-                // Space (`dashboardCornerHeight`), khác mọi splitter dọc khác (chỉ Space này) —
-                // tra theo layout GỐC (đầy đủ, không phải `visibleLayout`) qua origCi/origSiA/B,
-                // KHÔNG derive từ `rs.ci`/`rs.si` (chỉ số hiển thị).
+                // Ngoại lệ mục 11.10 (MỞ RỘNG 2026-07-09 — cả 2 khối): splitter liền kề khối
+                // `settings` VÀ/HOẶC `reminders` đổi `h` DÙNG CHUNG mọi Space
+                // (`dashboardCornerHeight`/`dashboardReminderHeight`), khác mọi splitter dọc khác
+                // (chỉ Space này) — tra theo layout GỐC (đầy đủ, không phải `visibleLayout`) qua
+                // origCi/origSiA/B, KHÔNG derive từ `rs.ci`/`rs.si` (chỉ số hiển thị).
                 const origCol = layout.cols[rs.origCi];
-                const touchesCornerHeight =
+                const touchesGlobalHeight =
                   slotHeightIfContains(origCol?.[rs.origSiA], 'settings') != null ||
-                  slotHeightIfContains(origCol?.[rs.origSiB], 'settings') != null;
+                  slotHeightIfContains(origCol?.[rs.origSiB], 'settings') != null ||
+                  slotHeightIfContains(origCol?.[rs.origSiA], 'reminders') != null ||
+                  slotHeightIfContains(origCol?.[rs.origSiB], 'reminders') != null;
                 return (
                   <Splitter
                     key={`row-${rs.ci}-${rs.si}`}
@@ -621,8 +626,8 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
                     }
                     onMouseDown={onRowSplitterMouseDown(rs.ci, rs.origCi, rs.origSiA, rs.origSiB)}
                     title={
-                      touchesCornerHeight
-                        ? 'Đổi kích thước khối "Điều hướng + Hôm nay" — áp dụng cho mọi Space của bạn'
+                      touchesGlobalHeight
+                        ? 'Đổi kích thước khối — áp dụng cho mọi Space của bạn'
                         : 'Đổi kích thước khối — chỉ áp dụng cho Space này'
                     }
                   />

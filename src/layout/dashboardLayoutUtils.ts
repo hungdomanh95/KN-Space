@@ -47,6 +47,31 @@ export function defaultHFor(id: LayoutBlockKey): number {
   return HEIGHT_LOCKED_IDS.has(id) ? 14 : 30;
 }
 
+/**
+ * Chiều cao TỐI ĐA (px) cho 1 số khối nhỏ gọn theo bản chất (nội dung không co giãn thêm dù resize
+ * cao hơn) — tránh cảnh kéo cao vô hạn để lại khoảng trống rỗng lộ liễu giữa nội dung và viền dưới
+ * (case thật: khối `settings` "Widget điều hướng + Hôm nay" — giờ/ngày/quote canh giữa đúng cách
+ * nhưng quote luôn là dòng THỨ 2 trong cột text nên không thể tự nó nằm giữa toàn khối, kéo càng
+ * cao càng lộ rõ; xem `DashboardCornerBlock.tsx`). Khối không có trong map này resize tự do không
+ * giới hạn như cũ. Chỉ áp dụng ở cấp SLOT wrapper (`AppLayout.renderSlot`), không phải ở style của
+ * chính component block.
+ *
+ * `settings: 150` — đo thật bằng DevTools (2026-07-09): hàng nav cố định cao 48px, phần nội dung
+ * ambient (ngày + quote 2 dòng + padding) chỉ cần ~76px → tổng tự nhiên ~124px. 150px chừa thêm
+ * ~26px cho ngày có quote dài phải xuống 3 dòng, không chừa dư quá mức gây trống trải như mốc
+ * 220px ban đầu (đo thực tế cho thấy 220px để lại ~60px khoảng trống mỗi bên, nhìn rỗng).
+ */
+export const SLOT_MAX_HEIGHT_PX: Partial<Record<LayoutBlockKey, number>> = {
+  settings: 150,
+};
+
+/** `maxHeight` (px) NẾU slot chứa khối có giới hạn trong `SLOT_MAX_HEIGHT_PX` (single hoặc ghép ngang). */
+export function maxHeightPxIfContains(slot: LayoutSlot): number | undefined {
+  if (slot.type === 'single') return SLOT_MAX_HEIGHT_PX[slot.id];
+  const capped = slot.items.map((it) => SLOT_MAX_HEIGHT_PX[it.id]).filter((v): v is number => v != null);
+  return capped.length > 0 ? Math.min(...capped) : undefined;
+}
+
 export function findLocation(layout: DashboardLayout, id: LayoutBlockKey): SlotLocation | null {
   for (let ci = 0; ci < layout.cols.length; ci++) {
     const col = layout.cols[ci];
