@@ -299,7 +299,7 @@ export function SpaceSwitcher({ compact, onPhoto }: SpaceSwitcherProps) {
             // chỉ còn viewport-16px, hẹp hơn width dropdown (=viewport) → shift middleware đẩy
             // dropdown dịch phải +8px để né padding trái, nhưng width không co theo nên tràn
             // +8px ra ngoài mép phải màn hình (đã đo thật bằng harness Playwright + floating-ui
-            // thật, 2026-07-08: content.left lệch từ 0→8, content.right tràn 398 > viewport 390).
+            // thật: content.left lệch từ 0→8, content.right tràn 398 > viewport 390).
             // Fix: bỏ padding NGANG (trái/phải=0) cho compact — anchor vốn đã luôn nằm trọn trong
             // viewport (chính là thanh top-bar đang hiển thị) nên không cần né mép ngang; vẫn giữ
             // padding DỌC=8 để middleware flip còn hoạt động khi thiếu chỗ bên dưới. Desktop giữ

@@ -10,11 +10,11 @@ interface DashboardCornerNavProps {
   compact?: boolean;
   /** Bật khi hàng nav nổi trực tiếp trên ảnh nền (DashboardCornerBlock, desktop) thay vì trên 1
    * card nền ổn định như mọi nơi khác — đổi 2 nút icon + trigger Space-switcher sang "ghost
-   * control" (2026-07-08, lần sửa thứ 3 — thay hẳn "dark glass pill" của lần 2, bị bác vì vẫn đọc
-   * như hộp dán lên ảnh): ở trạng thái nghỉ KHÔNG có nền/viền gì cả, chỉ icon/chữ trắng nổi bằng
-   * double drop-shadow; nền mờ + blur chỉ xuất hiện khi hover/focus/active. Không dùng cho
-   * `DashboardCorner` compact (mobile top-bar) vì nơi đó đã nằm trong thanh nền glass theo theme,
-   * không lỗi tông màu — giữ nguyên `--raised` mặc định.
+   * control" (thay cho "dark glass pill" — bị bác vì vẫn đọc như hộp dán lên ảnh): ở trạng thái
+   * nghỉ KHÔNG có nền/viền gì cả, chỉ icon/chữ trắng nổi bằng double drop-shadow; nền mờ + blur
+   * chỉ xuất hiện khi hover/focus/active. Không dùng cho `DashboardCorner` compact (mobile
+   * top-bar) vì nơi đó đã nằm trong thanh nền glass theo theme, không lỗi tông màu — giữ nguyên
+   * `--raised` mặc định.
    */
   onPhoto?: boolean;
 }
@@ -50,11 +50,10 @@ export function DashboardCornerNav({ onGoHome, compact, onPhoto }: DashboardCorn
     <>
       {/* Cụm trái (Home + Space-switcher) — chỉ cụm này chiếm khoảng trống co giãn (`flex-1`) trên
        * desktop, để tên Space neo sát nút Home thay vì tự canh giữa "trôi nổi" giữa Home và Settings
-       * (2026-07-08, lần sửa layout — trước đó SpaceSwitcher tự `flex-1` + `w-full justify-center`
-       * chiếm hết khoảng trống còn lại nên tạo 2 khoảng trống đối xứng không neo vào đâu). Trên
-       * mobile compact, Home bị ẩn nên KHÔNG dùng `flex-1` ở đây nữa — hàng ngoài compact dùng
-       * `justify-center` (không phải `justify-between`), nếu wrapper vẫn co giãn thì switcher sẽ bị
-       * đẩy dính sát mép trái. */}
+       * (trước đây SpaceSwitcher tự `flex-1` + `w-full justify-center` chiếm hết khoảng trống còn
+       * lại nên tạo 2 khoảng trống đối xứng không neo vào đâu). Trên mobile compact, Home bị ẩn nên
+       * KHÔNG dùng `flex-1` ở đây nữa — hàng ngoài compact dùng `justify-center` (không phải
+       * `justify-between`), nếu wrapper vẫn co giãn thì switcher sẽ bị đẩy dính sát mép trái. */}
       <div className={`flex min-w-0 items-center gap-1.5 ${compact ? '' : 'flex-1'}`}>
         {!compact && (
           <button
@@ -92,9 +91,9 @@ interface DashboardCornerProps {
   /** Thanh trên cùng cố định trên mobile (`<DashboardCorner compact />`, xem AppLayout) — tách
    * khỏi hệ layout tự do, luôn full-width dính đầu màn hình, chỉ hiện hàng nav (không có hàng
    * ambient đồng hồ/ngày/quote — hành vi này không đổi kể từ khi gộp `today` vào `settings`, xem
-   * docs/requirements.md mục 4.1 AC6). Kể từ 2026-07-08, đây là nơi DUY NHẤT còn dùng
-   * `DashboardCorner` — trên desktop, `AppLayout.renderBlock()` case `'settings'` dùng
-   * `DashboardCornerBlock` (khối gộp 2 hàng) thay vì component này.
+   * docs/requirements.md mục 4.1 AC6). Đây là nơi DUY NHẤT còn dùng `DashboardCorner` — trên
+   * desktop, `AppLayout.renderBlock()` case `'settings'` dùng `DashboardCornerBlock` (khối gộp 2
+   * hàng) thay vì component này.
    */
   compact?: boolean;
 }

@@ -26,24 +26,23 @@ export type SettingsAction =
   | { type: 'SETTINGS_HOME_QUOTE_ROTATE_NEXT' }
   | { type: 'BLOCK_TOGGLE_COLLAPSED'; payload: { key: keyof CollapsedBlocks } }
   | { type: 'NOTE_SET_VIEW'; payload: { view: NoteView } }
-  // LỊCH SỬ (trước 2026-07-08, xem docs/features/layout-theo-space.md mục 11) — set/reset TOÀN
-  // BỘ `dashboardLayout` (colWidths + cols) trong 1 lần, dùng chung mọi Space. Từ khi Phần 2
-  // (useDashboardLayout.ts/AppLayout.tsx/SettingsModal.tsx) chuyển hẳn sang dùng 2 action mới bên
-  // dưới, KHÔNG còn nơi nào trong UI dispatch 2 action này nữa — giữ lại dead-but-typed (không
-  // xoá) để có đường lùi tạm thời, xem Phần 3 docs/features/layout-theo-space-progress.md.
+  // LỊCH SỬ (xem docs/features/layout-theo-space.md mục 11) — set/reset TOÀN BỘ `dashboardLayout`
+  // (colWidths + cols) trong 1 lần, dùng chung mọi Space. UI (useDashboardLayout.ts/AppLayout.tsx/
+  // SettingsModal.tsx) đã chuyển hẳn sang dùng 2 action mới bên dưới, KHÔNG còn nơi nào trong UI
+  // dispatch 2 action này nữa — giữ lại dead-but-typed (không xoá) để có đường lùi tạm thời.
   | { type: 'SETTINGS_SET_DASHBOARD_LAYOUT'; payload: { layout: DashboardLayout } }
   | { type: 'SETTINGS_RESET_DASHBOARD_LAYOUT' }
-  // MỚI (2026-07-08) — tách theo đúng 2 phạm vi mục 11.1: colWidths (không kèm spaceId, dùng
-  // chung mọi Space) và cols (kèm spaceId, riêng theo Space). Xem AC-11.9: nút "Khôi phục mặc
-  // định" chỉ reset `cols` của Space đang mở, không đụng `colWidths`.
+  // Tách theo đúng 2 phạm vi mục 11.1: colWidths (không kèm spaceId, dùng chung mọi Space) và
+  // cols (kèm spaceId, riêng theo Space). Xem AC-11.9: nút "Khôi phục mặc định" chỉ reset `cols`
+  // của Space đang mở, không đụng `colWidths`.
   | { type: 'SETTINGS_SET_COL_WIDTHS'; payload: { colWidths: number[] } }
   | { type: 'SETTINGS_SET_DASHBOARD_COLS'; payload: { spaceId: string; cols: LayoutSlot[][] } }
   | { type: 'SETTINGS_RESET_DASHBOARD_COLS'; payload: { spaceId: string } }
-  // MỚI (2026-07-08, mục 11.10 — ngoại lệ chiều cao khối 'settings') — dùng chung mọi Space,
-  // không kèm `spaceId`, cùng nhóm với SETTINGS_SET_COL_WIDTHS.
+  // Mục 11.10 — ngoại lệ chiều cao khối 'settings' — dùng chung mọi Space, không kèm `spaceId`,
+  // cùng nhóm với SETTINGS_SET_COL_WIDTHS.
   | { type: 'SETTINGS_SET_CORNER_HEIGHT'; payload: { h: number } }
-  // MỚI (2026-07-09, mục 11.10 mở rộng) — cặp đôi với SETTINGS_SET_CORNER_HEIGHT, cho khối
-  // 'reminders' (Thông báo, cũng LUÔN hiển thị mọi Space).
+  // Cặp đôi với SETTINGS_SET_CORNER_HEIGHT, cho khối 'reminders' (Thông báo, cũng LUÔN hiển thị
+  // mọi Space).
   | { type: 'SETTINGS_SET_REMINDER_HEIGHT'; payload: { h: number } }
   | { type: 'SETTINGS_SET_PUSH_NOTIFY_SHARED_EVENTS'; payload: { enabled: boolean } };
 

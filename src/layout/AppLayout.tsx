@@ -20,8 +20,8 @@ import type { EnabledBlocks, LayoutBlockKey, LayoutSlot } from '../types';
 
 /** Dưới breakpoint useMobileLayout (kể cả desktop resize cửa sổ hẹp lại, không riêng điện
  * thoại), chuyển hẳn sang UI mobile (Chat-first + tab Chi tiết) — chỉ hiện 3 khối chính dùng để
- * note nhanh/xem việc cần làm/xem nhật ký (2026-07-08: thêm `logs`, xem
- * docs/features/nhat-ky-nhanh.md mục 5.2.2). Hệ layout cột tự do của desktop (kéo-thả/resize/
+ * note nhanh/xem việc cần làm/xem nhật ký (xem docs/features/nhat-ky-nhanh.md mục 5.2.2). Hệ
+ * layout cột tự do của desktop (kéo-thả/resize/
  * splitter) nhìn rất kỳ khi bị bóp vào khung hẹp dưới 1000px (cột chồng lên nhau, splitter/
  * drag-handle không còn hợp lý) — dưới mốc này dùng hẳn UI mobile thay vì cố nhồi layout desktop
  * vào khung hẹp. KHÔNG đụng tới `space.enabledBlocks` (cài đặt ẩn/hiện khối của desktop, đồng bộ
@@ -133,10 +133,9 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
   const isMobileBlocksOnly = useMobileLayout();
   // Accordion mobile: khối nào đang mở 80% (khối còn lại thu nhỏ 20%) — mặc định "Việc cần
   // làm" vì đây là khối hành động, ưu tiên kiểm tra trước khi ghi note (đã chốt với chủ dự án).
-  // MỞ RỘNG 2→3 khối (2026-07-08, xem docs/features/nhat-ky-nhanh.md mục 5.2.2): thêm "Nhật ký
-  // nhanh" — dùng danh sách `MOBILE_ACCORDION_ORDER`/`MOBILE_ACCORDION_DEFS` bên dưới thay vì
-  // 2 biến `tasksExpanded`/`notesExpanded` cứng như trước, để không phải lặp lại y hệt logic
-  // nếu sau này thêm/bớt khối trong accordion này.
+  // 3 khối trong accordion (xem docs/features/nhat-ky-nhanh.md mục 5.2.2) — dùng danh sách
+  // `MOBILE_ACCORDION_ORDER`/`MOBILE_ACCORDION_DEFS` bên dưới thay vì các biến cứng riêng từng
+  // khối, để không phải lặp lại y hệt logic nếu sau này thêm/bớt khối trong accordion này.
   const [mobileExpanded, setMobileExpanded] = useState<MobileAccordionBlockId>('tasks');
   // Mobile có 2 tab riêng: "Trò chuyện" (MobileChatScreen — màn chính, thay Home) và "Chi tiết"
   // (accordion Task/Notes đầy đủ y như trước). Mặc định mở Chat — đúng yêu cầu "gõ nhanh là
@@ -517,8 +516,8 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
   // khi dồn dọc, kể cả cột chỉ chứa "settings" cao vài chục px — để lại khoảng trống lớn lộ
   // background phía dưới, xem ảnh lỗi thực tế khi test). Dựng riêng 1 layout tĩnh: thanh
   // Space-switcher dính TRÊN cùng; "Việc cần làm"/"Ghi chú"/"Nhật ký nhanh" hoạt động dạng
-  // accordion (2026-07-08: mở rộng 2→3 khối, xem docs/features/nhat-ky-nhanh.md mục 5.2.2) —
-  // khối đang mở chiếm 80% chiều cao, các khối còn lại thu nhỏ về thanh tóm tắt (tiêu đề + số
+  // accordion (3 khối, xem docs/features/nhat-ky-nhanh.md mục 5.2.2) — khối đang mở chiếm 80%
+  // chiều cao, các khối còn lại thu nhỏ về thanh tóm tắt (tiêu đề + số
   // lượng), bấm vào để đổi chỗ — KHÔNG ẩn hẳn 0%, để không mất hoàn toàn context của khối kia
   // (đã cân nhắc với uiux, xem record quyết định kèm câu hỏi này). Chỉ đúng 1 khối mở tại 1 thời
   // điểm dù có 2 hay 3 khối — khi chỉ còn ≤1 khối hiển thị (do tắt bớt qua enabledBlocks), khối
@@ -605,7 +604,7 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
             {rowSplitters
               .filter((rs) => rs.ci === ci)
               .map((rs) => {
-                // Ngoại lệ mục 11.10 (MỞ RỘNG 2026-07-09 — cả 2 khối): splitter liền kề khối
+                // Ngoại lệ mục 11.10 (cả 2 khối): splitter liền kề khối
                 // `settings` VÀ/HOẶC `reminders` đổi `h` DÙNG CHUNG mọi Space
                 // (`dashboardCornerHeight`/`dashboardReminderHeight`), khác mọi splitter dọc khác
                 // (chỉ Space này) — tra theo layout GỐC (đầy đủ, không phải `visibleLayout`) qua

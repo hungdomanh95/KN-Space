@@ -10,11 +10,11 @@ import type { DashboardLayout, LayoutBlockKey, LayoutSlot } from '../types';
 
 /**
  * Khối có chiều cao LUÔN cố định theo nội dung thật (flex: 0 0 auto) ở cấp LAYOUT-ENGINE, không
- * theo trọng số `h`. Rỗng kể từ 2026-07-08 (gộp "Hôm nay"+"Widget điều hướng", xem
- * docs/requirements.md mục 4.1 change impact #4) — trước đó chứa `'settings'` (widget điều
- * hướng khoá cứng toàn khối). Khối gộp mới (`'settings'`) resize được bình thường như 1 khối dữ
- * liệu (tham gia trọng số `h`), chỉ HÀNG NAV bên trong nó khoá cứng — khoá cứng đó nằm ở cấp CSS
- * nội bộ component (`DashboardCornerBlock.tsx`), không phải ở tập hợp này.
+ * theo trọng số `h`. Rỗng (gộp "Hôm nay"+"Widget điều hướng", xem docs/requirements.md mục 4.1) —
+ * trước đó chứa `'settings'` (widget điều hướng khoá cứng toàn khối). Khối gộp mới (`'settings'`)
+ * resize được bình thường như 1 khối dữ liệu (tham gia trọng số `h`), chỉ HÀNG NAV bên trong nó
+ * khoá cứng — khoá cứng đó nằm ở cấp CSS nội bộ component (`DashboardCornerBlock.tsx`), không
+ * phải ở tập hợp này.
  */
 export const HEIGHT_LOCKED_IDS = new Set<LayoutBlockKey>([]);
 
@@ -56,7 +56,7 @@ export function defaultHFor(id: LayoutBlockKey): number {
  * giới hạn như cũ. Chỉ áp dụng ở cấp SLOT wrapper (`AppLayout.renderSlot`), không phải ở style của
  * chính component block.
  *
- * `settings: 150` — đo thật bằng DevTools (2026-07-09): hàng nav cố định cao 48px, phần nội dung
+ * `settings: 150` — đo thật bằng DevTools: hàng nav cố định cao 48px, phần nội dung
  * ambient (ngày + quote 2 dòng + padding) chỉ cần ~76px → tổng tự nhiên ~124px. 150px chừa thêm
  * ~26px cho ngày có quote dài phải xuống 3 dòng, không chừa dư quá mức gây trống trải như mốc
  * 220px ban đầu (đo thực tế cho thấy 220px để lại ~60px khoảng trống mỗi bên, nhìn rỗng).

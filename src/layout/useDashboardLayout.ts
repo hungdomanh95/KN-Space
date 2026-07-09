@@ -21,15 +21,14 @@ export type ActiveSplitter =
  * State + handlers cho layout Dashboard tự do (kéo-thả chèn trên/dưới/ghép ngang + resize
  * splitter ẩn) — port thuật toán từ docs/demo-layout-options/index.html sang React.
  *
- * MỚI (2026-07-08, xem docs/features/layout-theo-space.md mục 11 — thay đổi kiến trúc so với
- * comment cũ nói "dùng chung mọi Space"): `Settings.dashboardLayout` (1 object đơn) đã tách
- * thành 2 field phạm vi khác nhau:
+ * `Settings.dashboardLayout` (1 object đơn, lịch sử) đã tách thành 2 field phạm vi khác nhau
+ * (xem docs/requirements.md mục 11):
  * - `colWidths` (`settings.dashboardColWidths`) — DÙNG CHUNG mọi Space của user, KHÔNG phụ
  *   thuộc `currentSpaceId`. Đổi Space không đổi khung 3 cột.
  * - `cols` (`settings.dashboardCols[spaceId]`) — RIÊNG theo TỪNG Space, đọc qua
- *   `resolveDashboardCols()` (thứ tự fallback SAU bugfix 2026-07-08: entry riêng -> mặc định hệ
- *   thống — KHÔNG còn qua `dashboardLayout.cols` cũ, xem docs/features/layout-theo-space-
- *   progress.md mục "Bug phát sinh sau Phần 2"). Đổi Space đổi nội dung bên trong 3 cột.
+ *   `resolveDashboardCols()` (thứ tự fallback: entry riêng -> mặc định hệ thống — KHÔNG qua
+ *   `dashboardLayout.cols` cũ, xem lý do ở `resolveDashboardCols` trong `storage/normalize.ts`).
+ *   Đổi Space đổi nội dung bên trong 3 cột.
  *
  * Local state `layout` vẫn giữ dạng `DashboardLayout` gộp (colWidths + cols) vì toàn bộ thuật
  * toán kéo-thả/resize trong `dashboardLayoutUtils.ts` thao tác trên object gộp này — chỉ tách
@@ -61,8 +60,8 @@ export type ActiveSplitter =
  *    MỚI mỗi lần gọi dù nội dung giống hệt); nếu không memo, effect đồng bộ lại `layout` (dep
  *    `[persistedLayout]`, so sánh reference) sẽ chạy lại ở MỌI re-render dù dữ liệu không đổi.
  * 4. Ngoại lệ mục 11.10 (chiều cao khối `settings`/`reminders` dùng CHUNG mọi Space —
- *    `settings.dashboardCornerHeight`/`settings.dashboardReminderHeight`, MỞ RỘNG 2026-07-09 sang
- *    cả `reminders` — khác `h` mọi khối khác vẫn riêng theo Space): `resolveDashboardCols()` đã tự
+ *    `settings.dashboardCornerHeight`/`settings.dashboardReminderHeight` — khác `h` mọi khối khác
+ *    vẫn riêng theo Space): `resolveDashboardCols()` đã tự
  *    OVERRIDE cả 2 giá trị này khi ĐỌC (xem storage/normalize.ts) nên `persistedCols`/`layout`
  *    local ở hook này luôn phản ánh đúng, không cần xử lý gì thêm ở phần đọc. Phần GHI mới cần
  *    thêm ở đây: khi kết thúc splitter DỌC (`row`, đổi `h`) liền kề 1 trong 2 khối này, `endResize`
@@ -85,9 +84,9 @@ export function useDashboardLayout() {
   const persistedCols = useMemo(
     () => resolveDashboardCols(state.settings, currentSpaceId),
     // `dashboardCornerHeight`/`dashboardReminderHeight` PHẢI có trong deps — `resolveDashboardCols()`
-    // override `h` của khối `settings`/`reminders` bằng 2 giá trị này (mục 11.10, mở rộng
-    // 2026-07-09); thiếu dep sẽ khiến đổi chiều cao 2 khối này ở nơi khác (vd sau reload/từ máy
-    // khác) không kích hoạt tính lại `persistedCols`.
+    // override `h` của khối `settings`/`reminders` bằng 2 giá trị này (mục 11.10); thiếu dep sẽ
+    // khiến đổi chiều cao 2 khối này ở nơi khác (vd sau reload/từ máy khác) không kích hoạt tính
+    // lại `persistedCols`.
     [state.settings.dashboardCols, state.settings.dashboardCornerHeight, state.settings.dashboardReminderHeight, currentSpaceId],
   );
   const persistedLayout = useMemo<DashboardLayout>(
@@ -206,7 +205,7 @@ export function useDashboardLayout() {
       payload: { spaceId: pendingColsSpaceIdRef.current, cols: layoutRef.current.cols },
     });
 
-    // Ngoại lệ mục 11.10 (MỞ RỘNG 2026-07-09 — cả 2 khối) — splitter DỌC (row, đổi `h`) liền kề
+    // Ngoại lệ mục 11.10 (cả 2 khối `settings`/`reminders`) — splitter DỌC (row, đổi `h`) liền kề
     // `settings`/`reminders`: ghi THÊM `h` mới vào field DÙNG CHUNG tương ứng, tách biệt khỏi
     // entry per-Space vừa ghi ở trên (1 thao tác kéo -> tối đa 3 đích lưu trữ, xem comment đầu file
     // điểm 4). 2 khối kiểm tra ĐỘC LẬP (không phải else-if) — 1 slot chỉ khớp đúng 1 trong 2 id nên

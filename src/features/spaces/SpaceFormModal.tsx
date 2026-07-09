@@ -8,9 +8,9 @@ import type { EnabledBlocks, Space } from '../../types';
 
 // Khối Thông báo và khối gộp "Widget điều hướng + Hôm nay" KHÔNG nằm trong danh sách chọn
 // bật/tắt — luôn hiện ở mọi Space (xem requirements mục 4.1/5.5/6/8, forceRemindersEnabled() ở
-// reducers/spaces.ts). Từ 2026-07-08 (gộp Hôm nay vào Widget điều hướng), không còn checkbox
-// "Hôm nay" ở đây nữa — AC4, docs/requirements.md mục 4.1: mất khả năng tắt riêng hàng ambient
-// theo Space, đây là thay đổi hành vi đã chốt, không phải thiếu sót.
+// reducers/spaces.ts). Không còn checkbox "Hôm nay" riêng ở đây (đã gộp vào Widget điều hướng) —
+// AC4, docs/requirements.md mục 4.1: mất khả năng tắt riêng hàng ambient theo Space, đây là thay
+// đổi hành vi đã chốt, không phải thiếu sót.
 const BLOCK_DEFS: { key: keyof EnabledBlocks; label: string }[] = [
   { key: 'tasks', label: 'Việc cần làm' },
   { key: 'reminder', label: 'Nhắc việc' },

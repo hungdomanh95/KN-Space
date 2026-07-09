@@ -8,11 +8,10 @@ interface SplitterProps {
   active: boolean;
   onMouseDown: (e: React.MouseEvent) => void;
   /**
-   * MỚI (2026-07-08, xem docs/features/layout-theo-space.md mục 11.9.4) — `title`/`aria-label`
-   * gán TƯỜNG MINH tại từng vị trí gọi `<Splitter>` trong AppLayout.tsx, KHÔNG derive từ `axis`:
-   * splitter `axis="col"` có 2 phạm vi lưu trữ khác nhau (subcol ghép-ngang-trong-cột vs cột lớn
-   * ngoài cùng) render y hệt nhau về mặt hình ảnh nhưng khác hẳn phạm vi ảnh hưởng, xem mục
-   * 11.9.3 — bắt buộc truyền đúng theo từng vị trí gọi.
+   * `title`/`aria-label` gán TƯỜNG MINH tại từng vị trí gọi `<Splitter>` trong AppLayout.tsx,
+   * KHÔNG derive từ `axis`: splitter `axis="col"` có 2 phạm vi lưu trữ khác nhau (subcol
+   * ghép-ngang-trong-cột vs cột lớn ngoài cùng) render y hệt nhau về mặt hình ảnh nhưng khác hẳn
+   * phạm vi ảnh hưởng — bắt buộc truyền đúng theo từng vị trí gọi.
    */
   title: string;
 }

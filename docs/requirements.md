@@ -1,6 +1,6 @@
 # Requirements — KN-Space
 
-> **Trạng thái nền tảng (cập nhật):** KN-Space đã chuyển từ Chrome Extension (Phase 1, `chrome.storage`) sang **Web App cá nhân** (Phase 2, Bước 1+2). Bản extension đã được **xoá khỏi repo**, không còn duy trì. Mục 1–3 và 10–12 dưới đây mô tả đúng nền tảng hiện hành (Web App + Supabase). Mục 4–9 mô tả UX/feature chi tiết của 5 khối + Settings + đa Space — vẫn đúng bản chất sản phẩm.
+> **Trạng thái nền tảng (cập nhật):** KN-Space đã chuyển từ Chrome Extension (Phase 1, `chrome.storage`) sang **Web App cá nhân** (Phase 2, Bước 1+2). Bản extension đã được **xoá khỏi repo**, không còn duy trì. Mục 1–3 và 10–12 dưới đây mô tả đúng nền tảng hiện hành (Web App + Supabase). Mục 4–9 mô tả UX/feature chi tiết của 6 khối dữ liệu + Widget điều hướng gộp + Settings + đa Space — vẫn đúng bản chất sản phẩm.
 
 ## 1. Mục tiêu
 Xây dựng **KN-Space** thành một **Web App cá nhân** dạng dashboard năng suất, chạy được trên cả desktop và di động qua một URL duy nhất, dữ liệu lưu trên cloud (Supabase) và đồng bộ tự động giữa các máy/thiết bị đã đăng nhập.

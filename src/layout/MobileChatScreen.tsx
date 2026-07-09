@@ -61,8 +61,7 @@ export function MobileChatScreen() {
     return () => vv.removeEventListener('resize', onViewportResize);
   }, []);
 
-  // Cơ chế tiền tố (thay cho segmented picker cũ, theo yêu cầu đổi ngược của chủ dự án
-  // 2026-07-07 — xem docs/features/nhat-ky-nhanh-progress.md mục Phần 3):
+  // Cơ chế tiền tố (thay cho segmented picker cũ, theo yêu cầu đổi ngược của chủ dự án):
   // - Gõ trơn (không tiền tố) + Enter → mặc định tạo LOG (KHÁC bản gốc trước Nhật ký nhanh,
   //   lúc đó gõ trơn tạo Task).
   // - "/task " → tạo Task (tiền tố MỚI, trước đây gõ trơn mới ra Task).

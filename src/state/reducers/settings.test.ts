@@ -16,8 +16,8 @@ describe('settingsReducer — SETTINGS_SET_PUSH_NOTIFY_SHARED_EVENTS', () => {
 });
 
 // ─── SETTINGS_SET_COL_WIDTHS / SETTINGS_SET_DASHBOARD_COLS / SETTINGS_RESET_DASHBOARD_COLS ──
-// MỚI (2026-07-08, xem docs/features/layout-theo-space.md mục 11) — tách colWidths (dùng chung
-// mọi Space, không kèm spaceId) khỏi cols (riêng theo từng Space, kèm spaceId).
+// Xem docs/features/layout-theo-space.md mục 11 — tách colWidths (dùng chung mọi Space, không
+// kèm spaceId) khỏi cols (riêng theo từng Space, kèm spaceId).
 
 describe('settingsReducer — SETTINGS_SET_COL_WIDTHS', () => {
   it('ghi thẳng dashboardColWidths, không kèm spaceId, không đụng dashboardCols', () => {
@@ -64,8 +64,8 @@ describe('settingsReducer — SETTINGS_SET_CORNER_HEIGHT (mục 11.10, ngoại l
   });
 });
 
-// MỚI (2026-07-09, mục 11.10 MỞ RỘNG) — cặp đôi với SETTINGS_SET_CORNER_HEIGHT, cho khối
-// `reminders` (Thông báo) cũng LUÔN hiển thị mọi Space, không tắt được (y hệt lý do `settings`).
+// Mục 11.10 mở rộng — cặp đôi với SETTINGS_SET_CORNER_HEIGHT, cho khối `reminders` (Thông báo)
+// cũng LUÔN hiển thị mọi Space, không tắt được (y hệt lý do `settings`).
 describe('settingsReducer — SETTINGS_SET_REMINDER_HEIGHT (mục 11.10 mở rộng, ngoại lệ h khối reminders)', () => {
   it('ghi thẳng dashboardReminderHeight, không kèm spaceId, không đụng dashboardCols/colWidths/dashboardCornerHeight', () => {
     const initial = defaultSettings();

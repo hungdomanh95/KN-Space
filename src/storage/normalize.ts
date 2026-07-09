@@ -2,10 +2,9 @@ import type { DashboardLayout, HomeBackground, HomeQuotes, LayoutBlockKey, Layou
 import { defaultDashboardLayout, defaultSettings, findReminderHeight, findSettingsCornerHeight } from '../state/seed';
 
 /**
- * Chuẩn hoá `logs[]` (Nhật ký nhanh, MỚI 2026-07-07 — xem docs/features/nhat-ky-nhanh.md).
- * Data cũ (trước khi có tính năng này) không có field `logs` -> fallback `[]`, không crash.
- * Mỗi entry bất biến (chỉ tạo/xoá) nên chỉ cần đủ `id`/`content`/`createdAt` hợp lệ, không có
- * `updatedAt`/`order` để normalize như Task/Note.
+ * Chuẩn hoá `logs[]` (Nhật ký nhanh, xem docs/features/nhat-ky-nhanh.md). Dữ liệu thiếu field
+ * này -> fallback `[]`, không crash. Mỗi entry bất biến (chỉ tạo/xoá) nên chỉ cần `id`/`content`/
+ * `createdAt` hợp lệ, không có `updatedAt`/`order` để normalize như Task/Note.
  */
 export function normalizeLogEntries(raw: unknown): LogEntry[] {
   if (!Array.isArray(raw)) return [];
@@ -33,7 +32,7 @@ export function normalizeSpace(space: Space): Space {
       notes: space.enabledBlocks?.notes ?? true,
       // Khối Thông báo không có cấu hình tắt theo Space — luôn `true`, không đọc từ data cũ.
       reminders: true,
-      // Space lưu TRƯỚC khi có field `logs` (Nhật ký nhanh) -> mặc định hiện, không tự ẩn.
+      // Dữ liệu thiếu field `logs` (Nhật ký nhanh) -> mặc định hiện, không tự ẩn.
       logs: space.enabledBlocks?.logs ?? true,
     },
     tasks: Array.isArray(space.tasks)
@@ -127,29 +126,27 @@ export function findLegacyDashboardLayout(rawSpaces: unknown[]): DashboardLayout
 }
 
 /**
- * Migration khối gộp "Hôm nay" + "Widget điều hướng" (2026-07-08, xem docs/requirements.md mục
- * 4.1). Layout cũ (trước khi gộp) có 2 slot ĐỘC LẬP: `id:'today'` (đồng hồ/ngày/quote) và
- * `id:'settings'` (nav) — `'today'` đã bị xoá khỏi `LayoutBlockKey` nên không còn hợp lệ về
- * type, phải dùng `as string`/cast cục bộ để đọc dữ liệu LEGACY (runtime JSON không được
- * TypeScript xác nhận đúng type khai báo).
+ * Migrate layout cũ: trước khi khối "Hôm nay" gộp vào "Widget điều hướng" (xem
+ * docs/requirements.md mục 4.1), 2 khối này là 2 slot ĐỘC LẬP — `id:'today'` (đồng hồ/ngày/quote)
+ * và `id:'settings'` (nav). `'today'` đã bị xoá khỏi `LayoutBlockKey` nên không còn hợp lệ về
+ * type, phải cast `as string` để đọc dữ liệu LEGACY.
  *
- * Quy tắc (change impact #2, docs/requirements.md mục 4.1):
+ * Quy tắc:
  * - Neo vị trí theo slot `settings` cũ (nav ổn định hơn, ít khả năng đã bị kéo đi chỗ khác).
  * - Nếu `today` đã bị kéo sang vị trí khác/ghép ngang với khối khác — vị trí đó bị BỎ HẲN sau
  *   migrate (không giữ được 2 vị trí cho 1 khối gộp); slot/row chứa nó được rút gọn giống hệt
  *   logic `removeIdFromLayout` (viết tay lại ở đây vì hàm gốc trong `dashboardLayoutUtils.ts`
  *   thao tác trên `LayoutBlockKey` đã không còn chấp nhận `'today'`).
  * - Chiều cao slot gộp = `max(h cũ của 'today', h cũ của 'settings')` — không cộng dồn (dễ ra
- *   quá cao so với mặc định mới ~20-24, xem `defaultDashboardLayout()`), chỉ cần đủ chỗ hiển thị
- *   thêm hàng ambient so với khi `settings` còn đứng 1 mình, không cần khớp tuyệt đối.
+ *   quá cao so với mặc định mới, xem `defaultDashboardLayout()`), chỉ cần đủ chỗ hiển thị thêm
+ *   hàng ambient so với khi `settings` còn đứng 1 mình, không cần khớp tuyệt đối.
  *
- * Chạy tự động, 1 chiều, không cần UI/thông báo riêng (thay đổi visual nhỏ, không mất dữ liệu
- * nghiệp vụ) — bỏ qua ngay nếu layout đã ở schema mới (không còn `'today'`).
+ * Chạy tự động, 1 chiều, bỏ qua ngay nếu layout đã ở schema mới (không còn `'today'`).
  *
  * **Fallback an toàn nếu dữ liệu bất thường:** giả định "luôn có sẵn slot `settings` để neo vị
- * trí" có thể sai với dữ liệu hỏng/import cũ bất thường (dù UI hiện tại không có cách xoá khối
- * này) — nếu sau bước gộp vẫn không tìm thấy `settings` trong layout, tự chèn thêm 1 slot mới
- * (không để Dashboard mất hẳn cách về Home/đổi Space/mở Settings — vi phạm AC3).
+ * trí" có thể sai với dữ liệu hỏng/import cũ bất thường — nếu sau bước gộp vẫn không tìm thấy
+ * `settings` trong layout, tự chèn thêm 1 slot mới (không để Dashboard mất hẳn cách về Home/đổi
+ * Space/mở Settings).
  */
 function migrateTodaySettingsMerge(rawCols: LayoutSlot[][]): LayoutSlot[][] {
   const ids = collectLayoutBlockIds(rawCols);
@@ -228,9 +225,8 @@ function patchMissingLogsBlock(rawCols: LayoutSlot[][]): LayoutSlot[][] {
  * "không migration phức tạp" của dự án giai đoạn này; người dùng resize lại bằng tay sau đó (đã
  * sửa hết bug resize) là đủ.
  *
- * Dùng chung cho CẢ 2 nơi (2026-07-08, xem docs/features/layout-theo-space.md mục 11.7.5):
- * `Settings.dashboardColWidths` (field mới, dùng chung mọi Space) VÀ `DashboardLayout.colWidths`
- * legacy (field `dashboardLayout` cũ, qua `normalizeDashboardLayout`).
+ * Dùng chung cho cả `Settings.dashboardColWidths` (dùng chung mọi Space) và
+ * `DashboardLayout.colWidths` legacy (field `dashboardLayout` cũ, qua `normalizeDashboardLayout`).
  */
 function normalizeColWidths(raw: unknown, fallback: number[]): number[] {
   if (!Array.isArray(raw) || raw.length !== fallback.length) return fallback;
@@ -274,12 +270,11 @@ export function normalizeDashboardLayout(raw: DashboardLayout | undefined): Dash
 }
 
 /**
- * Chuẩn hoá SHAPE của `Settings.dashboardCols` (map `spaceId -> cols`, MỚI 2026-07-08) — chỉ
- * validate cấu trúc từng entry (`normalizeCols`), KHÔNG suy luận fallback theo 1 `spaceId` cụ thể
- * nào ở đây (hàm này không biết `currentSpaceId`). Entry hỏng cấu trúc bị BỎ HẲN (không thay bằng
- * default) — để `resolveDashboardCols()` tự rơi xuống đúng thứ tự fallback khi đọc, thay vì lưu
- * cứng 1 giá trị default vào đúng key đó (tránh "khoá cứng" 1 Space vào default sớm hơn cần
- * thiết).
+ * Chuẩn hoá SHAPE của `Settings.dashboardCols` (map `spaceId -> cols`) — chỉ validate cấu trúc
+ * từng entry (`normalizeCols`), KHÔNG suy luận fallback theo 1 `spaceId` cụ thể nào ở đây (hàm
+ * này không biết `currentSpaceId`). Entry hỏng cấu trúc bị BỎ HẲN (không thay bằng default) — để
+ * `resolveDashboardCols()` tự rơi xuống đúng thứ tự fallback khi đọc, thay vì lưu cứng 1 giá trị
+ * default vào đúng key đó (tránh "khoá cứng" 1 Space vào default sớm hơn cần thiết).
  */
 function normalizeDashboardColsMap(raw: unknown, colCount: number): Record<string, LayoutSlot[][]> {
   if (!raw || typeof raw !== 'object') return {};
@@ -292,15 +287,12 @@ function normalizeDashboardColsMap(raw: unknown, colCount: number): Record<strin
 }
 
 /**
- * Chuẩn hoá `Settings.dashboardCornerHeight`/`dashboardReminderHeight` (mục 11.10, MỚI 2026-07-08,
- * MỞ RỘNG 2026-07-09) — 1 số dương hữu hạn, DÙNG CHUNG mọi Space (cùng nhóm `dashboardColWidths`).
- * **Cố ý KHÔNG migrate/fallback qua field `dashboardLayout` cũ** (khác mô tả gốc mục 11.10.4 — xem
- * giải thích trong docs/features/layout-theo-space-progress.md mục 11.10, quyết định lúc code): áp
- * dụng lại đúng bài học Phương án A (bug 2026-07-08) đã dùng cho `dashboardColWidths`/
- * `dashboardCols` — field `dashboardLayout` là dữ liệu ĐÓNG BĂNG tại 1 thời điểm cũ, có thể mang
- * giá trị bất thường (vd do bug resize cộng-dồn-delta đã sửa trước đây). Với 2 field NÀY, rủi ro
- * còn LỚN HƠN cả `cols` per-Space: vì dùng CHUNG mọi Space, 1 giá trị lỗi đọc được từ dữ liệu cũ sẽ
- * làm SAI NGAY LẬP TỨC ở TẤT CẢ Space cùng lúc, thay vì chỉ 1 Space chưa từng chỉnh như trường hợp
+ * Chuẩn hoá `Settings.dashboardCornerHeight`/`dashboardReminderHeight` — 1 số dương hữu hạn, DÙNG
+ * CHUNG mọi Space (cùng nhóm `dashboardColWidths`). **Cố ý KHÔNG migrate/fallback qua field
+ * `dashboardLayout` cũ**: field đó là dữ liệu ĐÓNG BĂNG tại 1 thời điểm cũ, có thể mang giá trị
+ * bất thường (vd do bug resize cộng-dồn-delta đã sửa trước đây). Với 2 field NÀY rủi ro còn LỚN
+ * HƠN cả `cols` per-Space — vì dùng CHUNG mọi Space, 1 giá trị lỗi đọc được từ dữ liệu cũ sẽ làm
+ * SAI NGAY LẬP TỨC ở TẤT CẢ Space cùng lúc, thay vì chỉ 1 Space chưa từng chỉnh như trường hợp
  * `cols`. Fallback THẲNG `defaultDashboardLayout()` (qua `findSettingsCornerHeight`/
  * `findReminderHeight`, tham số `fallback` truyền vào từ `normalizeSettings`).
  */
@@ -310,11 +302,10 @@ function normalizeGlobalSlotHeight(raw: unknown, fallback: number): number {
 
 /**
  * Ghi đè `h` của MỌI slot mang khối trong `overrides` (single hoặc ghép ngang) bằng giá trị DÙNG
- * CHUNG tương ứng (mục 11.10.2, MỞ RỘNG 2026-07-09 — cả `settings` lẫn `reminders`) — áp dụng bất
- * kể `dashboardCols[spaceId]`/`defaultDashboardLayout().cols` lưu gì cho slot đó. Chỉ đổi đúng các
- * `LayoutBlockKey` có mặt trong `overrides`, giữ nguyên `h` của mọi khối khác. Giữ nguyên REFERENCE
- * gốc của `cols` nếu không có gì cần đổi (referential-stability cho `useMemo` ở
- * `useDashboardLayout.ts` — xem rủi ro #3 mục 11.7/9.6, cùng lý do áp dụng lại ở đây).
+ * CHUNG tương ứng (`settings` lẫn `reminders`) — áp dụng bất kể `dashboardCols[spaceId]`/
+ * `defaultDashboardLayout().cols` lưu gì cho slot đó. Chỉ đổi đúng các `LayoutBlockKey` có mặt
+ * trong `overrides`, giữ nguyên `h` của mọi khối khác. Giữ nguyên REFERENCE gốc của `cols` nếu
+ * không có gì cần đổi (referential-stability cho `useMemo` ở `useDashboardLayout.ts`).
  */
 function overrideSlotHeights(cols: LayoutSlot[][], overrides: Partial<Record<LayoutBlockKey, number>>): LayoutSlot[][] {
   let changed = false;
@@ -345,33 +336,30 @@ function overrideSlotHeights(cols: LayoutSlot[][], overrides: Partial<Record<Lay
 }
 
 /**
- * Đọc `cols` hiệu lực cho 1 Space cụ thể — đúng thứ tự fallback đã chốt SAU khi sửa bug
- * 2026-07-08 (xem "Bug phát sinh sau Phần 2" trong docs/features/layout-theo-space-progress.md —
- * Phương án A):
+ * Đọc `cols` hiệu lực cho 1 Space cụ thể — thứ tự fallback:
  *   1. `settings.dashboardCols[spaceId]` — Space này đã từng bị user tự chỉnh riêng (kéo dọc/
- *      kéo-thả) kể từ khi tính năng "layout riêng theo Space" lên production.
- *   2. `defaultDashboardLayout().cols` — MỌI trường hợp còn lại (user hoàn toàn mới, HOẶC Space
- *      chưa từng tự chỉnh riêng từ Phần 2).
+ *      kéo-thả).
+ *   2. `defaultDashboardLayout().cols` — mọi trường hợp còn lại (user mới, hoặc Space chưa từng
+ *      tự chỉnh riêng).
  *
- * **KHÔNG còn fallback qua `settings.dashboardLayout.cols`** (đã bỏ hẳn, khác thiết kế gốc ở Phần
- * 1) — field đó là dữ liệu ĐÓNG BĂNG tại đúng thời điểm Phần 2 lên production, có thể mang cấu
- * trúc cột CŨ/LẠ (nhóm khối khác bố cục hiện hành, từ nhiều đợt migration trước đó) mà không có
- * cách nào phân biệt "dữ liệu hợp lệ nhưng cũ" với "dữ liệu hỏng" chỉ bằng validate SHAPE — gây bug
- * vỡ layout thật (Space "MAFC", báo 2026-07-08: 1 cột chỉ chứa `habits` biến mất khi Space tắt
- * khối này, làm 2 cột còn lại trông như gộp làm 1). Đánh đổi đã chấp nhận: Space chưa từng tự
- * chỉnh riêng từ Phần 2 sẽ dùng đúng bố cục mặc định hiện hành (1 lần), thay vì âm thầm dùng dữ
- * liệu đóng băng có thể sai lệch.
+ * **Cố ý KHÔNG fallback qua `settings.dashboardLayout.cols`** (field lịch sử) — field đó là dữ
+ * liệu ĐÓNG BĂNG tại 1 thời điểm cũ, có thể mang cấu trúc cột CŨ/LẠ (nhóm khối khác bố cục hiện
+ * hành) mà không có cách nào phân biệt "dữ liệu hợp lệ nhưng cũ" với "dữ liệu hỏng" chỉ bằng
+ * validate SHAPE — dễ gây vỡ layout thật (1 cột chỉ chứa 1 khối đã bị Space tắt sẽ biến mất khỏi
+ * render, làm 2 cột còn lại trông như gộp làm 1). Đánh đổi chấp nhận: Space chưa từng tự chỉnh
+ * riêng sẽ dùng đúng bố cục mặc định hiện hành, thay vì âm thầm dùng dữ liệu đóng băng có thể sai
+ * lệch.
  *
  * Hàm THUẦN (không dispatch/side-effect nào) — nhận `settings` đã qua `normalizeSettings()` (nên
  * `dashboardCols` ở đây đã hợp lệ về cấu trúc, không cần validate lại).
  *
- * MỚI (2026-07-08, mục 11.10, MỞ RỘNG 2026-07-09) — sau khi resolve `cols` theo đúng thứ tự
- * fallback trên, override `h` của slot `settings` bằng `settings.dashboardCornerHeight` VÀ `h` của
- * slot `reminders` bằng `settings.dashboardReminderHeight` (cả 2 dùng chung mọi Space — khối
- * `reminders`/Thông báo cũng LUÔN hiển thị, không tắt theo Space, y hệt lý do `settings`) — bất kể
- * entry per-Space hay default lưu giá trị `h` nào cho 2 slot đó. Đây là bước override ĐỌC-THỜI-
- * ĐIỂM-RENDER duy nhất trong hàm này; ghi ("2 đích lưu trữ" khi resize splitter liền kề 1 trong 2
- * khối này) là việc của `useDashboardLayout.ts`, không phải hàm thuần này.
+ * Sau khi resolve `cols` theo thứ tự fallback trên, override `h` của slot `settings` bằng
+ * `settings.dashboardCornerHeight` VÀ `h` của slot `reminders` bằng
+ * `settings.dashboardReminderHeight` (cả 2 dùng chung mọi Space — khối `reminders`/Thông báo cũng
+ * LUÔN hiển thị, không tắt theo Space, y hệt lý do `settings`) — bất kể entry per-Space hay
+ * default lưu giá trị `h` nào cho 2 slot đó. Đây là bước override ĐỌC-THỜI-ĐIỂM-RENDER duy nhất
+ * trong hàm này; ghi (2 đích lưu trữ khi resize splitter liền kề 1 trong 2 khối này) là việc của
+ * `useDashboardLayout.ts`, không phải hàm thuần này.
  */
 export function resolveDashboardCols(settings: Settings, spaceId: string): LayoutSlot[][] {
   const perSpace = settings.dashboardCols?.[spaceId];
@@ -408,11 +396,11 @@ export function normalizeSettings(
   const fallback = defaultSettings();
   const dashboardLayout = normalizeDashboardLayout(settings.dashboardLayout ?? legacyDashboardLayout);
   // Nguồn colCount/fallback DUY NHẤT cho `dashboardColWidths`/`dashboardCols` bên dưới — KHÔNG
-  // dùng `dashboardLayout` (biến ở trên, field lịch sử đã đóng băng) nữa (Phương án A, xem bug
-  // 2026-07-08 trong docs/features/layout-theo-space-progress.md). `dashboardLayout` vẫn được
-  // tính/giữ trong object trả về để không mất field khi export/import (Settings vẫn khai báo bắt
-  // buộc field này), nhưng từ đây trở đi CHỈ dùng làm dữ liệu đọc thô lịch sử, không tham gia suy
-  // luận colCount/giá trị mặc định cho 2 field mới.
+  // dùng `dashboardLayout` (biến ở trên, field lịch sử đã đóng băng, xem lý do ở
+  // `resolveDashboardCols`/`normalizeGlobalSlotHeight`). `dashboardLayout` vẫn được tính/giữ
+  // trong object trả về để không mất field khi export/import (Settings vẫn khai báo bắt buộc
+  // field này), nhưng từ đây trở đi CHỈ dùng làm dữ liệu đọc thô lịch sử, không tham gia suy luận
+  // colCount/giá trị mặc định cho 2 field mới.
   const defaultLayout = defaultDashboardLayout();
   return {
     theme: settings.theme ?? fallback.theme,
@@ -433,23 +421,22 @@ export function normalizeSettings(
     // nếu cần), nhưng KHÔNG còn tham gia tính `dashboardColWidths`/`dashboardCols` bên dưới (xem
     // comment ở `defaultLayout` phía trên + comment `Settings.dashboardLayout` trong types.ts).
     dashboardLayout,
-    // MỚI (2026-07-08, xem docs/features/layout-theo-space.md mục 11.4) — `colWidths` dùng
-    // chung mọi Space: copy 1:1 từ giá trị đã lưu, fallback THẲNG `defaultDashboardLayout()`
-    // (Phương án A, KHÔNG còn qua `dashboardLayout` cũ — field đó là dữ liệu đóng băng, có thể
-    // lệch khỏi bố cục mặc định hiện hành). Migration diễn ra NGAY TẠI ĐÂY (khác `cols` bên dưới,
-    // đọc-fallback tại chỗ) vì đây chỉ là 1 giá trị đơn, không có vấn đề thứ tự load nhiều Space.
+    // `colWidths` dùng chung mọi Space: copy 1:1 từ giá trị đã lưu, fallback THẲNG
+    // `defaultDashboardLayout()` (KHÔNG qua `dashboardLayout` cũ — xem lý do ở
+    // `resolveDashboardCols`). Migration diễn ra NGAY TẠI ĐÂY (khác `cols` bên dưới, đọc-fallback
+    // tại chỗ) vì đây chỉ là 1 giá trị đơn, không có vấn đề thứ tự load nhiều Space.
     dashboardColWidths: normalizeColWidths(settings.dashboardColWidths, defaultLayout.colWidths),
-    // MỚI — `cols` RIÊNG theo từng Space: chỉ chuẩn hoá SHAPE của map ở đây (từng entry hợp lệ
-    // cấu trúc, colCount chuẩn lấy từ `defaultDashboardLayout()` — Phương án A, không còn từ
-    // `dashboardLayout` cũ); fallback theo 1 `spaceId` cụ thể là việc của `resolveDashboardCols()`
-    // (gọi tại nơi biết `currentSpaceId`, xem Phần 2 docs/features/layout-theo-space-progress.md).
+    // `cols` RIÊNG theo từng Space: chỉ chuẩn hoá SHAPE của map ở đây (từng entry hợp lệ cấu
+    // trúc, colCount chuẩn lấy từ `defaultDashboardLayout()`, không từ `dashboardLayout` cũ);
+    // fallback theo 1 `spaceId` cụ thể là việc của `resolveDashboardCols()` (gọi tại nơi biết
+    // `currentSpaceId`).
     dashboardCols: normalizeDashboardColsMap(settings.dashboardCols, defaultLayout.colWidths.length),
-    // MỚI (2026-07-08, mục 11.10) — ngoại lệ dùng chung: h của khối 'settings'. KHÔNG migrate qua
-    // `dashboardLayout` cũ (xem comment `normalizeGlobalSlotHeight` — Phương án A áp dụng lại, rủi
-    // ro cao hơn `colWidths` vì đây cũng dùng chung mọi Space).
+    // Ngoại lệ dùng chung: h của khối 'settings'. KHÔNG migrate qua `dashboardLayout` cũ (xem
+    // comment `normalizeGlobalSlotHeight` — rủi ro cao hơn `colWidths` vì đây cũng dùng chung
+    // mọi Space).
     dashboardCornerHeight: normalizeGlobalSlotHeight(settings.dashboardCornerHeight, findSettingsCornerHeight(defaultLayout.cols)),
-    // MỚI (2026-07-09, mục 11.10 MỞ RỘNG) — cặp đôi với dashboardCornerHeight: h của khối
-    // 'reminders' (Thông báo), cùng lý do/cách xử lý (KHÔNG migrate qua `dashboardLayout` cũ).
+    // Cặp đôi với dashboardCornerHeight: h của khối 'reminders' (Thông báo), cùng lý do/cách xử
+    // lý (KHÔNG migrate qua `dashboardLayout` cũ).
     dashboardReminderHeight: normalizeGlobalSlotHeight(settings.dashboardReminderHeight, findReminderHeight(defaultLayout.cols)),
   };
 }

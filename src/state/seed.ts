@@ -6,14 +6,12 @@ import { DEFAULT_HOME_IMAGES, HOME_QUOTES, dayIndex, epochDay } from '../feature
  * đổi vị trí khối Thói quen: gộp cùng cột với Việc cần làm + Nhắc việc (xếp dưới Việc cần làm)
  * thay vì tách riêng sang cột Thông báo như demo gốc — đúng yêu cầu thực tế đã chốt (Thói quen
  * và Nhắc việc phải nằm dưới Việc cần làm, không lẫn sang cột khác):
- * - Cột 1 (32%): notes (h=62) + logs/"Nhật ký nhanh" (h=20) — không đổi so với trước
- *   2026-07-08 ngoài việc mất khối `today` cũ (đã gộp vào `settings`, xem cột 3 dưới đây).
+ * - Cột 1 (32%): notes (h=62) + logs/"Nhật ký nhanh" (h=20).
  * - Cột 2 (36%): tasks (h=45) + reminder/"Nhắc việc" (h=28) + habits/"Thói quen" (h=27)
- * - Cột 3 (32%): settings (h=22, MỚI 2026-07-08 — khối gộp "Widget điều hướng + Hôm nay", xem
- *   docs/requirements.md mục 4.1: hàng nav khoá cứng theo nội dung + hàng ambient đồng hồ/ngày/
- *   quote resize tự do bên trong, KHÔNG còn khoá cứng toàn khối ở cấp layout-engine — `h` chỉ là
- *   điểm khởi tạo, user resize được bình thường qua splitter) + reminders/"Thông báo" (h=68,
- *   giảm từ 86 để nhường chỗ cho hàng ambient mới của khối gộp).
+ * - Cột 3 (32%): settings (h=22 — khối gộp "Widget điều hướng + Hôm nay", xem docs/requirements.md
+ *   mục 4.1: hàng nav khoá cứng theo nội dung + hàng ambient đồng hồ/ngày/quote resize tự do bên
+ *   trong, KHÔNG còn khoá cứng toàn khối ở cấp layout-engine — `h` chỉ là điểm khởi tạo, user
+ *   resize được bình thường qua splitter) + reminders/"Thông báo" (h=68).
  * Lưu ý mapping id: demo dùng `reminders`/`noti` cho 2 khối khác field-naming trong code thật —
  * demo.reminders = "Nhắc việc" = field `reminder` (số ít) ở đây; demo.noti = "Thông báo" =
  * field `reminders` (số nhiều) ở đây (xem comment LayoutBlockKey trong types.ts).
@@ -62,7 +60,7 @@ export function findSettingsCornerHeight(cols: LayoutSlot[][], fallback = 22): n
   return findSlotHeight(cols, 'settings', fallback);
 }
 
-/** Cặp đôi với `findSettingsCornerHeight` — MỚI (mục 11.10 mở rộng 2026-07-09), xem `findSlotHeight`. */
+/** Cặp đôi với `findSettingsCornerHeight` — xem `findSlotHeight`. */
 export function findReminderHeight(cols: LayoutSlot[][], fallback = 68): number {
   return findSlotHeight(cols, 'reminders', fallback);
 }
@@ -91,22 +89,20 @@ export function defaultSettings(): Settings {
     // (ngay sau seed, cùng lượt) không snap lại lần nữa một cách dư thừa.
     lastOpenedEpochDay: epochDay(),
     dashboardLayout: defaultDashboardLayout(),
-    // MỚI (2026-07-08, xem docs/features/layout-theo-space.md mục 11.4): user hoàn toàn mới
-    // (chưa từng có `dashboardLayout` cũ) -> colWidths lấy đúng default, cols khởi tạo RỖNG (mọi
-    // Space fallback qua `resolveDashboardCols()` về `defaultDashboardLayout().cols`).
+    // User hoàn toàn mới -> colWidths lấy đúng default, cols khởi tạo RỖNG (mọi Space fallback
+    // qua `resolveDashboardCols()` về `defaultDashboardLayout().cols`).
     dashboardColWidths: defaultDashboardLayout().colWidths,
     dashboardCols: {},
-    // MỚI (2026-07-08, mục 11.10) — ngoại lệ dùng chung: h của khối 'settings', cùng nhóm khởi
-    // tạo với dashboardColWidths phía trên.
+    // Ngoại lệ dùng chung: h của khối 'settings', cùng nhóm khởi tạo với dashboardColWidths phía trên.
     dashboardCornerHeight: findSettingsCornerHeight(defaultDashboardLayout().cols),
-    // MỚI (2026-07-09, mục 11.10 mở rộng) — cặp đôi với dashboardCornerHeight: h của khối
-    // 'reminders' (Thông báo, LUÔN hiển thị mọi Space, y hệt lý do settings dùng chung).
+    // Cặp đôi với dashboardCornerHeight: h của khối 'reminders' (Thông báo, LUÔN hiển thị mọi
+    // Space, y hệt lý do settings dùng chung).
     dashboardReminderHeight: findReminderHeight(defaultDashboardLayout().cols),
     pushNotifySharedSpaceEvents: true,
   };
 }
 
-/** Lần đầu mở extension (storage rỗng): tạo đúng 1 Space trống, không seed data demo. */
+/** Lần đầu mở app (chưa có dữ liệu Supabase): tạo đúng 1 Space trống, không seed data demo. */
 export function createSeedSpaces(): Space[] {
   const space: Space = {
     id: crypto.randomUUID(),

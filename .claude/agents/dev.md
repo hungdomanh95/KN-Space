@@ -31,7 +31,7 @@ src/
   state/           # AppStateContext, seed.ts
   layout/          # AppLayout.tsx, useDashboardLayout.ts, useMobileLayout.ts, MobileChatScreen.tsx
   components/
-  features/        # tasks/ reminders/ habits/ notes/ notifications/ today/ spaces/ settings/ home/
+  features/        # tasks/ reminders/ habits/ notes/ notifications/ logs/ spaces/ settings/ home/
 supabase/schema.sql
 ```
 
@@ -39,8 +39,8 @@ Nguyên tắc khi triển khai:
 1. Giữ bundle nhỏ và dependency có chủ đích: React/TypeScript/Vite/Tailwind + `@supabase/supabase-js` + `lucide-react` cho icon; tránh UI framework nặng nếu chưa cần.
 2. Persistence: mọi mutation (task/note/habit/reminder/space/theme/layout) qua `storage/supabaseStore.ts`, debounce 600ms trước khi ghi Supabase. Không có Realtime — đồng bộ đa máy chỉ xảy ra khi máy kia tự load lại/mở lại app. Shared Space dùng cơ chế item-level Last-Write-Wins theo `updatedAt` khi xung đột — không dựng merge field-level.
 3. RLS: Space cá nhân ràng buộc `auth.uid() = user_id`; Shared Space dựa trên `space_members` (Owner/Member). Không tự nới lỏng RLS để "cho dễ test".
-4. Responsive bắt buộc: desktop đầy đủ 6 khối, mobile (`≤639px`) chỉ 2 khối (Việc cần làm + Ghi chú) dạng accordion — đây là phạm vi dài hạn đã chốt, không tự mở rộng thêm khối cho mobile trừ khi ba/requirements yêu cầu rõ.
-5. Giữ đủ tính năng đã chốt: 2 màn Home/Dashboard, 6 khối (gồm cả "Hôm nay"), đa Space (cá nhân + chung), Grid/List note, streak thói quen, modal tuỳ biến (không `window.confirm`), settings 3 tab, export/import JSON.
+4. Responsive bắt buộc: ngưỡng chuyển mô hình UI mobile/desktop là **~1000px** (vào mobile `≤999px`, thoát `≥1010px` — hysteresis 2 mốc có chủ đích, chống nhảy qua-lại khi resize dao động sát biên, xem `src/layout/useMobileLayout.ts`), **KHÔNG phải** breakpoint Tailwind `≤639px` (breakpoint đó vẫn tồn tại riêng cho vài tinh chỉnh responsive cục bộ nhỏ, không phải ngưỡng chuyển mô hình UI). Desktop đầy đủ 6 khối dữ liệu + Widget điều hướng gộp. Mobile không còn màn Home, vào thẳng UI chính với 2 tab qua `MobileTabBar`: **"Trò chuyện"** (mặc định, `MobileChatScreen` — chat-style gộp Việc cần làm + Ghi chú + Nhật ký nhanh thành bong bóng/dòng log theo thời gian) và **"Chi tiết"** (accordion 3 khối: Việc cần làm/Ghi chú/Nhật ký nhanh). Nhắc việc/Thói quen/Thông báo/Widget điều hướng vẫn ẩn hoàn toàn trên cả 2 tab mobile — phạm vi dài hạn đã chốt, không tự mở rộng thêm khối cho mobile trừ khi ba/requirements yêu cầu rõ.
+5. Giữ đủ tính năng đã chốt: 2 màn Home/Dashboard, 6 khối dữ liệu (gồm "Nhật ký nhanh") + Widget điều hướng gộp (đã gộp "Hôm nay"), đa Space (cá nhân + chung), Grid/List note, streak thói quen, modal tuỳ biến (không `window.confirm`), settings 3 tab, export/import JSON.
 
 **Tư duy end-to-end khi thêm/sửa 1 tính năng:** đi xuyên suốt từ schema Supabase (`supabase/schema.sql`) → hàm đọc/ghi trong `storage/` → state trong `state/AppStateContext.tsx` → component UI, giữ **type nhất quán ở mọi tầng** (field trong `types.ts` phải khớp cột DB thật, không tự bịa field ở FE rồi để lệch với schema). Nếu đổi schema DB, luôn cân nhắc dữ liệu hiện có (migration/backfill) — đây là app đã có dữ liệu thật, không phải project mới tinh.
 
@@ -51,7 +51,7 @@ Checklist tự rà trước khi báo "xong" (rút gọn cho quy mô dự án, kh
 - Không phá cơ chế đồng bộ load-on-open hiện có (debounce 600ms, không Realtime) khi thêm luồng ghi dữ liệu mới.
 - `npx tsc --noEmit` + `npm run build` pass trước khi báo xong (bắt buộc, xem mục dưới).
 
-Sau khi sửa code xong một phần (theo [[feedback-always-build-after-changes]]):
+Sau khi sửa code xong một phần:
 - Chạy `npx tsc --noEmit` và `npm run build` trước khi báo "xong" — không đợi nhắc.
 - Chỉ `git commit`/`git push` khi user yêu cầu rõ ràng.
 - Không tự mở rộng phạm vi ngoài requirements; nếu thiếu thông tin quan trọng, dừng và hỏi thay vì tự đoán. Luôn trả lời bằng tiếng Việt.

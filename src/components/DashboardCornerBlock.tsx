@@ -19,8 +19,8 @@ interface DashboardCornerBlockProps {
 }
 
 /**
- * Khối gộp "Widget điều hướng + Hôm nay" (`docs/requirements.md` mục 4.1, gộp 2026-07-08) — 1
- * card duy nhất, 2 hàng dọc, tham gia layout tự do như 1 khối bình thường (kéo-thả/resize được
+ * Khối gộp "Widget điều hướng + Hôm nay" (`docs/requirements.md` mục 4.1) — 1 card duy nhất, 2
+ * hàng dọc, tham gia layout tự do như 1 khối bình thường (kéo-thả/resize được
  * qua `style`/`className`/drag handlers do `AppLayout.renderBlock()` truyền vào, giữ id
  * `#dashboard-corner` để tái dùng nguyên hiệu ứng kéo-thả `.dragging`/`.drag-over`/`.zone-side`
  * đã có sẵn trong `styles/components.css`). Luôn hiện, không thuộc `enabledBlocks` của Space nào.
@@ -32,13 +32,13 @@ interface DashboardCornerBlockProps {
  *   hồ/quote chuyển thẳng vào đây): đồng hồ/ngày/quote thuần hiển thị, `flex-1 min-h-0` ăn hết
  *   phần chiều cao còn lại sau hàng nav, resize tự do theo trọng số `h` của cả khối.
  *
- * Style hợp nhất nav + ambient (AC8, cập nhật 2026-07-08 — thay AC8 cũ "2 hàng không dung hoà"):
- * cả khối dùng chung đúng 1 lớp overlay gradient đen dọc (`180deg`, `.14`→`.32`), không đổi theo
- * theme, cùng `backdrop-filter: blur(8px)` — hàng nav không còn nền `color-mix(panel-bg)` riêng.
- * 3 control (Home/Space-switcher/Settings) dùng biến thể "dark glass pill" riêng cho ngữ cảnh nổi
- * trên ảnh nền (`onPhoto`, cập nhật 2026-07-08 — sửa lỗi nổi trắng đục lệch tông trên nền tối),
- * KHÔNG dùng nền `--raised` theme-adaptive mặc định như mọi nơi khác — xem
- * `DashboardCornerNavProps.onPhoto` trong `DashboardCorner.tsx`. Hàng nav có thêm
+ * Style hợp nhất nav + ambient (AC8 — thay AC8 cũ "2 hàng không dung hoà"): cả khối dùng chung
+ * đúng 1 lớp overlay gradient đen dọc (`180deg`, `.14`→`.32`), không đổi theo theme, cùng
+ * `backdrop-filter: blur(8px)` — hàng nav không còn nền `color-mix(panel-bg)` riêng. 3 control
+ * (Home/Space-switcher/Settings) dùng biến thể "ghost control" riêng cho ngữ cảnh nổi trên ảnh
+ * nền (`onPhoto`, tránh lỗi nổi trắng đục lệch tông trên nền tối), KHÔNG dùng nền `--raised`
+ * theme-adaptive mặc định như mọi nơi khác — xem `DashboardCornerNavProps.onPhoto` trong
+ * `DashboardCorner.tsx`. Hàng nav có thêm
  * `id="dashboard-corner-nav"` riêng để `SpaceSwitcher` định vị popover đúng theo đáy hàng nav
  * (không phải đáy cả khối 2 hàng) — xem `SpaceSwitcher.tsx`.
  *

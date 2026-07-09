@@ -96,7 +96,7 @@ const SPACES_ACTION_TYPES = new Set([
  * HYDRATE đầu tiên của ngày đó (mục 4.6/7 requirements: "ảnh đang dùng được chọn theo chỉ số
  * ngày... khi mở app LẦN ĐẦU trong ngày"). Các lần mở app khác trong cùng ngày giữ nguyên index
  * hiện tại (có thể đã đổi do auto-rotate/chọn tay), không snap lại — khác hành vi mockup vanilla
- * (luôn snap mỗi lần reload trang) vì extension thật PERSIST state giữa các lần mở tab.
+ * (luôn snap mỗi lần reload trang) vì app thật PERSIST state giữa các lần mở/reload.
  */
 function syncDailyContentIfNewDay(settings: Settings): Settings {
   const today = epochDay();

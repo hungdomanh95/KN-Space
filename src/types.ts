@@ -80,10 +80,7 @@ export interface EnabledBlocks {
   habits: boolean;
   notes: boolean;
   reminders: boolean;
-  /**
-   * MỚI (2026-07-07, xem docs/features/nhat-ky-nhanh.md) — bật/tắt khối "Nhật ký nhanh" theo
-   * từng Space, giống Task/Note/Habit.
-   */
+  /** Bật/tắt khối "Nhật ký nhanh" theo từng Space, giống Task/Note/Habit (xem docs/features/nhat-ky-nhanh.md). */
   logs: boolean;
 }
 
@@ -110,18 +107,16 @@ export interface HomeBackground {
 }
 
 /**
- * 7 phần tử tham gia layout tự do của Dashboard (2026-07-08: gộp `today` vào `settings`, xem
- * docs/requirements.md mục 4.1). `reminder` (số ít) = khối "Nhắc việc"; `reminders` = khối
- * "Thông báo" (tên field cũ giữ nguyên để không phải đổi schema EnabledBlocks/CollapsedBlocks ở
- * nơi khác). `logs` = khối "Nhật ký nhanh".
+ * 7 phần tử tham gia layout tự do của Dashboard (xem docs/requirements.md mục 4.1). `reminder`
+ * (số ít) = khối "Nhắc việc"; `reminders` = khối "Thông báo" (tên field cũ giữ nguyên để không
+ * phải đổi schema EnabledBlocks/CollapsedBlocks ở nơi khác). `logs` = khối "Nhật ký nhanh".
  *
- * `settings` = khối gộp "Widget điều hướng + Hôm nay" (`DashboardCornerBlock.tsx`) — trước
- * 2026-07-08 là 2 phần tử riêng (`settings` = nav, `today` = đồng hồ/ngày/quote). Giữ nguyên tên
- * key `settings` cho khối gộp (đỡ đổi `HEIGHT_LOCKED_IDS`/`ENABLED_BLOCKS_KEY`/
- * `MOBILE_VISIBLE_BLOCKS`/`blockRefs` ở nhiều nơi khác — quyết định implementation, xem
- * docs/requirements.md mục 4.1 change impact #3) — `'today'` đã bị xoá khỏi union này, KHÔNG
- * còn là 1 `LayoutBlockKey` độc lập. Layout đã lưu từ trước còn `id:'today'` được tự động
- * migrate 1 lần (xem `normalizeDashboardLayout` trong `storage/normalize.ts`).
+ * `settings` = khối gộp "Widget điều hướng + Hôm nay" (`DashboardCornerBlock.tsx`) — trước đây là
+ * 2 phần tử riêng (`settings` = nav, `today` = đồng hồ/ngày/quote). Giữ nguyên tên key `settings`
+ * cho khối gộp (đỡ đổi `HEIGHT_LOCKED_IDS`/`ENABLED_BLOCKS_KEY`/`MOBILE_VISIBLE_BLOCKS`/
+ * `blockRefs` ở nhiều nơi khác) — `'today'` đã bị xoá khỏi union này, KHÔNG còn là 1
+ * `LayoutBlockKey` độc lập. Layout đã lưu từ trước còn `id:'today'` được tự động migrate 1 lần
+ * (xem `normalizeDashboardLayout` trong `storage/normalize.ts`).
  */
 export type LayoutBlockKey =
   | 'tasks'
@@ -178,13 +173,11 @@ export interface Space {
   habits: Habit[];
   notes: Note[];
   /**
-   * MỚI (2026-07-07, xem docs/features/nhat-ky-nhanh.md) — item-level, giống `tasks`/`notes`.
-   * Ở Shared Space (`kn_shared_spaces`), field này cần thêm cột `logs` mới trong DB (xem
+   * Nhật ký nhanh — item-level, giống `tasks`/`notes` (xem docs/features/nhat-ky-nhanh.md). Ở
+   * Shared Space (`kn_shared_spaces`), field này có cột `logs` riêng trong DB (xem
    * `docs/features/nhat-ky-nhanh-schema.sql`) — bảng đó lưu từng mảng thành CỘT RIÊNG
-   * (`tasks`/`notes`/`reminders`), KHÔNG phải 1 cột `spaces` jsonb gộp chung như
-   * `kn_space_state` (Space cá nhân). Đọc/ghi cột này qua Supabase là việc của Phần 2
-   * (storage functions), CHƯA làm ở Phần 1 — hiện `sharedSpaceStore.rowToSpace()` tạm trả về
-   * `logs: []` cho mọi Shared Space bất kể DB có dữ liệu gì.
+   * (`tasks`/`notes`/`reminders`/`logs`), KHÔNG phải 1 cột `spaces` jsonb gộp chung như
+   * `kn_space_state` (Space cá nhân). Đọc/ghi qua `sharedSpaceStore.ts`.
    */
   logs: LogEntry[];
   /** true nếu là shared space (lưu trong kn_shared_spaces) */
@@ -201,7 +194,7 @@ export interface CollapsedBlocks {
   habits: boolean;
   notes: boolean;
   reminders: boolean;
-  /** MỚI (2026-07-07) — trạng thái icon mắt ẩn/hiện nội dung khối "Nhật ký nhanh". */
+  /** Trạng thái icon mắt ẩn/hiện nội dung khối "Nhật ký nhanh". */
   logs: boolean;
 }
 
@@ -239,33 +232,29 @@ export interface Settings {
    */
   lastOpenedEpochDay: number;
   /**
-   * Bố cục Dashboard — field ĐƠN LỊCH SỬ (trước 2026-07-08), ĐÃ NGỪNG dùng làm nguồn
-   * đọc/fallback cho `dashboardColWidths`/`dashboardCols` bên dưới kể từ bugfix 2026-07-08 (xem
-   * "Bug phát sinh sau Phần 2" trong docs/features/layout-theo-space-progress.md — Phương án A).
-   * Lý do: đây là dữ liệu ĐÓNG BĂNG tại thời điểm tính năng "layout riêng theo Space" lên
-   * production, có thể mang cấu trúc cột CŨ/LẠ không khớp bố cục mặc định hiện hành, gây vỡ layout
-   * khi dùng làm fallback ngầm. Field này **KHÔNG bị xoá khỏi schema** (dữ liệu cũ trong Postgres
-   * của user vẫn còn cột này, xoá field TS không xoá được data thật) và **vẫn được `normalizeSettings`
-   * tính/giữ nguyên trong object trả về** (để không vi phạm kiểu bắt buộc + không mất dữ liệu khi
-   * export/import) — nhưng không còn action nào ghi mới, và không còn nơi nào đọc chủ động để suy
-   * luận colCount/giá trị mặc định. Coi như field "chết" an toàn.
+   * Bố cục Dashboard — field ĐƠN LỊCH SỬ, ĐÃ NGỪNG dùng làm nguồn đọc/fallback cho
+   * `dashboardColWidths`/`dashboardCols` bên dưới (xem `resolveDashboardCols`/`normalizeSettings`
+   * trong `storage/normalize.ts` để biết lý do — dữ liệu đóng băng, có thể mang cấu trúc cột cũ
+   * không khớp bố cục mặc định hiện hành, gây vỡ layout nếu dùng làm fallback ngầm). Field này
+   * **KHÔNG bị xoá khỏi schema** (dữ liệu cũ trong Postgres của user vẫn còn cột này, xoá field TS
+   * không xoá được data thật) và **vẫn được `normalizeSettings` tính/giữ nguyên trong object trả
+   * về** (để không vi phạm kiểu bắt buộc + không mất dữ liệu khi export/import) — nhưng không còn
+   * action nào ghi mới, và không còn nơi nào đọc chủ động để suy luận colCount/giá trị mặc định.
+   * Coi như field "chết" an toàn.
    */
   dashboardLayout: DashboardLayout;
   /**
-   * Độ rộng 3 cột lớn của Dashboard (%, không cần cộng đúng 100) — MỚI (2026-07-08, xem
-   * docs/features/layout-theo-space.md mục 11.1). DÙNG CHUNG cho MỌI Space của user. Fallback khi
-   * chưa lưu: THẲNG `defaultDashboardLayout().colWidths` (KHÔNG còn qua `dashboardLayout.colWidths`
-   * cũ, xem bugfix 2026-07-08 ở comment `dashboardLayout` phía trên).
+   * Độ rộng 3 cột lớn của Dashboard (%, không cần cộng đúng 100). DÙNG CHUNG cho MỌI Space của
+   * user. Fallback khi chưa lưu: THẲNG `defaultDashboardLayout().colWidths` (KHÔNG qua
+   * `dashboardLayout.colWidths` cũ, xem comment `dashboardLayout` phía trên).
    */
   dashboardColWidths: number[];
   /**
-   * Khối nào nằm cột nào/chiều cao bao nhiêu trong Dashboard — MỚI (2026-07-08), RIÊNG theo
-   * TỪNG Space (key = `spaceId`), khác hẳn `dashboardColWidths` phía trên. Space chưa có entry ở
-   * đây (chưa từng bị user tự chỉnh riêng kể từ khi tính năng này lên production) đọc fallback
-   * qua `resolveDashboardCols()` (storage/normalize.ts): THẲNG `defaultDashboardLayout().cols`
-   * (KHÔNG còn qua `dashboardLayout.cols` cũ, xem bugfix 2026-07-08 ở comment `dashboardLayout`
-   * phía trên). KHÔNG eager-write entry cho mọi Space ngay từ đầu (Space cá nhân/Shared Space load
-   * không đồng bộ — xem mục 4.3/11.4 tài liệu trên).
+   * Khối nào nằm cột nào/chiều cao bao nhiêu trong Dashboard — RIÊNG theo TỪNG Space (key =
+   * `spaceId`), khác hẳn `dashboardColWidths` phía trên. Space chưa có entry ở đây (chưa từng bị
+   * user tự chỉnh riêng) đọc fallback qua `resolveDashboardCols()` (storage/normalize.ts): THẲNG
+   * `defaultDashboardLayout().cols` (KHÔNG qua `dashboardLayout.cols` cũ). KHÔNG eager-write entry
+   * cho mọi Space ngay từ đầu (Space cá nhân/Shared Space load không đồng bộ).
    *
    * Áp dụng đúng bài học `enabledBlocks` (docs/features/shared-space.md) — 2 field này PHẢI nằm
    * trong `Settings` (cấp user), KHÔNG đặt trong `interface Space` — nếu không sẽ tái tạo bug
@@ -274,13 +263,12 @@ export interface Settings {
    */
   dashboardCols: Record<string, LayoutSlot[][]>;
   /**
-   * Ngoại lệ mục 11.10 (docs/features/layout-theo-space.md, chốt 2026-07-08, MỞ RỘNG 2026-07-09):
-   * trọng số `h` của slot `id === 'settings'` (khối gộp "Điều hướng + Hôm nay", luôn hiển thị mọi
-   * Space, không thuộc `enabledBlocks`) — DÙNG CHUNG mọi Space, cùng nhóm với `dashboardColWidths`
-   * phía trên, KHÔNG theo `spaceId` như phần còn lại của `dashboardCols`. Lý do: nội dung khối này
-   * giống hệt nhau ở mọi Space (nav + đồng hồ/ngày/quote), không có ý nghĩa gì khi mỗi Space có 1
-   * chiều cao khác nhau cho cùng 1 nội dung tĩnh — khác các khối dữ liệu thật (Task/Note/Log/...)
-   * vẫn `h` riêng theo Space bình thường, không đổi.
+   * Ngoại lệ mục 11.10 (docs/requirements.md): trọng số `h` của slot `id === 'settings'` (khối
+   * gộp "Điều hướng + Hôm nay", luôn hiển thị mọi Space, không thuộc `enabledBlocks`) — DÙNG CHUNG
+   * mọi Space, cùng nhóm với `dashboardColWidths` phía trên, KHÔNG theo `spaceId` như phần còn lại
+   * của `dashboardCols`. Lý do: nội dung khối này giống hệt nhau ở mọi Space (nav + đồng hồ/ngày/
+   * quote), không có ý nghĩa gì khi mỗi Space có 1 chiều cao khác nhau cho cùng 1 nội dung tĩnh —
+   * khác các khối dữ liệu thật (Task/Note/Log/...) vẫn `h` riêng theo Space bình thường, không đổi.
    *
    * Giá trị `h` lưu SẴN cho slot `settings` bên trong `dashboardCols[spaceId]`/
    * `defaultDashboardLayout().cols` bị BỎ QUA khi hiển thị — luôn override bằng field này (xem
@@ -288,18 +276,17 @@ export interface Settings {
    * nào, đứng trước/sau khối nào) vẫn tiếp tục riêng theo Space như bình thường — chỉ `h` là
    * ngoại lệ, phạm vi hẹp, không suy rộng sang khối khác.
    *
-   * MỞ RỘNG 2026-07-09: khối `reminders` (Thông báo) cũng LUÔN hiển thị mọi Space, không tắt
-   * được, y hệt lý do trên — nay dùng field riêng `dashboardReminderHeight` bên dưới (KHÔNG gộp
-   * chung 1 field, xem comment field đó) thay vì tiếp tục là phần bù riêng theo Space như bản đầu
-   * mục 11.10.
+   * Khối `reminders` (Thông báo) cũng LUÔN hiển thị mọi Space, không tắt được, y hệt lý do trên —
+   * dùng field riêng `dashboardReminderHeight` bên dưới (KHÔNG gộp chung 1 field, xem comment
+   * field đó).
    */
   dashboardCornerHeight: number;
   /**
-   * Ngoại lệ mục 11.10, MỞ RỘNG 2026-07-09 — cặp đôi với `dashboardCornerHeight` ở trên: trọng số
-   * `h` của slot `id === 'reminders'` (khối "Thông báo", `AppLayout.tsx` — LUÔN hiển thị mọi
-   * Space, không thuộc `enabledBlocks`, y hệt lý do đã áp dụng cho `settings`). DÙNG CHUNG mọi
-   * Space, override khi đọc qua `resolveDashboardCols()`, ghi qua action `SETTINGS_SET_REMINDER_
-   * HEIGHT` riêng (không kèm `spaceId`).
+   * Cặp đôi với `dashboardCornerHeight` ở trên: trọng số `h` của slot `id === 'reminders'` (khối
+   * "Thông báo", `AppLayout.tsx` — LUÔN hiển thị mọi Space, không thuộc `enabledBlocks`, y hệt lý
+   * do đã áp dụng cho `settings`). DÙNG CHUNG mọi Space, override khi đọc qua
+   * `resolveDashboardCols()`, ghi qua action `SETTINGS_SET_REMINDER_HEIGHT` riêng (không kèm
+   * `spaceId`).
    *
    * **Vì sao TÁCH 2 field độc lập thay vì suy ra `reminders.h = 100 - dashboardCornerHeight`:**
    * `h` trong `LayoutSlot` là TRỌNG SỐ FLEX-GROW tương đối (`flex: h 1 0`, xem `AppLayout.tsx`),
