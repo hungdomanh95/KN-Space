@@ -56,6 +56,66 @@ export function groupLinesIntoBlocks(lines: string[]): string[][] {
   return blocks;
 }
 
+const FENCE_MARKER = /^```/;
+
+interface RawSegment {
+  lines: string[];
+  isFence: boolean;
+}
+
+/**
+ * Tách nội dung thành từng đoạn XEN KẼ trong/ngoài dấu code-fence ```` ``` ```` (cú pháp Markdown
+ * quen thuộc — GitHub/Slack/Discord/Notion đều dùng) — ranh giới TƯỜNG MINH do user tự đánh dấu,
+ * không cần đoán qua độ sâu ngoặc/`do...end` nữa (xem `groupNoteIntoBlocks`). Dòng ``` (mở hoặc
+ * đóng, kể cả có tag ngôn ngữ như ```ruby) không nằm trong nội dung trả về — thuần làm dấu phân
+ * cách. Fence chưa đóng (thiếu ``` kết thúc) coi như nuốt hết phần còn lại của note — đúng hành vi
+ * trình render Markdown thông thường.
+ */
+function splitFenceSegments(lines: string[]): RawSegment[] {
+  const segments: RawSegment[] = [];
+  let current: string[] = [];
+  let inFence = false;
+  for (const line of lines) {
+    if (FENCE_MARKER.test(line.trim())) {
+      segments.push({ lines: current, isFence: inFence });
+      current = [];
+      inFence = !inFence;
+      continue;
+    }
+    current.push(line);
+  }
+  segments.push({ lines: current, isFence: inFence });
+  return segments;
+}
+
+export interface NoteBlock {
+  lines: string[];
+  /** true nếu cụm này nằm trong dấu ```` ``` ```` — user đã tự xác nhận là code, không cần dò
+   * `looksLikeCode()` nữa (xem `NoteViewModal.tsx`). */
+  isFenced: boolean;
+}
+
+/**
+ * Gom TOÀN BỘ nội dung note thành các cụm — ưu tiên ranh giới ```` ``` ```` tường minh trước, phần
+ * còn lại (ngoài fence) mới rơi về suy luận dòng trắng/độ sâu ngoặc cũ (`groupLinesIntoBlocks`) làm
+ * phương án dự phòng cho code chưa được đánh dấu bằng fence.
+ */
+export function groupNoteIntoBlocks(content: string): NoteBlock[] {
+  const segments = splitFenceSegments(content.split('\n'));
+  const blocks: NoteBlock[] = [];
+  for (const seg of segments) {
+    if (seg.lines.length === 0) continue; // đoạn rỗng (2 dấu ``` liền nhau, hoặc fence ở đầu/cuối note)
+    if (seg.isFence) {
+      blocks.push({ lines: seg.lines, isFenced: true });
+    } else {
+      for (const group of groupLinesIntoBlocks(seg.lines)) {
+        blocks.push({ lines: group, isFenced: false });
+      }
+    }
+  }
+  return blocks;
+}
+
 /**
  * Nhận diện 1 cụm có "trông giống code/cấu hình" hay không, để hiển thị bằng font monospace +
  * khung riêng trong modal xem chi tiết thay vì trộn chung phong cách với văn xuôi (xem thảo luận
@@ -112,7 +172,7 @@ export function notePreviewText(hidden: boolean, content: string): string {
   const lines = content
     .split('\n')
     .map((line) => line.trim())
-    .filter(Boolean);
+    .filter((line) => line && !FENCE_MARKER.test(line));
   if (lines.length === 0) return '(Trống)';
   const linkLine = findLinkLine(content);
   if (linkLine) {

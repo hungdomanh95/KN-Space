@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Check, Copy, Eye, EyeOff } from 'lucide-react';
 import { Modal } from '../../components/Modal';
 import { useAppState } from '../../state/AppStateContext';
-import { groupLinesIntoBlocks, looksLikeCode, maskLine } from './noteUtils';
+import { groupNoteIntoBlocks, looksLikeCode, maskLine } from './noteUtils';
 import type { Note } from '../../types';
 
 interface NoteViewModalProps {
@@ -23,13 +23,17 @@ export function NoteViewModal({ note, onClose, onEdit }: NoteViewModalProps) {
     if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
   }, []);
 
-  // Gom cụm LUÔN dựa trên dòng THẬT (giữ đúng ranh giới cụm giống Notion — dòng trống giữa 1 khối
-  // ngoặc/`do...end` chưa đóng không tách cụm, xem `groupLinesIntoBlocks`). Bản hiển thị khi đang
-  // ẩn chỉ mask TỪNG DÒNG sau khi đã gom xong, để 2 mảng luôn khớp index — mask trước rồi mới gom
-  // sẽ làm mất hết ký tự cú pháp ({}/do/end) khiến ranh giới cụm bị lệch so với nội dung thật.
-  const lineGroups = groupLinesIntoBlocks(note.content.split('\n'));
-  const realBlocks = lineGroups.map((g) => g.join('\n'));
-  const displayBlocks = lineGroups.map((g) => (isHidden ? g.map(maskLine).join('\n') : g.join('\n')));
+  // Gom cụm LUÔN dựa trên dòng THẬT — ưu tiên ranh giới ```` ``` ```` tường minh do user tự đánh
+  // dấu, phần còn lại mới rơi về suy luận dòng trắng/độ sâu ngoặc (xem `groupNoteIntoBlocks`). Bản
+  // hiển thị khi đang ẩn chỉ mask TỪNG DÒNG sau khi đã gom xong, để 2 mảng luôn khớp index — mask
+  // trước rồi mới gom sẽ làm mất hết ký tự cú pháp ({}/do/end/```) khiến ranh giới cụm bị lệch so
+  // với nội dung thật.
+  const noteBlocks = groupNoteIntoBlocks(note.content);
+  const realBlocks = noteBlocks.map((b) => b.lines.join('\n'));
+  const displayBlocks = noteBlocks.map((b) => (isHidden ? b.lines.map(maskLine).join('\n') : b.lines.join('\n')));
+  // Cụm trong dấu fence LUÔN coi là code (user đã tự xác nhận) — không cần dò `looksLikeCode()`
+  // nữa; cụm ngoài fence vẫn dùng suy luận cũ làm phương án dự phòng.
+  const isCodeFlags = noteBlocks.map((b) => b.isFenced || looksLikeCode(b.lines.join('\n')));
 
   // Copy CẢ CỤM (nhiều dòng) giá trị THẬT, kể cả khi đang ẩn (masked) — cho phép copy nguyên
   // khối lệnh/token mà không cần hiện ra màn hình trước.
@@ -57,7 +61,7 @@ export function NoteViewModal({ note, onClose, onEdit }: NoteViewModalProps) {
       </div>
       <div className="flex max-h-[60vh] flex-col gap-2.5 overflow-y-auto px-0.5 py-1 text-[0.9375rem] leading-[1.65] text-[var(--text)]">
         {displayBlocks.map((block, i) => {
-          const isCode = looksLikeCode(realBlocks[i]);
+          const isCode = isCodeFlags[i];
           return (
             <div
               key={i}
