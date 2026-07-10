@@ -7,16 +7,16 @@ import {
   seedAndPersist,
   setFallbackListener,
   setPrivateFallbackActive,
+  setSharedFallbackActive,
 } from '../storage/supabaseStore';
 import {
   createPrivateSpace,
   deletePrivateSpace,
-  getPrivateSpaceVersion,
   loadPrivateSpaces,
   savePrivateSpace,
   upsertPrivateSpaces,
 } from '../storage/privateSpaceStore';
-import { deleteSharedSpace, getSharedSpaceVersion, loadSharedSpaces, saveSharedSpace } from '../storage/sharedSpaceStore';
+import { deleteSharedSpace, loadSharedSpaces, saveSharedSpace } from '../storage/sharedSpaceStore';
 import { writeLocalCurrentSpaceId } from '../storage/localCurrentSpace';
 import { writeLocalLastScreen } from '../storage/localLastScreen';
 import { buildUiInitialState } from '../storage/normalize';
@@ -178,7 +178,6 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   // Space — sửa Space A không kích hoạt lưu Space B). Xem docs/features/storage-architecture-fix.md
   // mục 4 Bước 3.
   // ==========================================================================================
-  const privateVersionsRef = useRef<Map<string, number>>(new Map());
   const privateSaveTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const prevPrivateRef = useRef<Map<string, string>>(new Map()); // spaceId → JSON snapshot (baseline)
   const pendingPrivateSavesRef = useRef<Map<string, ReturnType<typeof privateSnapshot>>>(new Map());
@@ -187,32 +186,24 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const creatingPrivateRef = useRef<Set<string>>(new Set());
 
   /**
-   * Thử lưu 1 Space cá nhân, tự resync + retry nếu bị conflict — mirror CHÍNH XÁC
-   * `attemptSaveShared` bên dưới (cùng lý do: conflict bị drop im lặng trước đây từng gây mất
-   * đồng bộ CRUD, xem comment ở `attemptSaveShared`).
+   * Thử lưu 1 Space cá nhân — ghi thẳng, KHÔNG version-check/retry (bỏ theo
+   * docs/features/conflict-handling-simplification.md mục 2.1, 2026-07-10 — mirror CHÍNH XÁC
+   * `attemptSaveShared` bên dưới). Lỗi thật (network/server, từ `catch`) bật banner lỗi mạng qua
+   * `setPrivateFallbackActive` (mục 3 tài liệu trên — A1 thay thế); thành công thì tắt banner.
    */
-  async function attemptSavePrivate(sid: string, retriesLeft = 3): Promise<boolean> {
+  async function attemptSavePrivate(sid: string): Promise<boolean> {
     const data = pendingPrivateSavesRef.current.get(sid);
     if (!data) return true; // không có gì pending — coi như đã lưu xong
-    const version = privateVersionsRef.current.get(sid) ?? 1;
     try {
-      const result = await savePrivateSpace(sid, data, version);
-      if (result.ok) {
-        if (result.newVersion !== undefined) privateVersionsRef.current.set(sid, result.newVersion);
-        if (pendingPrivateSavesRef.current.get(sid) === data) {
-          pendingPrivateSavesRef.current.delete(sid);
-        }
-        return true;
+      await savePrivateSpace(sid, data);
+      if (pendingPrivateSavesRef.current.get(sid) === data) {
+        pendingPrivateSavesRef.current.delete(sid);
       }
-      if (result.conflict && retriesLeft > 0) {
-        const freshVersion = await getPrivateSpaceVersion(sid);
-        if (freshVersion !== null) privateVersionsRef.current.set(sid, freshVersion);
-        return attemptSavePrivate(sid, retriesLeft - 1);
-      }
-      console.warn('[KN-Space] savePrivateSpace conflict, hết lượt thử lại — thay đổi CHƯA được lưu:', sid);
-      return false;
+      setPrivateFallbackActive(false);
+      return true;
     } catch (err) {
       console.warn('[KN-Space] savePrivateSpace thất bại:', err);
+      setPrivateFallbackActive(true);
       return false;
     }
   }
@@ -244,7 +235,6 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
             return; // lần render sau (nếu spaces vẫn đổi) tự retry vì _privateVersion vẫn undefined
           }
           setPrivateFallbackActive(false);
-          privateVersionsRef.current.set(sid, result.version ?? 1);
           prevPrivateRef.current.set(sid, snapshotAtCreate);
           dispatch({ type: 'SPACE_SET_PRIVATE_VERSION', payload: { id: sid, version: result.version ?? 1 } });
         })();
@@ -252,9 +242,6 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Space đã có hàng trên DB — diff theo baseline, debounce update giống Shared Space.
-      if (!privateVersionsRef.current.has(sid)) {
-        privateVersionsRef.current.set(sid, space._privateVersion);
-      }
       const snapshot = JSON.stringify(privateSnapshot(space));
       // Lần đầu thấy space này (vừa hydrate/load) → chỉ ghi nhận baseline, KHÔNG save (tránh 1 lượt
       // save thừa ngay khi mở app do Map rỗng làm snapshot cũ luôn "khác" snapshot hiện tại).
@@ -276,8 +263,6 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.spaces]);
 
-  // Theo dõi version của từng shared space — cập nhật sau mỗi lần save thành công.
-  const sharedVersionsRef = useRef<Map<string, number>>(new Map());
   const sharedSaveTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const prevSharedRef = useRef<Map<string, string>>(new Map()); // spaceId → JSON snapshot
   // Track data pending flush — cập nhật NGAY khi có thay đổi, trước debounce timer
@@ -288,37 +273,25 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   }>>(new Map());
 
   /**
-   * Thử lưu 1 shared space, tự resync + retry nếu bị conflict (version đã đổi trên DB
-   * do client khác — hoặc chính tab này — vừa ghi trước đó).
-   *
-   * Trước đây conflict bị drop im lặng (chỉ console.warn, không retry) khiến thay đổi
-   * (vd: xoá task) tưởng đã lưu ở UI nhưng thực ra KHÔNG BAO GIỜ tới được DB — client
-   * khác F5 vẫn thấy data cũ vì DB chưa từng đổi. Đây là nguyên nhân chính gây mất
-   * đồng bộ CRUD giữa các member của shared space.
+   * Thử lưu 1 shared space — ghi thẳng, KHÔNG version-check/retry (bỏ theo
+   * docs/features/conflict-handling-simplification.md mục 2.1, 2026-07-10). Lỗi thật (network/
+   * server, từ `catch`) bật banner lỗi mạng qua `setSharedFallbackActive` (mục 3 tài liệu trên — A1
+   * thay thế); thành công thì tắt banner.
    */
-  async function attemptSaveShared(sid: string, retriesLeft = 3): Promise<boolean> {
+  async function attemptSaveShared(sid: string): Promise<boolean> {
     const data = pendingSharedSavesRef.current.get(sid);
     if (!data) return true; // không có gì pending — coi như đã lưu xong
-    const version = sharedVersionsRef.current.get(sid) ?? 1;
     try {
-      const result = await saveSharedSpace(sid, data, version);
-      if (result.ok) {
-        if (result.newVersion !== undefined) sharedVersionsRef.current.set(sid, result.newVersion);
-        // Chỉ xoá pending nếu không có thay đổi mới hơn ghi đè trong lúc đang save
-        if (pendingSharedSavesRef.current.get(sid) === data) {
-          pendingSharedSavesRef.current.delete(sid);
-        }
-        return true;
+      await saveSharedSpace(sid, data);
+      // Chỉ xoá pending nếu không có thay đổi mới hơn ghi đè trong lúc đang save
+      if (pendingSharedSavesRef.current.get(sid) === data) {
+        pendingSharedSavesRef.current.delete(sid);
       }
-      if (result.conflict && retriesLeft > 0) {
-        const freshVersion = await getSharedSpaceVersion(sid);
-        if (freshVersion !== null) sharedVersionsRef.current.set(sid, freshVersion);
-        return attemptSaveShared(sid, retriesLeft - 1);
-      }
-      console.warn('[KN-Space] saveSharedSpace conflict, hết lượt thử lại — thay đổi CHƯA được lưu:', sid);
-      return false;
+      setSharedFallbackActive(false);
+      return true;
     } catch (err) {
       console.warn('[KN-Space] saveSharedSpace thất bại:', err);
+      setSharedFallbackActive(true);
       return false;
     }
   }
@@ -329,10 +302,6 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     const sharedSpaces = state.spaces.filter((s) => s.isShared && s.sharedSpaceId);
     sharedSpaces.forEach((space) => {
       const sid = space.sharedSpaceId!;
-      // Khởi tạo version lần đầu từ _sharedVersion trong Space
-      if (!sharedVersionsRef.current.has(sid) && space._sharedVersion !== undefined) {
-        sharedVersionsRef.current.set(sid, space._sharedVersion);
-      }
       const snapshot = JSON.stringify({ tasks: space.tasks, notes: space.notes, reminders: space.reminders, logs: space.logs, name: space.name, enabledBlocks: space.enabledBlocks });
       // Lần đầu thấy space này (vừa hydrate/load) → chỉ ghi nhận baseline, KHÔNG save.
       // Trước đây thiếu bước này khiến lần render đầu tiên luôn bị coi là "có thay đổi"
@@ -371,7 +340,77 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     writeLocalLastScreen(state.settings.lastScreen);
   }, [state.settings.lastScreen, isLoading]);
 
-  // Flush ngay khi tab ẩn đi — tránh mất thay đổi cuối nếu đóng tab trong cửa sổ debounce.
+  /**
+   * Hướng 2 (docs/features/conflict-handling-simplification.md mục 2.2) — refresh RAM khi tab quay
+   * lại `visible`, thu hẹp cửa sổ "RAM cũ" (root cause thật của sự cố mất dữ liệu, xem mục 1 tài
+   * liệu trên) từ hàng giờ (thời lượng 1 phiên mở tab) xuống còn khoảng thời gian tab bị ẩn.
+   *
+   * Tải lại `kn_private_spaces`/`kn_shared_spaces`, rồi với TỪNG Space trong kết quả: nếu KHÔNG có
+   * thay đổi đang chờ lưu (không có entry trong pending*SavesRef, không có debounce timer đang
+   * chạy, riêng Space cá nhân thêm điều kiện không đang trong lượt INSERT) → gộp vào danh sách
+   * refresh + cập nhật baseline (prev*Ref) để effect debounce không hiểu nhầm "vừa có thay đổi cần
+   * lưu". Space đang có pending → bỏ qua nguyên vẹn, tự lưu theo đúng luồng debounce/flush hiện có
+   * (không đè mất nội dung đang gõ dở).
+   *
+   * Lỗi network khi tải lại → bắt riêng từng nguồn (private/shared độc lập), bỏ qua im lặng, không
+   * throw/crash — thử lại ở lần `visible` kế tiếp. KHÔNG phải polling (chỉ chạy khi
+   * `visibilitychange` bắn `visible`, không có `setInterval`).
+   */
+  async function refreshStaleSpaces(): Promise<void> {
+    if (!hydratedRef.current) return; // bootstrap chưa xong — để bootstrap tự lo, tránh gọi trùng
+
+    const [freshPrivate, freshShared] = await Promise.all([
+      loadPrivateSpaces().catch((err) => {
+        console.warn('[KN-Space] refreshStaleSpaces: tải lại Space cá nhân lỗi:', err);
+        return null;
+      }),
+      loadSharedSpaces().catch((err) => {
+        console.warn('[KN-Space] refreshStaleSpaces: tải lại Shared Space lỗi:', err);
+        return null;
+      }),
+    ]);
+
+    const toRefresh: Space[] = [];
+
+    (freshPrivate ?? []).forEach((space) => {
+      const sid = space.id;
+      if (
+        pendingPrivateSavesRef.current.has(sid) ||
+        privateSaveTimersRef.current.has(sid) ||
+        creatingPrivateRef.current.has(sid)
+      ) {
+        return; // đang gõ dở/đang lưu/đang tạo — không đè
+      }
+      toRefresh.push(space);
+      prevPrivateRef.current.set(sid, JSON.stringify(privateSnapshot(space)));
+    });
+
+    (freshShared ?? []).forEach((space) => {
+      const sid = space.sharedSpaceId ?? space.id;
+      if (pendingSharedSavesRef.current.has(sid) || sharedSaveTimersRef.current.has(sid)) {
+        return;
+      }
+      toRefresh.push(space);
+      prevSharedRef.current.set(
+        sid,
+        JSON.stringify({
+          tasks: space.tasks,
+          notes: space.notes,
+          reminders: space.reminders,
+          logs: space.logs,
+          name: space.name,
+          enabledBlocks: space.enabledBlocks,
+        }),
+      );
+    });
+
+    if (toRefresh.length > 0) {
+      dispatch({ type: 'SPACE_REFRESH_FROM_SERVER', payload: { spaces: toRefresh } });
+    }
+  }
+
+  // Flush ngay khi tab ẩn đi (tránh mất thay đổi cuối nếu đóng tab trong cửa sổ debounce) / refresh
+  // RAM khi tab quay lại hoạt động (Hướng 2, xem `refreshStaleSpaces()` ở trên).
   useEffect(() => {
     function handleVisibilityChange() {
       if (document.visibilityState === 'hidden') {
@@ -391,6 +430,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           sharedSaveTimersRef.current.forEach((t) => clearTimeout(t));
           sharedSaveTimersRef.current.clear();
         }
+      } else if (document.visibilityState === 'visible') {
+        void refreshStaleSpaces();
       }
     }
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -463,7 +504,6 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         privateSaveTimersRef.current.clear();
         pendingPrivateSavesRef.current.clear();
         prevPrivateRef.current.clear();
-        privateVersionsRef.current.clear();
         // Chặn effect debounce tự ý tạo/update các Space này trong lúc import đang xử lý bất đồng
         // bộ bên dưới — gỡ chặn ngay khi có kết quả.
         newPrivateSpaces.forEach((s) => creatingPrivateRef.current.add(s.id));
@@ -488,7 +528,6 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           setPrivateFallbackActive(false);
           result.spaces.forEach((s) => {
             const version = s._privateVersion ?? 1;
-            privateVersionsRef.current.set(s.id, version);
             prevPrivateRef.current.set(s.id, JSON.stringify(privateSnapshot(s)));
             dispatch({ type: 'SPACE_SET_PRIVATE_VERSION', payload: { id: s.id, version } });
           });
@@ -578,9 +617,6 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       }
       pendingSharedSavesRef.current.set(sid, data);
       prevSharedRef.current.set(sid, JSON.stringify(data));
-      if (!sharedVersionsRef.current.has(sid) && targetSpace._sharedVersion !== undefined) {
-        sharedVersionsRef.current.set(sid, targetSpace._sharedVersion);
-      }
 
       const ok = await attemptSaveShared(sid);
       return ok
@@ -610,7 +646,6 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         if (!result.ok) {
           return { ok: false, error: result.error ?? 'Không lưu được dữ liệu — kiểm tra kết nối mạng và thử lại.' };
         }
-        privateVersionsRef.current.set(sid, result.version ?? 1);
         prevPrivateRef.current.set(sid, snapshotAtCreate);
         dispatch({ type: 'SPACE_SET_PRIVATE_VERSION', payload: { id: sid, version: result.version ?? 1 } });
         return { ok: true };
@@ -624,9 +659,6 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       }
       pendingPrivateSavesRef.current.set(sid, data);
       prevPrivateRef.current.set(sid, JSON.stringify(data));
-      if (!privateVersionsRef.current.has(sid)) {
-        privateVersionsRef.current.set(sid, targetSpace._privateVersion);
-      }
 
       const ok = await attemptSavePrivate(sid);
       return ok

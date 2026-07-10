@@ -4,6 +4,13 @@
 > lúc đó gác lại vì chi phí/rủi ro > lợi ích). Chủ dự án đã xác nhận (2026-07-10) muốn làm bước tiếp
 > theo này. Tài liệu này là output PHÂN TÍCH — chưa code, chưa đụng DB thật.
 >
+> **Cập nhật 2026-07-10 — cột `version`/trigger mô tả ở mục 3.4 đang được xem xét lại.** Điều tra sau
+> tài liệu này phát hiện version-check + retry (pattern đang được mirror ở đây) không chặn được đúng kịch
+> bản gây sự cố thật ở cấp Space — khả năng cao cũng không cần thiết ở cấp item. Xem đề xuất đầy đủ ở
+> `docs/features/conflict-handling-simplification.md` mục 4.3 — **CHƯA chốt**, cần `dev` xác nhận + chủ
+> dự án chốt lại trước khi bắt đầu Bước 1 (entity Log). Quyết định Phương án B (9 bảng, mục 3.2/3.3) và
+> các quyết định khác trong tài liệu này **không đổi**, chỉ riêng phần version-check đang mở lại.
+>
 > **Ghi chú minh bạch về quy trình:** phiên làm việc tạo tài liệu này **không có công cụ gọi trực tiếp
 > sang agent `dev`** (Agent tool không có trong bộ công cụ khả dụng của phiên `ba` này, dù mô tả vai trò
 > có nhắc tới). Để không dừng lại giữa chừng, `ba` đã tự đọc sâu toàn bộ code thật liên quan

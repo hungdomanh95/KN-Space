@@ -9,8 +9,12 @@
 //     email/displayName/avatarUrl để trống vì auth.users không accessible qua
 //     client-side Supabase JS. Nếu Phase 4 cần đầy đủ profile → tạo bảng
 //     kn_profiles (public) mirror từ auth.users qua Supabase trigger.
-//   - Optimistic locking: trigger kn_shared_spaces_before_update tự tăng version.
-//     Client gửi WHERE version = expectedVersion; nếu 0 rows affected = conflict.
+//   - KHÔNG version-check/retry (bỏ theo docs/features/conflict-handling-simplification.md,
+//     2026-07-10 — version-check chỉ bảo vệ được 1 khung rất hẹp, không chặn được đúng kịch bản gây
+//     mất dữ liệu thật). saveSharedSpace() ghi thẳng WHERE id = spaceId (blind write, last-write-
+//     wins). Cột version/trigger kn_shared_spaces_before_update VẪN GIỮ trên DB (tự tăng version/
+//     updated_at vô điều kiện) nhưng tầng app không còn đọc/dùng để chặn ghi. Rủi ro RAM cũ (root
+//     cause thật) xử lý riêng bằng refresh-on-visible ở AppStateContext.tsx (refreshStaleSpaces()).
 //   - Token generation dùng Web Crypto API (browser-safe, không cần Node.js).
 // =============================================================================
 
@@ -172,38 +176,20 @@ export async function loadSharedSpaces(): Promise<Space[]> {
 }
 
 /**
- * Đọc version hiện tại của 1 shared space trên DB — dùng để resync sau khi
- * saveSharedSpace() báo conflict (client khác vừa ghi đè), tránh mất thay đổi
- * do bị drop im lặng.
- */
-export async function getSharedSpaceVersion(sharedSpaceId: string): Promise<number | null> {
-  const { data, error } = await supabase
-    .from('kn_shared_spaces')
-    .select('version')
-    .eq('id', sharedSpaceId)
-    .maybeSingle<{ version: number }>();
-
-  if (error) {
-    console.warn('[KN-Space] getSharedSpaceVersion lỗi:', error.message);
-    throw error;
-  }
-  return data?.version ?? null;
-}
-
-/**
- * Save shared space với optimistic locking.
+ * Save shared space — ghi thẳng (blind write, last-write-wins), KHÔNG version-check (bỏ theo
+ * docs/features/conflict-handling-simplification.md mục 2.1 — 2026-07-10).
  *
- * UPDATE kn_shared_spaces SET tasks=..., notes=..., reminders=..., name=...
- * WHERE id = spaceId AND version = expectedVersion
+ * UPDATE kn_shared_spaces SET tasks=..., notes=..., reminders=..., name=... WHERE id = spaceId
  *
- * Trigger kn_shared_spaces_before_update tự tăng version và cập nhật updated_at.
- * Nếu 0 rows affected → version đã thay đổi (conflict) → client cần fetch lại.
+ * Trigger kn_shared_spaces_before_update vẫn tự tăng version + updated_at (giữ nguyên, vô hại)
+ * nhưng `newVersion` trả về ở đây chỉ mang tính thông tin, không dùng để chặn ghi lần sau. Lỗi thật
+ * (network/server) throw ra ngoài cho caller (`AppStateContext.tsx` — `attemptSaveShared`) tự bật
+ * banner lỗi mạng.
  */
 export async function saveSharedSpace(
   spaceId: string,
   patch: Partial<Pick<Space, 'tasks' | 'notes' | 'reminders' | 'logs' | 'name' | 'enabledBlocks'>>,
-  expectedVersion: number,
-): Promise<{ ok: boolean; conflict: boolean; newVersion?: number }> {
+): Promise<{ newVersion?: number }> {
   // Chỉ gửi các field thực sự có trong patch
   const updatePayload: Record<string, unknown> = {};
   if (patch.tasks !== undefined) updatePayload.tasks = patch.tasks;
@@ -217,14 +203,13 @@ export async function saveSharedSpace(
   if (patch.enabledBlocks !== undefined) updatePayload.enabled_blocks = { ...patch.enabledBlocks, habits: false };
 
   if (Object.keys(updatePayload).length === 0) {
-    return { ok: true, conflict: false, newVersion: expectedVersion };
+    return {};
   }
 
   const { data, error } = await supabase
     .from('kn_shared_spaces')
     .update(updatePayload)
     .eq('id', spaceId)
-    .eq('version', expectedVersion)
     .select('version')
     .maybeSingle<{ version: number }>();
 
@@ -233,12 +218,7 @@ export async function saveSharedSpace(
     throw error;
   }
 
-  if (!data) {
-    // 0 rows updated → version đã đổi trên DB → conflict
-    return { ok: false, conflict: true };
-  }
-
-  return { ok: true, conflict: false, newVersion: data.version };
+  return { newVersion: data?.version };
 }
 
 /**

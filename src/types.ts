@@ -204,14 +204,21 @@ export interface Space {
   isShared?: boolean;
   /** uuid của hàng trong kn_shared_spaces (= id trong bảng đó) */
   sharedSpaceId?: string;
-  /** version optimistic lock từ kn_shared_spaces — dùng nội bộ để save, không hiển thị UI */
+  /**
+   * `version` đọc từ cột `version` của `kn_shared_spaces` — chỉ mang tính THÔNG TIN, không hiển thị
+   * UI. KHÔNG còn dùng để chặn/điều kiện ghi (đã bỏ optimistic-lock, xem
+   * docs/features/conflict-handling-simplification.md mục 2.1, 2026-07-10) — `saveSharedSpace()` ghi
+   * thẳng theo `id`, không còn gửi `WHERE version = ...`.
+   */
   _sharedVersion?: number;
   /**
-   * version optimistic lock từ `kn_private_spaces` (Space cá nhân, xem
-   * docs/features/storage-architecture-fix.md mục 4 Bước 3) — dùng nội bộ để save, không hiển thị
-   * UI. Chỉ có ý nghĩa khi `!isShared`. `undefined` = Space CHƯA từng được ghi lên DB (vừa tạo cục
-   * bộ qua `SPACE_CREATE`/import — tầng storage cần INSERT thay vì UPDATE); một số giá trị số =
-   * hàng đã tồn tại trên `kn_private_spaces`, dùng làm `expectedVersion` cho UPDATE.
+   * `version` đọc/gán từ cột `version` của `kn_private_spaces` (Space cá nhân, xem
+   * docs/features/storage-architecture-fix.md mục 4 Bước 3). Chỉ có ý nghĩa khi `!isShared`.
+   * `undefined` = Space CHƯA từng được ghi lên DB (vừa tạo cục bộ qua `SPACE_CREATE`/import — tầng
+   * storage cần INSERT thay vì UPDATE); một số giá trị số = hàng đã tồn tại trên `kn_private_spaces`.
+   * Vai trò DUY NHẤT còn lại là SENTINEL insert-vs-update này — KHÔNG còn dùng làm `expectedVersion`
+   * cho UPDATE (đã bỏ optimistic-lock, xem docs/features/conflict-handling-simplification.md mục
+   * 2.1, 2026-07-10) — `savePrivateSpace()` ghi thẳng theo `id`, không còn gửi `WHERE version = ...`.
    */
   _privateVersion?: number;
 }

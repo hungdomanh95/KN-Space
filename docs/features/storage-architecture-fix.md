@@ -30,6 +30,13 @@
 
 ## 3. Quyết định kiến trúc — KHÔNG dùng Realtime, dùng version-check
 
+> **Cập nhật 2026-07-10 — phần "dùng version-check" của quyết định này đang được xem xét lại.** Điều tra
+> sâu code thật xác nhận version-check + retry hiện tại KHÔNG chặn được đúng kịch bản đã gây sự cố (mục 1
+> ở trên) — chỉ chặn được 1 khung rất hẹp (2 client ghi trúng cùng vài trăm mili-giây). Phần "KHÔNG dùng
+> Realtime" (mục này) **vẫn giữ nguyên, không đổi**. Xem đề xuất thay thế đầy đủ (bỏ version-check, thêm
+> refresh-on-visible) ở `docs/features/conflict-handling-simplification.md` — chưa code, đang chờ `dev`
+> review.
+
 Đã cân nhắc khôi phục Supabase Realtime để giảm độ trễ đồng bộ giữa các tab/thiết bị. **Quyết định: KHÔNG làm.**
 
 **Lý do:**
@@ -83,6 +90,11 @@ Tạo `docs/features/storage-architecture-fix-progress.md` theo mẫu chuẩn, c
 ---
 
 ## 6. Bổ sung — hoàn thiện banner cảnh báo khi hết lượt retry (2026-07-10, `ba`)
+
+> **Cập nhật cùng ngày (2026-07-10) — mục 6 này có thể bị thay thế.** Nếu đề xuất bỏ version-check ở
+> `docs/features/conflict-handling-simplification.md` (Hướng 1) được chấp nhận, khái niệm "hết lượt retry"
+> không còn tồn tại — A1 mô tả dưới đây được thay bằng 1 banner lỗi network chung, đơn giản hơn (xem tài
+> liệu đó mục 3). Giữ nguyên nội dung gốc dưới đây làm lịch sử phân tích, không xoá.
 
 > Phần còn thiếu của chính Phần B mục 4 Bước 3 — **không phải tính năng mới**, mà là khe hở còn sót lại
 > trong đúng cơ chế vừa được xây để chống mất dữ liệu. Phát hiện trong đợt rà soát/brainstorm tổng thể

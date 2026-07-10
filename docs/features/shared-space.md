@@ -214,6 +214,7 @@ Khi 2+ người cùng sửa cùng lúc:
 - **Không có push realtime.** Thành viên khác chỉ thấy thay đổi của bạn sau khi họ **tự mở lại/reload app** — kể cả khi đang online cùng lúc.
 - Không có offline queue — giữ nguyên hành vi Phase 2 (banner lỗi nếu save thất bại do mất kết nối).
 - Vì không có cơ chế "đẩy" thay đổi, rủi ro conflict LWW (mục 6.2) thực tế cao hơn giả định ban đầu ("đang online cùng lúc" không giúp giảm xung đột) — nếu cần giảm rủi ro mất dữ liệu khi nhiều người cùng sửa gần như đồng thời, cần bàn lại với `ba`/`dev` một giải pháp khác (không phải khôi phục Realtime, đã có quyết định bỏ hẳn).
+- **Cập nhật 2026-07-10:** đã bàn lại — xem `docs/features/conflict-handling-simplification.md`. Đề xuất bỏ version-check hiện tại (vốn không chặn được ca gây sự cố thật) + thêm refresh dữ liệu khi tab quay lại visible (thu hẹp cửa sổ RAM cũ). Chưa code — mục 6.2 ở trên (mô tả "LWW theo `updatedAt`") vẫn đang mô tả sai so với code thật (xem `docs/features/item-level-entity-tables.md` mục 1) và **chưa được sửa trong đợt này**, chỉ đánh dấu ở đây để không hiểu nhầm.
 
 ---
 

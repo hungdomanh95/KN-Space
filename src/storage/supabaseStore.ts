@@ -201,9 +201,13 @@ function createSaveChannel<T>(flush: (snapshot: T) => Promise<FlushResult>, onFa
 // Banner lỗi lưu (`storageFallbackActive`) — active nếu kênh `settings` (module này) HOẶC kênh
 // per-Space (private/shared, AppStateContext) đang có lỗi lưu. `setPrivateFallbackActive()` /
 // `setSharedFallbackActive()` cho phép AppStateContext báo trạng thái lỗi của các kênh nó tự quản,
-// gộp OR vào cùng 1 banner duy nhất — không để kênh này "xoá" banner do lỗi của kênh khác.
+// gộp OR vào cùng 1 banner duy nhất — không để kênh này "xoá" banner do lỗi của kênh khác. Từ
+// docs/features/conflict-handling-simplification.md mục 3/A1 (2026-07-10): cả 2 hàm này giờ được
+// nối vào ĐÚNG nhánh lỗi thật (catch) của `attemptSavePrivate`/`attemptSaveShared` — thay cho khái
+// niệm "hết lượt retry" (A1 gốc) đã không còn tồn tại sau khi bỏ version-check.
 let settingsFallbackActive = false;
 let privateFallbackActive = false;
+let sharedFallbackActive = false;
 let onFallbackChange: ((active: boolean) => void) | null = null;
 
 export function setFallbackListener(listener: (active: boolean) => void): void {
@@ -211,12 +215,18 @@ export function setFallbackListener(listener: (active: boolean) => void): void {
 }
 
 function notifyFallback(): void {
-  onFallbackChange?.(settingsFallbackActive || privateFallbackActive);
+  onFallbackChange?.(settingsFallbackActive || privateFallbackActive || sharedFallbackActive);
 }
 
 /** AppStateContext gọi khi 1 lượt save Space cá nhân (per-row, kn_private_spaces) thất bại/hồi phục. */
 export function setPrivateFallbackActive(active: boolean): void {
   privateFallbackActive = active;
+  notifyFallback();
+}
+
+/** AppStateContext gọi khi 1 lượt save Shared Space (per-row, kn_shared_spaces) thất bại/hồi phục. */
+export function setSharedFallbackActive(active: boolean): void {
+  sharedFallbackActive = active;
   notifyFallback();
 }
 

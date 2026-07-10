@@ -3,6 +3,11 @@
 > Nguồn sự thật: `docs/features/item-level-entity-tables.md` (phân tích + thiết kế đã qua `dev` review đầy đủ, 2026-07-10). File này theo dõi tiến độ triển khai — làm cuốn chiếu đúng 1 phần/lượt, KHÔNG tự nhảy phần khi chưa được yêu cầu.
 >
 > **Tạm dừng theo yêu cầu chủ dự án (2026-07-10) — CHƯA CODE GÌ.** Toàn bộ nội dung dưới đây là checkpoint để phiên làm việc sau (có thể là ngày mai) đọc lại và tiếp tục đúng chỗ, không phải dò lại từ đầu.
+>
+> **Cập nhật cùng ngày (2026-07-10, muộn hơn) — quyết định #1 (schema) và #7 (A1) dưới đây đang được xem
+> xét lại phần "version-check".** Xem `docs/features/conflict-handling-simplification.md` — đề xuất bỏ
+> version-check + retry (cả ở Space-level hiện tại lẫn item-level sắp tới), thay A1 bằng banner lỗi network
+> chung. **CHƯA chốt**, cần đọc kỹ trước khi bắt đầu Bước 1 (entity Log).
 
 **Trạng thái tổng quan:** ⬜ CHƯA BẮT ĐẦU CODE. Đã xong: phân tích (`ba`) + review kỹ thuật (`dev`) + chốt các quyết định kiến trúc chính. Đang treo: xác nhận thời điểm bắt đầu.
 

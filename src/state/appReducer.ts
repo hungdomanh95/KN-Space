@@ -36,11 +36,21 @@ export type AppAction =
   /**
    * Metadata thuần cho tầng lưu trữ (Bước 3, docs/features/storage-architecture-fix.md mục 4) —
    * đánh dấu 1 Space cá nhân VỪA lưu thành công lên `kn_private_spaces` lần đầu (INSERT), gắn
-   * `_privateVersion` để các lượt sửa sau đó dùng đúng optimistic-lock version. KHÔNG phải action
-   * người dùng, chỉ `AppStateContext.tsx` tự dispatch sau khi `createPrivateSpace()`/
-   * `upsertPrivateSpaces()` trả kết quả.
+   * `_privateVersion` (một số, không còn dùng cho optimistic-lock — chỉ còn là SENTINEL phân biệt
+   * "Space mới, chưa từng lưu" (`undefined`) với "đã có hàng trên DB", xem
+   * docs/features/conflict-handling-simplification.md mục 2.1). KHÔNG phải action người dùng, chỉ
+   * `AppStateContext.tsx` tự dispatch sau khi `createPrivateSpace()`/`upsertPrivateSpaces()` trả kết
+   * quả.
    */
-  | { type: 'SPACE_SET_PRIVATE_VERSION'; payload: { id: string; version: number } };
+  | { type: 'SPACE_SET_PRIVATE_VERSION'; payload: { id: string; version: number } }
+  /**
+   * Hướng 2 (docs/features/conflict-handling-simplification.md mục 2.2) — refresh RAM khi tab
+   * quay lại `visible`. KHÔNG phải action người dùng, chỉ `AppStateContext.tsx` tự dispatch sau khi
+   * `refreshStaleSpaces()` tải lại `kn_private_spaces`/`kn_shared_spaces`. Payload CHỈ gồm những
+   * Space không có thay đổi đang chờ lưu (đã lọc sẵn ở caller) — Space nào không có mặt trong
+   * `payload.spaces` giữ nguyên dữ liệu RAM hiện có, không bị xoá/thêm mới qua action này.
+   */
+  | { type: 'SPACE_REFRESH_FROM_SERVER'; payload: { spaces: Space[] } };
 
 const SPACE_DOMAIN_ACTION_TYPES = new Set([
   'TASK_CREATE',
@@ -234,6 +244,15 @@ export function appReducer(state: AppState, action: AppAction): AppState {
           s.id === action.payload.id ? { ...s, _privateVersion: action.payload.version } : s,
         ),
       };
+
+    case 'SPACE_REFRESH_FROM_SERVER': {
+      if (action.payload.spaces.length === 0) return state;
+      const freshById = new Map(action.payload.spaces.map((s) => [s.id, s]));
+      return {
+        ...state,
+        spaces: state.spaces.map((s) => freshById.get(s.id) ?? s),
+      };
+    }
 
     case 'TASK_SET_FILTER':
       return { ...state, ui: { ...state.ui, taskFilter: action.payload.filter } };

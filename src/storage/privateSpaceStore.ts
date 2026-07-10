@@ -7,10 +7,14 @@
 // `supabaseStore.ts`) hay `kn_shared_spaces`/`kn_space_members` (Shared Space, xem
 // `sharedSpaceStore.ts`).
 //
-// Cơ chế cố ý MIRROR CHÍNH XÁC `sharedSpaceStore.ts` (đã chứng minh chạy ổn):
-//   - Optimistic locking: trigger `kn_private_spaces_before_update` tự tăng `version`. Client gửi
-//     `WHERE id = spaceId AND version = expectedVersion`; 0 rows affected = conflict (client khác/
-//     tab khác vừa ghi trước) → caller (AppStateContext) tự resync version mới + retry.
+// Cơ chế cố ý MIRROR CHÍNH XÁC `sharedSpaceStore.ts`:
+//   - KHÔNG version-check/retry (bỏ theo docs/features/conflict-handling-simplification.md, 2026-07-10
+//     — version-check chỉ bảo vệ được 1 khung rất hẹp, không chặn được đúng kịch bản gây mất dữ liệu
+//     thật). `savePrivateSpace()` ghi thẳng `WHERE id = spaceId` (blind write, last-write-wins). Cột
+//     `version`/trigger `kn_private_spaces_before_update` VẪN GIỮ trên DB (tự tăng version/updated_at
+//     vô điều kiện) nhưng tầng app không còn đọc/dùng để chặn ghi — chỉ còn tác dụng phụ miễn phí là
+//     `updated_at`. Rủi ro RAM cũ (root cause thật) được xử lý riêng bằng refresh-on-visible ở
+//     `AppStateContext.tsx` (`refreshStaleSpaces()`), không phải version-check.
 //   - `id` do CLIENT tự sinh (`crypto.randomUUID()`, xem `state/reducers/spaces.ts`) — khác
 //     `kn_shared_spaces` (id do server sinh) — nên `createPrivateSpace`/`upsertPrivateSpaces` LUÔN
 //     gửi kèm `id`, không dựa vào default DB.
@@ -120,24 +124,6 @@ export async function loadPrivateSpaces(): Promise<Space[]> {
 }
 
 /**
- * Đọc version hiện tại của 1 Space cá nhân — dùng để resync sau khi `savePrivateSpace()` báo
- * conflict, tránh mất thay đổi do bị drop im lặng (mirror `getSharedSpaceVersion`).
- */
-export async function getPrivateSpaceVersion(spaceId: string): Promise<number | null> {
-  const { data, error } = await supabase
-    .from('kn_private_spaces')
-    .select('version')
-    .eq('id', spaceId)
-    .maybeSingle<{ version: number }>();
-
-  if (error) {
-    console.warn('[KN-Space] getPrivateSpaceVersion lỗi:', error.message);
-    throw error;
-  }
-  return data?.version ?? null;
-}
-
-/**
  * Tạo mới 1 Space cá nhân (INSERT) — dùng khi `Space._privateVersion === undefined` (chưa từng
  * lưu lên DB). `space.id` giữ nguyên (client tự sinh từ trước, xem `emptySpace()` ở
  * `state/reducers/spaces.ts`). Trigger chỉ chạy khi UPDATE nên version sau INSERT luôn = 1 (default
@@ -195,18 +181,23 @@ export async function upsertPrivateSpaces(spaces: Space[]): Promise<{ ok: boolea
 }
 
 /**
- * Save 1 Space cá nhân với optimistic locking — mirror CHÍNH XÁC `saveSharedSpace()`.
+ * Save 1 Space cá nhân — ghi thẳng (blind write, last-write-wins), KHÔNG version-check (bỏ theo
+ * docs/features/conflict-handling-simplification.md mục 2.1 — 2026-07-10). Mirror CHÍNH XÁC
+ * `saveSharedSpace()`: throw lỗi thật ra ngoài cho caller tự bật banner lỗi mạng
+ * (`AppStateContext.tsx` — `attemptSavePrivate`), KHÔNG tự nuốt lỗi rồi trả `{ok:false}` như bản cũ
+ * (bản cũ tạo ra lỗ hổng banner không bao giờ bật cho Space cá nhân — xem mục "Cập nhật sau review
+ * dev" trong tài liệu trên).
  *
- * UPDATE kn_private_spaces SET ... WHERE id = spaceId AND version = expectedVersion
+ * UPDATE kn_private_spaces SET ... WHERE id = spaceId
  *
- * Trigger `kn_private_spaces_before_update` tự tăng version + `updated_at`. 0 rows affected =
- * version đã đổi trên DB (client khác/tab khác vừa ghi) → caller cần resync + retry.
+ * Trigger `kn_private_spaces_before_update` vẫn tự tăng `version` + `updated_at` (giữ nguyên, vô
+ * hại) nhưng kết quả `newVersion` trả về ở đây chỉ mang tính thông tin, không dùng để chặn ghi lần
+ * sau.
  */
 export async function savePrivateSpace(
   spaceId: string,
   patch: Partial<Pick<Space, 'name' | 'order' | 'enabledBlocks' | 'tasks' | 'reminders' | 'habits' | 'notes' | 'logs'>>,
-  expectedVersion: number,
-): Promise<{ ok: boolean; conflict: boolean; newVersion?: number; error?: string }> {
+): Promise<{ newVersion?: number }> {
   const updatePayload: Record<string, unknown> = {};
   if (patch.name !== undefined) updatePayload.name = patch.name;
   if (patch.order !== undefined) updatePayload.space_order = patch.order;
@@ -218,31 +209,22 @@ export async function savePrivateSpace(
   if (patch.logs !== undefined) updatePayload.logs = patch.logs;
 
   if (Object.keys(updatePayload).length === 0) {
-    return { ok: true, conflict: false, newVersion: expectedVersion };
+    return {};
   }
 
-  try {
-    const { data, error } = await supabase
-      .from('kn_private_spaces')
-      .update(updatePayload)
-      .eq('id', spaceId)
-      .eq('version', expectedVersion)
-      .select('version')
-      .maybeSingle<{ version: number }>();
+  const { data, error } = await supabase
+    .from('kn_private_spaces')
+    .update(updatePayload)
+    .eq('id', spaceId)
+    .select('version')
+    .maybeSingle<{ version: number }>();
 
-    if (error) throw error;
-
-    if (!data) {
-      // 0 rows updated → version đã đổi trên DB → conflict
-      return { ok: false, conflict: true };
-    }
-
-    return { ok: true, conflict: false, newVersion: data.version };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.warn('[KN-Space] savePrivateSpace lỗi:', message);
-    return { ok: false, conflict: false, error: message };
+  if (error) {
+    console.warn('[KN-Space] savePrivateSpace lỗi:', error.message);
+    throw error;
   }
+
+  return { newVersion: data?.version };
 }
 
 /** Xoá 1 Space cá nhân (RLS `auth.uid() = user_id` đảm bảo chỉ xoá được hàng của chính mình). */
