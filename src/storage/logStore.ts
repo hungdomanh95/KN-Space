@@ -5,12 +5,14 @@
 // Đọc/ghi 2 bảng MỚI `kn_private_logs`/`kn_shared_logs` (xem
 // docs/features/item-level-log-schema.sql — đã chạy thật trên Supabase, dữ
 // liệu cũ đã migrate). Các hàm GHI (`createLog`/`updateLogExpense`/`deleteLog`/
-// `deleteLogs`) đang được gọi thật từ `state/itemPersist.ts` (cờ
-// `LOG_ITEM_PERSIST_ENABLED = true`, "Giai đoạn A" — dual-write). Các hàm ĐỌC
-// (`loadPrivateLogs`/`loadSharedLogs`) VẪN CHƯA được gọi ở đâu ngoài chính
-// chúng — nguồn đọc Nhật ký nhanh THẬT vẫn là cột `logs jsonb` trong
-// `kn_private_spaces`/`kn_shared_spaces` cho tới khi "Giai đoạn B" (cutover
-// đọc, xem -progress.md câu hỏi mở #2) được duyệt và triển khai riêng.
+// `deleteLogs`) được gọi từ `state/itemPersist.ts` (dual-write, cờ
+// `LOG_ITEM_PERSIST_ENABLED = true`). Các hàm ĐỌC (`loadPrivateLogs`/
+// `loadSharedLogs`) được gọi từ `state/AppStateContext.tsx` (bootstrap +
+// `refreshStaleSpaces()`, "Giai đoạn B", 2026-07-11, xem -progress.md câu hỏi
+// mở #2) — nguồn đọc Nhật ký nhanh THẬT giờ là 2 bảng này, gán đè `space.logs`
+// sau khi tải. Cột `logs jsonb` trong `kn_private_spaces`/`kn_shared_spaces`
+// VẪN được ghi song song (dual-write, làm lưới an toàn) nhưng KHÔNG còn là
+// nguồn đọc.
 //
 // Cơ chế cố ý MIRROR CHÍNH XÁC `privateSpaceStore.ts`/`sharedSpaceStore.ts`:
 //   - KHÔNG version-check/retry — ghi thẳng blind write (`WHERE id = logId`),

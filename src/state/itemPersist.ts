@@ -13,15 +13,16 @@
 // CỜ BẬT/TẮT — `LOG_ITEM_PERSIST_ENABLED`:
 // Bảng `kn_private_logs`/`kn_shared_logs` (docs/features/item-level-log-schema.sql)
 // đã tạo thật trên Supabase và dữ liệu cũ đã migrate xong (`window.knMigrateLogs.run()`).
-// Cờ đang BẬT (`true`) — đây là "Giai đoạn A" (xem -progress.md, câu hỏi mở #2,
-// đề xuất đã được chủ dự án duyệt 2026-07-11): mọi action `LOG_*` giờ GHI SONG
-// SONG (dual-write) vào bảng mới, NHƯNG phần ĐỌC vẫn 100% qua cột `logs` jsonb
-// trong `kn_private_spaces`/`kn_shared_spaces` như cũ — `loadPrivateLogs`/
-// `loadSharedLogs` (`logStore.ts`) CHƯA được nối vào bootstrap/`refreshStaleSpaces`.
-// Mục đích: để bảng mới tự "đuổi kịp" log phát sinh mới, giảm rủi ro lệch dữ
-// liệu trước khi cutover đọc. Rủi ro hiển thị ~0 (không đổi UI/hành vi đọc).
-// "Giai đoạn B" (nối phần đọc, cutover) là bước RIÊNG, cần duyệt lại trước khi
-// code — xem checklist 3 lưu ý bắt buộc ở -progress.md.
+// Cờ đang BẬT (`true`) — mọi action `LOG_*` GHI SONG SONG (dual-write) vào bảng
+// mới. "Giai đoạn B" (2026-07-11, -progress.md câu hỏi mở #2) đã nối phần ĐỌC:
+// `AppStateContext.tsx` (bootstrap + `refreshStaleSpaces()`) gọi `loadPrivateLogs`/
+// `loadSharedLogs` (`logStore.ts`) cho từng Space rồi GÁN ĐÈ `space.logs` — nguồn
+// đọc THẬT của Nhật ký nhanh giờ là bảng item-level, KHÔNG còn là cột `logs` jsonb
+// nữa (dù nhánh ghi jsonb VẪN CHẠY SONG SONG làm lưới an toàn, chưa tắt). Hàm
+// `hasPendingLogsForSpace()` bên dưới là điểm nối quan trọng nhất: cho
+// `refreshStaleSpaces()` biết Space nào đang có Log "chưa ghi xong" (còn debounce
+// hoặc network đang bay) để KHÔNG gán đè `space.logs` cho Space đó trong lượt
+// refresh hiện tại (tránh đè mất log vừa tạo/sửa/xoá cục bộ).
 // =============================================================================
 
 import type { Space } from '../types';
@@ -158,6 +159,15 @@ const pending = new Map<string, PendingEntry>();
 // mất im lặng). Không loại bỏ hoàn toàn rủi ro network-level reorder, nhưng đảm bảo app không tự bắn
 // 2 request chồng lấp cho cùng 1 item.
 const inFlight = new Map<string, Promise<void>>();
+// itemId -> {scope, spaceId} cho MỌI item hiện "chưa ghi xong" — còn chờ debounce (có mặt trong
+// `pending`) HOẶC network call đang bay/đang chuỗi qua `inFlight` (không còn trong `pending` vì
+// `flushLogItem` xoá khỏi `pending` NGAY khi bắt đầu await, nhưng request thực tế có thể còn chưa
+// xong). Dùng riêng map này (thay vì suy ra từ `pending`) vì `flushAllPendingLogPersist()` (gọi khi
+// tab chuyển `hidden`) chuyển gần như toàn bộ `pending` sang trạng thái in-flight ngay lập tức — nếu
+// chỉ check `pending`, đúng lúc tab quay lại `visible` (thời điểm cần guard nhất) sẽ luôn trả về
+// "không pending" dù request vẫn còn bay. Dùng ở `hasPendingLogsForSpace()` (Giai đoạn B,
+// `refreshStaleSpaces()` trong AppStateContext.tsx).
+const activeSpaceRefs = new Map<string, { scope: LogScope; spaceId: string }>();
 
 function setFallback(scope: LogScope, active: boolean): void {
   if (scope === 'private') setPrivateFallbackActive(active);
@@ -185,16 +195,32 @@ async function flushLogItem(itemId: string): Promise<void> {
   }
 }
 
-/** Xếp lượt flush của `itemId` nối tiếp sau lượt đang bay (nếu có) — xem giải thích `inFlight` ở trên. */
+/**
+ * Xếp lượt flush của `itemId` nối tiếp sau lượt đang bay (nếu có) — xem giải thích `inFlight` ở
+ * trên.
+ *
+ * BUG ĐÃ SỬA (phát hiện lúc thêm `hasPendingLogsForSpace()`, Giai đoạn B, 2026-07-11): bản gốc
+ * lưu `inFlight.set(itemId, next.finally(cb))` (1 Promise MỚI, do `.finally()` luôn trả về 1
+ * promise khác) nhưng `cb` lại so sánh `inFlight.get(itemId) === next` — so với `next` (promise
+ * TRƯỚC khi bọc `.finally()`), không phải giá trị THẬT SỰ vừa lưu vào map -> điều kiện này luôn
+ * `false`, `inFlight.delete(itemId)` không bao giờ chạy được. Trước đây vô hại vì không có ai đọc
+ * `inFlight.has()` để quyết định gì (chaining vẫn hoạt động đúng vì `.then()` trên 1 promise đã
+ * resolve chạy ngay lập tức dù entry cũ còn "mồ côi" trong map) — nhưng giờ `hasPendingLogsForSpace()`
+ * phụ thuộc vào việc dọn đúng lúc, nếu không sẽ coi 1 Space là "còn Log pending" MÃI MÃI sau lần
+ * ghi Log đầu tiên. Sửa bằng cách tự tham chiếu đúng promise đã lưu (`wrapped`) thay vì `next`.
+ */
 function scheduleFlush(itemId: string): void {
   const prior = inFlight.get(itemId) ?? Promise.resolve();
-  const next = prior.then(() => flushLogItem(itemId));
-  inFlight.set(
-    itemId,
-    next.finally(() => {
-      if (inFlight.get(itemId) === next) inFlight.delete(itemId);
-    }),
-  );
+  const chained = prior.then(() => flushLogItem(itemId));
+  const wrapped: Promise<void> = chained.finally(() => {
+    if (inFlight.get(itemId) === wrapped) {
+      inFlight.delete(itemId);
+      // Chỉ xoá "đang bận" nếu KHÔNG có thao tác mới nào vừa được queue lại cho item này trong
+      // lúc lượt flush này còn bay (pending còn entry -> vẫn đang chờ 1 lượt flush kế tiếp).
+      if (!pending.has(itemId)) activeSpaceRefs.delete(itemId);
+    }
+  });
+  inFlight.set(itemId, wrapped);
 }
 
 /** Đưa 1 thao tác vào hàng đợi debounce (600ms) của `itemId`, gộp với thao tác đang chờ (nếu có). */
@@ -205,17 +231,21 @@ function queueLogPersist(scope: LogScope, spaceId: string, itemId: string, op: L
   const merged = mergeLogPendingOp(existing?.op, op);
   if (merged === null) {
     pending.delete(itemId);
+    // Không còn gì cần gửi cho item này — trừ khi 1 lượt flush TRƯỚC ĐÓ của cùng item vẫn đang bay
+    // (inFlight), vẫn cần giữ "đang bận" tới khi lượt đó xong hẳn (xem finally ở scheduleFlush).
+    if (!inFlight.has(itemId)) activeSpaceRefs.delete(itemId);
     return;
   }
 
   const timer = setTimeout(() => scheduleFlush(itemId), debounceMs);
   pending.set(itemId, { scope, spaceId, op: merged, timer });
+  activeSpaceRefs.set(itemId, { scope, spaceId });
 }
 
 /** `LOG_DELETE_MANY` — 1 network call cho N id (mục 4.3 tài liệu trên), KHÔNG qua debounce/hàng đợi
  * per-item (huỷ mọi pending riêng lẻ của các id liên quan trước, tránh 1 lượt insert/update cũ bay
  * ra SAU khi đã xoá hàng loạt). */
-function queueLogDeleteMany(scope: LogScope, itemIds: string[]): void {
+function queueLogDeleteMany(scope: LogScope, spaceId: string, itemIds: string[]): void {
   if (itemIds.length === 0) return;
   itemIds.forEach((id) => {
     const existing = pending.get(id);
@@ -223,6 +253,7 @@ function queueLogDeleteMany(scope: LogScope, itemIds: string[]): void {
       clearTimeout(existing.timer);
       pending.delete(id);
     }
+    activeSpaceRefs.set(id, { scope, spaceId });
   });
   void (async () => {
     try {
@@ -231,8 +262,27 @@ function queueLogDeleteMany(scope: LogScope, itemIds: string[]): void {
     } catch (err) {
       console.warn('[KN-Space] itemPersist: xoá hàng loạt Log thất bại:', err);
       setFallback(scope, true);
+    } finally {
+      itemIds.forEach((id) => {
+        if (!pending.has(id) && !inFlight.has(id)) activeSpaceRefs.delete(id);
+      });
     }
   })();
+}
+
+/**
+ * `true` nếu Space (`scope`+`spaceId`) hiện có ÍT NHẤT 1 Log "chưa ghi xong" (còn chờ debounce
+ * HOẶC network call đang bay) — dùng ở `refreshStaleSpaces()` (Giai đoạn B, AppStateContext.tsx)
+ * để KHÔNG gán đè `space.logs` bằng dữ liệu vừa tải lại từ bảng item-level cho Space này trong
+ * lượt refresh hiện tại (server có thể chưa phản ánh kịp thao tác local vừa/đang lưu — đè lúc này
+ * có thể làm "mất" tạm log vừa tạo/sửa/xoá khỏi UI cho tới lượt refresh kế tiếp). Luôn trả `false`
+ * khi `LOG_ITEM_PERSIST_ENABLED === false` (không có gì được queue vào `activeSpaceRefs` khi đó).
+ */
+export function hasPendingLogsForSpace(scope: LogScope, spaceId: string): boolean {
+  for (const ref of activeSpaceRefs.values()) {
+    if (ref.scope === scope && ref.spaceId === spaceId) return true;
+  }
+  return false;
 }
 
 /**
@@ -265,7 +315,7 @@ export function handleLogActionForPersist(currentSpace: Space, action: LogAction
 
   const nextSpace = logsReducer(currentSpace, resolvedAction);
   if (resolvedAction.type === 'LOG_DELETE_MANY') {
-    queueLogDeleteMany(scope, resolvedAction.payload.ids);
+    queueLogDeleteMany(scope, spaceId, resolvedAction.payload.ids);
     return resolvedAction;
   }
 

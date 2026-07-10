@@ -1,6 +1,24 @@
-import { describe, it, expect } from 'vitest';
-import { computeLogPersistDescriptors, mergeLogPendingOp, type LogPendingOp } from './itemPersist';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
+import {
+  computeLogPersistDescriptors,
+  handleLogActionForPersist,
+  hasPendingLogsForSpace,
+  mergeLogPendingOp,
+  type LogPendingOp,
+} from './itemPersist';
 import type { LogEntry, Space } from '../types';
+
+// Mock logStore.ts (thay vì để `hasPendingLogsForSpace` test dưới đây gọi network Supabase THẬT) —
+// chỉ cần biết CÓ gọi hàm ghi nào không và điều khiển được thời điểm resolve, không cần hành vi
+// DB thật. `../storage/supabaseStore` KHÔNG cần mock — `setPrivateFallbackActive`/
+// `setSharedFallbackActive` chỉ đổi biến module-level cục bộ, không có side-effect network.
+vi.mock('../storage/logStore', () => ({
+  createLog: vi.fn(),
+  updateLogExpense: vi.fn(),
+  deleteLog: vi.fn(),
+  deleteLogs: vi.fn(),
+}));
+import { createLog, deleteLogs } from '../storage/logStore';
 
 function emptySpace(logs: LogEntry[] = []): Space {
   return {
@@ -116,4 +134,82 @@ describe('mergeLogPendingOp', () => {
     const merged = mergeLogPendingOp(existing, { kind: 'update', patch: { categoryOverride: null } });
     expect(merged).toEqual({ kind: 'insert', log: makeLog() });
   });
+});
+
+// Giai đoạn B (item-level-entity-tables-progress.md, câu hỏi mở #2) — `hasPendingLogsForSpace()`
+// là điểm nối quan trọng nhất cho `refreshStaleSpaces()` (AppStateContext.tsx): phải trả `true`
+// xuyên suốt từ lúc action được queue (còn debounce) tới khi network call THẬT SỰ resolve xong
+// (không chỉ tới khi rời khỏi cửa sổ debounce) — nếu không, `refreshStaleSpaces()` có thể đè mất
+// log đang bay lên server.
+function sharedSpace(overrides: Partial<Space> = {}): Space {
+  return {
+    ...emptySpace(),
+    id: 'shared-local-id',
+    isShared: true,
+    ...overrides,
+  };
+}
+
+// Đợi qua hết 1 vòng debounce 600ms bằng TIMER THẬT (không dùng fake timers) — đơn giản/đáng tin
+// cậy hơn cho module này vì `flushLogItem` là 1 chuỗi async thật (setTimeout -> await network mock
+// -> .then/.finally), fake timers của vitest chỉ đảm bảo flush microtask "tại mỗi tick timer", dễ
+// sai khác thời điểm thật với debounce 600ms hard-code trong `itemPersist.ts`.
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+describe('hasPendingLogsForSpace', () => {
+  beforeEach(() => {
+    vi.mocked(createLog).mockReset();
+    vi.mocked(deleteLogs).mockReset();
+  });
+
+  it('Space chưa từng có action Log nào -> luôn false', () => {
+    expect(hasPendingLogsForSpace('shared', 'space-never-touched')).toBe(false);
+  });
+
+  it('LOG_CREATE: true ngay khi queue (đang debounce), true suốt lúc network đang bay, false khi resolve xong', async () => {
+    let resolveCreate!: (v: { ok: boolean }) => void;
+    vi.mocked(createLog).mockImplementation(
+      () => new Promise((resolve) => { resolveCreate = resolve; }),
+    );
+
+    const space = sharedSpace({ sharedSpaceId: 'space-log-create' });
+    handleLogActionForPersist(space, { type: 'LOG_CREATE', payload: { content: 'Test', id: 'log-create-1' } });
+
+    expect(hasPendingLogsForSpace('shared', 'space-log-create')).toBe(true); // còn trong 600ms debounce
+
+    await wait(650); // hết debounce -> flushLogItem() gọi createLog() (đang treo, chưa resolve)
+    expect(hasPendingLogsForSpace('shared', 'space-log-create')).toBe(true); // network chưa resolve
+
+    resolveCreate({ ok: true });
+    await wait(0); // setTimeout(0) chạy SAU khi mọi microtask (.then/.finally) đã xử lý xong
+    expect(hasPendingLogsForSpace('shared', 'space-log-create')).toBe(false);
+  }, 2000);
+
+  it('LOG_CREATE rồi LOG_DELETE cùng id TRONG cửa sổ debounce -> huỷ hẳn, không còn pending, KHÔNG gọi network', async () => {
+    const space = sharedSpace({ sharedSpaceId: 'space-log-create-delete' });
+    handleLogActionForPersist(space, { type: 'LOG_CREATE', payload: { content: 'Test', id: 'log-create-2' } });
+    expect(hasPendingLogsForSpace('shared', 'space-log-create-delete')).toBe(true);
+
+    handleLogActionForPersist(space, { type: 'LOG_DELETE', payload: { id: 'log-create-2' } });
+    expect(hasPendingLogsForSpace('shared', 'space-log-create-delete')).toBe(false); // insert+delete = huỷ
+
+    await wait(650);
+    expect(createLog).not.toHaveBeenCalled();
+  }, 2000);
+
+  it('LOG_DELETE_MANY: true ngay lập tức (không qua debounce), false khi deleteLogs resolve xong', async () => {
+    let resolveDelete!: () => void;
+    vi.mocked(deleteLogs).mockImplementation(() => new Promise((resolve) => { resolveDelete = resolve; }));
+
+    const space = sharedSpace({ sharedSpaceId: 'space-log-delete-many' });
+    handleLogActionForPersist(space, { type: 'LOG_DELETE_MANY', payload: { ids: ['log-a', 'log-b'] } });
+
+    expect(hasPendingLogsForSpace('shared', 'space-log-delete-many')).toBe(true);
+
+    resolveDelete();
+    await wait(0);
+    expect(hasPendingLogsForSpace('shared', 'space-log-delete-many')).toBe(false);
+  }, 2000);
 });

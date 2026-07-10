@@ -32,7 +32,14 @@ import {
   computeTaskUpdateNotifyEffect,
   computeTaskToggleDoneNotifyEffect,
 } from './sharedTaskNotifyEffects';
-import { flushAllPendingLogPersist, handleLogActionForPersist, isLogAction } from './itemPersist';
+import {
+  flushAllPendingLogPersist,
+  handleLogActionForPersist,
+  hasPendingLogsForSpace,
+  isLogAction,
+  LOG_ITEM_PERSIST_ENABLED,
+} from './itemPersist';
+import { loadPrivateLogs, loadSharedLogs } from '../storage/logStore';
 
 interface AppStateContextValue {
   state: AppState;
@@ -77,6 +84,46 @@ function privateSnapshot(space: Space) {
     notes: space.notes,
     logs: space.logs,
   };
+}
+
+/**
+ * Giai đoạn B (docs/features/item-level-entity-tables-progress.md, câu hỏi mở #2) — tải Log của
+ * TỪNG Space từ bảng item-level mới (`kn_private_logs`/`kn_shared_logs`, qua `logStore.ts`), gán
+ * đè `space.logs` (thay cho mảng jsonb cũ vốn đã có sẵn trong `space` truyền vào) làm nguồn ĐỌC
+ * thật. Chạy song song cho mọi Space qua `Promise.all` — lỗi tải riêng 1 Space KHÔNG throw/chặn
+ * Space khác, fallback dùng đúng `space.logs` jsonb đã có sẵn cho Space đó (log cảnh báo console).
+ *
+ * `shouldSkip(space)` — Space nào trả `true` thì GIỮ NGUYÊN `space.logs` gốc (không gọi
+ * `loadPrivateLogs`/`loadSharedLogs`, không gán đè) — dùng ở `refreshStaleSpaces()` để bỏ qua Space
+ * đang có Log "chưa ghi xong" (xem `hasPendingLogsForSpace()`, tránh đè mất log vừa tạo/sửa/xoá cục
+ * bộ bằng dữ liệu server có thể chưa kịp phản ánh thao tác đó).
+ *
+ * No-op hoàn toàn (trả về nguyên mảng đầu vào, không gọi network) khi `LOG_ITEM_PERSIST_ENABLED
+ * === false` — giữ nguyên hành vi cũ 100% (đọc qua `logs` jsonb) nếu cờ tắt.
+ */
+async function hydrateItemLevelLogs(
+  spaces: Space[],
+  shouldSkip: (space: Space) => boolean = () => false,
+): Promise<Space[]> {
+  if (!LOG_ITEM_PERSIST_ENABLED) return spaces;
+  return Promise.all(
+    spaces.map(async (space) => {
+      if (shouldSkip(space)) return space;
+      try {
+        const logs =
+          space.isShared && space.sharedSpaceId
+            ? await loadSharedLogs(space.sharedSpaceId)
+            : await loadPrivateLogs(space.id);
+        return { ...space, logs };
+      } catch (err) {
+        console.warn(
+          `[KN-Space] Không tải được Log item-level cho Space "${space.name}" (${space.id}) — dùng tạm logs jsonb cũ:`,
+          err,
+        );
+        return space;
+      }
+    }),
+  );
 }
 
 export function AppStateProvider({ children }: { children: React.ReactNode }) {
@@ -129,7 +176,14 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           console.warn('[KN-Space] Không tải được shared spaces:', err);
         }
 
-        const allSpaces = [...privateSpaces, ...sharedSpaces];
+        // Giai đoạn B (item-level-entity-tables-progress.md, câu hỏi mở #2) — gán đè `space.logs`
+        // của MỌI Space (private + shared) bằng dữ liệu tải từ bảng item-level mới, TRƯỚC khi
+        // dispatch HYDRATE. Không cần cập nhật `prevPrivateRef`/`prevSharedRef` thủ công ở đây —
+        // 2 baseline này bắt đầu rỗng, effect debounce Space-level tự nhận ra "lần đầu thấy Space
+        // này" (sau khi `state.spaces` đổi do HYDRATE) và chỉ ghi nhận baseline từ `space.logs` ĐÃ
+        // được gán đè ở bước này, không tự bắn save thừa.
+        const rawSpaces = [...privateSpaces, ...sharedSpaces];
+        const allSpaces = await hydrateItemLevelLogs(rawSpaces);
         // Validate sau khi có đủ cả private + shared — localId có thể là shared space
         const validCurrentSpaceId = allSpaces.some((s) => s.id === currentSpaceId)
           ? currentSpaceId
@@ -356,6 +410,13 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
    * Lỗi network khi tải lại → bắt riêng từng nguồn (private/shared độc lập), bỏ qua im lặng, không
    * throw/crash — thử lại ở lần `visible` kế tiếp. KHÔNG phải polling (chỉ chạy khi
    * `visibilitychange` bắn `visible`, không có `setInterval`).
+   *
+   * Giai đoạn B (item-level-entity-tables-progress.md, câu hỏi mở #2) — với các Space QUA ĐƯỢC
+   * vòng lọc pending Space-level ở trên, tải thêm Log từ bảng item-level (`hydrateItemLevelLogs`)
+   * để gán đè `.logs`, NHƯNG bỏ qua riêng phần gán đè `.logs` (giữ nguyên bản jsonb vừa tải từ
+   * `kn_private_spaces`/`kn_shared_spaces`) cho Space nào đang có Log "chưa ghi xong" theo
+   * `hasPendingLogsForSpace()` (`itemPersist.ts`) — tránh đè mất log vừa tạo/sửa/xoá cục bộ bằng
+   * dữ liệu server (cả 2 nguồn, jsonb lẫn item-level) có thể chưa kịp phản ánh thao tác đó.
    */
   async function refreshStaleSpaces(): Promise<void> {
     if (!hydratedRef.current) return; // bootstrap chưa xong — để bootstrap tự lo, tránh gọi trùng
@@ -371,27 +432,35 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       }),
     ]);
 
-    const toRefresh: Space[] = [];
-
-    (freshPrivate ?? []).forEach((space) => {
+    const privateCandidates = (freshPrivate ?? []).filter((space) => {
       const sid = space.id;
-      if (
+      return !(
         pendingPrivateSavesRef.current.has(sid) ||
         privateSaveTimersRef.current.has(sid) ||
         creatingPrivateRef.current.has(sid)
-      ) {
-        return; // đang gõ dở/đang lưu/đang tạo — không đè
-      }
-      toRefresh.push(space);
-      prevPrivateRef.current.set(sid, JSON.stringify(privateSnapshot(space)));
+      ); // đang gõ dở/đang lưu/đang tạo — không đè
     });
 
-    (freshShared ?? []).forEach((space) => {
+    const sharedCandidates = (freshShared ?? []).filter((space) => {
       const sid = space.sharedSpaceId ?? space.id;
-      if (pendingSharedSavesRef.current.has(sid) || sharedSaveTimersRef.current.has(sid)) {
-        return;
-      }
-      toRefresh.push(space);
+      return !(pendingSharedSavesRef.current.has(sid) || sharedSaveTimersRef.current.has(sid));
+    });
+
+    const [refreshedPrivate, refreshedShared] = await Promise.all([
+      hydrateItemLevelLogs(privateCandidates, (space) => hasPendingLogsForSpace('private', space.id)),
+      hydrateItemLevelLogs(sharedCandidates, (space) =>
+        hasPendingLogsForSpace('shared', space.sharedSpaceId ?? space.id),
+      ),
+    ]);
+
+    const toRefresh: Space[] = [...refreshedPrivate, ...refreshedShared];
+
+    refreshedPrivate.forEach((space) => {
+      prevPrivateRef.current.set(space.id, JSON.stringify(privateSnapshot(space)));
+    });
+
+    refreshedShared.forEach((space) => {
+      const sid = space.sharedSpaceId ?? space.id;
       prevSharedRef.current.set(
         sid,
         JSON.stringify({
