@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Check, Copy, Eye, EyeOff } from 'lucide-react';
 import { Modal } from '../../components/Modal';
 import { useAppState } from '../../state/AppStateContext';
-import { maskContent } from './noteUtils';
+import { looksLikeCode, maskContent } from './noteUtils';
 import type { Note } from '../../types';
 
 interface NoteViewModalProps {
@@ -76,21 +76,29 @@ export function NoteViewModal({ note, onClose, onEdit }: NoteViewModalProps) {
           {isHidden ? <Eye className="icon" size={13} /> : <EyeOff className="icon" size={13} />}
         </button>
       </div>
-      <div className="flex max-h-[60vh] flex-col gap-3 overflow-y-auto px-0.5 py-1 text-[0.9375rem] leading-[1.65] text-[var(--text)]">
-        {displayBlocks.map((block, i) => (
-          <div key={i} className="group flex items-start gap-2">
-            <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">{block}</span>
-            <button
-              type="button"
-              className="icon-btn mt-0.5 flex-none opacity-0 transition-opacity duration-150 group-hover:opacity-100 max-md:opacity-100"
-              title="Copy cụm này"
-              aria-label="Copy cụm này"
-              onClick={() => handleCopyBlock(i)}
+      <div className="flex max-h-[60vh] flex-col gap-2.5 overflow-y-auto px-0.5 py-1 text-[0.9375rem] leading-[1.65] text-[var(--text)]">
+        {displayBlocks.map((block, i) => {
+          const isCode = looksLikeCode(realBlocks[i]);
+          return (
+            <div
+              key={i}
+              className={`group flex items-start gap-2 rounded-lg border border-[color:var(--border-hairline)] bg-[var(--raised)] px-3 py-2 ${
+                isCode ? 'font-mono text-[0.8125rem] leading-[1.55]' : ''
+              }`}
             >
-              {copiedIndex === i ? <Check className="icon" size={13} /> : <Copy className="icon" size={13} />}
-            </button>
-          </div>
-        ))}
+              <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">{block}</span>
+              <button
+                type="button"
+                className="icon-btn mt-0.5 flex-none opacity-0 transition-opacity duration-150 group-hover:opacity-100 max-md:opacity-100"
+                title="Copy cụm này"
+                aria-label="Copy cụm này"
+                onClick={() => handleCopyBlock(i)}
+              >
+                {copiedIndex === i ? <Check className="icon" size={13} /> : <Copy className="icon" size={13} />}
+              </button>
+            </div>
+          );
+        })}
       </div>
       <div className="modal-actions">
         <button className="btn-ghost" onClick={onClose}>

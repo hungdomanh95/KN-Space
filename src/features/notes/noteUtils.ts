@@ -5,6 +5,22 @@ export function maskContent(text: string): string {
     .join('\n');
 }
 
+/**
+ * Nhận diện 1 cụm có "trông giống code/cấu hình" hay không, để hiển thị bằng font monospace +
+ * khung riêng trong modal xem chi tiết thay vì trộn chung phong cách với văn xuôi (xem thảo luận
+ * UX — cụm dài kiểu Podspec/script hiện ra như 1 khối chữ liền tù tì, không phân biệt được với
+ * ghi chú thường). Tín hiệu: có ký tự cú pháp đặc trưng ({};/=>/::), có dòng thụt lề, hoặc là dòng
+ * comment (#, //, --). Với cụm nhiều dòng, cần ít nhất một nửa số dòng khớp mới tính là code —
+ * tránh nhận nhầm 1 câu văn xuôi chỉ tình cờ có 1 dấu `;` hay `::`.
+ */
+export function looksLikeCode(text: string): boolean {
+  const codeSignal = /[{};]|=>|::/;
+  const lines = text.split('\n');
+  if (lines.length < 2) return codeSignal.test(text);
+  const codeLikeLines = lines.filter((line) => /^\s{2,}\S/.test(line) || codeSignal.test(line) || /^\s*(#|\/\/|--)/.test(line));
+  return codeLikeLines.length >= Math.ceil(lines.length / 2);
+}
+
 export function formatNoteDate(updatedAt: number): string {
   const d = new Date(updatedAt);
   return `${d.getDate()} thg ${d.getMonth() + 1}`;
