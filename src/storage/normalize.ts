@@ -71,7 +71,7 @@ export function normalizeSpace(space: Space): Space {
           completedDates: Array.isArray(h.completedDates) ? h.completedDates : [],
         }))
       : [],
-    notes: Array.isArray(space.notes) ? space.notes.map((n) => ({ ...n, expanded: n.expanded ?? false, hidden: n.hidden ?? false })) : [],
+    notes: Array.isArray(space.notes) ? space.notes.map((n) => ({ ...n, hidden: n.hidden ?? false })) : [],
     logs: normalizeLogEntries(space.logs),
     ...(space.isShared ? { isShared: true as const, sharedSpaceId: space.sharedSpaceId, _sharedVersion: space._sharedVersion } : {}),
     // _privateVersion: chỉ giữ khi có giá trị số hợp lệ (hàng đã tồn tại trên kn_private_spaces) —
@@ -426,7 +426,6 @@ export function normalizeSettings(
     homeBackground: normalizeHomeBackground(homeBgRaw ?? settings.homeBackground, fallback.homeBackground),
     homeQuotes: normalizeHomeQuotes(settings.homeQuotes, fallback.homeQuotes),
     collapsedBlocks: { ...fallback.collapsedBlocks, ...settings.collapsedBlocks },
-    noteView: settings.noteView ?? fallback.noteView,
     lastScreen: settings.lastScreen === 'dashboard' ? 'dashboard' : 'home',
     // Dữ liệu cũ (trước khi có field này) không có `lastOpenedEpochDay` -> -1 để HYDRATE coi
     // là "ngày mới", tự snap lại ảnh nền/quote theo dayIndex đúng 1 lần khi nâng cấp lên.

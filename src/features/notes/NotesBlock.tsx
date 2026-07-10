@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { BookOpen, ChevronDown, EyeOff, Grid2x2, Plus, Rows2 } from 'lucide-react';
+import { BookOpen, ChevronDown, EyeOff, Plus } from 'lucide-react';
 import { BlockShell } from '../../components/BlockShell';
 import { EmptyState } from '../../components/EmptyState';
 import { useAppState, useCurrentSpace } from '../../state/AppStateContext';
@@ -8,7 +8,7 @@ import { useConfirm } from '../../components/ConfirmContext';
 import { useCurrentUserId } from '../../state/useCurrentUserId';
 import { useSpaceMembers } from '../../state/useSpaceMembers';
 import { getMemberColor, getMemberDisplayName } from '../../utils/memberColors';
-import { NoteCard } from './NoteCard';
+import { NoteRow } from './NoteRow';
 import { NoteFormModal } from './NoteFormModal';
 import { NoteViewModal } from './NoteViewModal';
 import type { Note, NoteSortBy } from '../../types';
@@ -54,13 +54,12 @@ export function NotesBlock({
   const [draggedId, setDraggedId] = useState<string | null>(null);
 
   const collapsed = state.settings.collapsedBlocks.notes;
-  const { noteView } = state.settings;
   const { noteSearch, noteSortBy } = state.ui;
 
-  // Disarm draggable trên mọi card khi nhấc chuột ra, dù không drop đúng chỗ.
+  // Disarm draggable trên mọi hàng khi nhấc chuột ra, dù không drop đúng chỗ.
   useEffect(() => {
     function onMouseUp() {
-      document.querySelectorAll<HTMLElement>('.note-card').forEach((el) => {
+      document.querySelectorAll<HTMLElement>('.note-row').forEach((el) => {
         if (!el.classList.contains('dragging')) el.draggable = false;
       });
     }
@@ -78,16 +77,15 @@ export function NotesBlock({
   else if (noteSortBy === 'recent') list = [...list].sort((a, b) => b.updatedAt - a.updatedAt);
 
   function handleDelete(note: Note) {
-    showConfirm('Xoá note?', 'Xoá card note này? Hành động không thể hoàn tác.', () =>
+    showConfirm('Xoá note?', 'Xoá note này? Hành động không thể hoàn tác.', () =>
       dispatch({ type: 'NOTE_DELETE', payload: { id: note.id } }),
     );
   }
 
   const viewingNote = viewingNoteId ? space.notes.find((n) => n.id === viewingNoteId) ?? null : null;
 
-  const cardsProps = {
+  const rowProps = {
     sortBy: noteSortBy,
-    view: noteView,
     onOpenView: (id: string) => setViewingNoteId(id),
     onEdit: (note: Note) => setEditingNote(note),
     onDelete: handleDelete,
@@ -98,7 +96,6 @@ export function NotesBlock({
 
   function getNoteCreatorInfo(note: Note): { name: string; color: string } | undefined {
     if (!space.isShared || !note.createdBy || note.createdBy === currentUserId) return undefined;
-    // Không cắt cứng theo ký tự — NoteCard tự ellipsis bằng CSS theo chỗ trống thật của card.
     return {
       name: getMemberDisplayName(note.createdBy, members, Infinity),
       color: getMemberColor(note.createdBy, members),
@@ -161,30 +158,6 @@ export function NotesBlock({
             py-1.5 text-[0.7812rem] text-[var(--text)] transition-[border-color] duration-150
             hover:border-[color:var(--accent)] focus:border-[color:var(--accent)] focus:outline-none"
         />
-        <div className="flex flex-none gap-0.5 rounded-lg bg-[var(--bg)] p-[3px]" role="group" aria-label="Chế độ hiển thị note">
-          <button
-            className={`flex h-[26px] w-7 items-center justify-center rounded-md text-[var(--text-dim)] transition-[background,color] duration-150 hover:text-[var(--text)] ${
-              noteView === 'grid' ? 'bg-[var(--raised)] text-[var(--accent)] shadow-[0_1px_3px_rgba(0,0,0,.08)]' : 'bg-transparent'
-            }`}
-            title="Lưới tự động (CSS grid)"
-            aria-label="Chế độ lưới"
-            aria-pressed={noteView === 'grid'}
-            onClick={() => dispatch({ type: 'NOTE_SET_VIEW', payload: { view: 'grid' } })}
-          >
-            <Grid2x2 className="icon h-3.5 w-3.5" size={14} />
-          </button>
-          <button
-            className={`flex h-[26px] w-7 items-center justify-center rounded-md text-[var(--text-dim)] transition-[background,color] duration-150 hover:text-[var(--text)] ${
-              noteView === 'list' ? 'bg-[var(--raised)] text-[var(--accent)] shadow-[0_1px_3px_rgba(0,0,0,.08)]' : 'bg-transparent'
-            }`}
-            title="Danh sách (1 cột)"
-            aria-label="Chế độ danh sách"
-            aria-pressed={noteView === 'list'}
-            onClick={() => dispatch({ type: 'NOTE_SET_VIEW', payload: { view: 'list' } })}
-          >
-            <Rows2 className="icon h-3.5 w-3.5" size={14} />
-          </button>
-        </div>
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>
             <button
@@ -231,16 +204,10 @@ export function NotesBlock({
               hint="Thử đổi từ khoá tìm kiếm hoặc xoá bộ lọc hiện tại."
             />
           )
-        ) : noteView === 'list' ? (
+        ) : (
           <div className="notes-list">
             {list.map((note) => (
-              <NoteCard key={note.id} note={note} {...cardsProps} creatorInfo={getNoteCreatorInfo(note)} />
-            ))}
-          </div>
-        ) : (
-          <div className="notes-grid">
-            {list.map((note) => (
-              <NoteCard key={note.id} note={note} {...cardsProps} creatorInfo={getNoteCreatorInfo(note)} />
+              <NoteRow key={note.id} note={note} {...rowProps} creatorInfo={getNoteCreatorInfo(note)} />
             ))}
           </div>
         )}

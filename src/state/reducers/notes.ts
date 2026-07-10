@@ -11,7 +11,6 @@ export type NoteAction =
   | { type: 'NOTE_UPDATE'; payload: { id: string; title: string; content: string; color: string } }
   | { type: 'NOTE_DELETE'; payload: { id: string } }
   | { type: 'NOTE_REORDER'; payload: { draggedId: string; targetId: string; insertAfter: boolean } }
-  | { type: 'NOTE_TOGGLE_EXPANDED'; payload: { id: string } }
   | { type: 'NOTE_TOGGLE_CONTENT_HIDDEN'; payload: { id: string } };
 
 export function notesReducer(space: Space, action: NoteAction): Space {
@@ -25,7 +24,6 @@ export function notesReducer(space: Space, action: NoteAction): Space {
         color: action.payload.color || NOTE_PALETTE[0],
         updatedAt: Date.now(),
         order: maxOrder + 1,
-        expanded: false,
         hidden: false,
         createdAt: new Date().toISOString(),
         ...(action.payload.createdBy ? { createdBy: action.payload.createdBy } : {}),
@@ -64,11 +62,6 @@ export function notesReducer(space: Space, action: NoteAction): Space {
       const reindexed = ordered.map((n, idx) => ({ ...n, order: idx }));
       return { ...space, notes: reindexed };
     }
-    case 'NOTE_TOGGLE_EXPANDED':
-      return {
-        ...space,
-        notes: space.notes.map((n) => (n.id === action.payload.id ? { ...n, expanded: !n.expanded } : n)),
-      };
     case 'NOTE_TOGGLE_CONTENT_HIDDEN':
       return {
         ...space,

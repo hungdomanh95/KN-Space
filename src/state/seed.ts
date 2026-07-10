@@ -83,7 +83,6 @@ export function defaultSettings(): Settings {
       rotateMode: 'daily',
     },
     collapsedBlocks: { tasks: false, reminder: false, habits: false, notes: false, reminders: false, logs: false },
-    noteView: 'grid',
     lastScreen: 'home',
     // Đã snap theo dayIndex ngay trên — đánh dấu hôm nay đã "sync" để HYDRATE đầu tiên
     // (ngay sau seed, cùng lượt) không snap lại lần nữa một cách dư thừa.

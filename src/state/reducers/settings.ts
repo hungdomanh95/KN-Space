@@ -3,7 +3,6 @@ import type {
   DashboardLayout,
   HomeBgAutoRotateMs,
   LayoutSlot,
-  NoteView,
   QuoteRotateMode,
   Settings,
   ThemeMode,
@@ -25,7 +24,6 @@ export type SettingsAction =
   | { type: 'SETTINGS_SET_QUOTE_ROTATE_MODE'; payload: { mode: QuoteRotateMode } }
   | { type: 'SETTINGS_HOME_QUOTE_ROTATE_NEXT' }
   | { type: 'BLOCK_TOGGLE_COLLAPSED'; payload: { key: keyof CollapsedBlocks } }
-  | { type: 'NOTE_SET_VIEW'; payload: { view: NoteView } }
   // LỊCH SỬ (xem docs/features/layout-theo-space.md mục 11) — set/reset TOÀN BỘ `dashboardLayout`
   // (colWidths + cols) trong 1 lần, dùng chung mọi Space. UI (useDashboardLayout.ts/AppLayout.tsx/
   // SettingsModal.tsx) đã chuyển hẳn sang dùng 2 action mới bên dưới, KHÔNG còn nơi nào trong UI
@@ -111,8 +109,6 @@ export function settingsReducer(settings: Settings, action: SettingsAction): Set
           [action.payload.key]: !settings.collapsedBlocks[action.payload.key],
         },
       };
-    case 'NOTE_SET_VIEW':
-      return { ...settings, noteView: action.payload.view };
     case 'SETTINGS_SET_DASHBOARD_LAYOUT':
       return { ...settings, dashboardLayout: action.payload.layout };
     case 'SETTINGS_RESET_DASHBOARD_LAYOUT':

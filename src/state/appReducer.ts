@@ -59,7 +59,6 @@ const SPACE_DOMAIN_ACTION_TYPES = new Set([
   'NOTE_UPDATE',
   'NOTE_DELETE',
   'NOTE_REORDER',
-  'NOTE_TOGGLE_EXPANDED',
   'NOTE_TOGGLE_CONTENT_HIDDEN',
   'LOG_CREATE',
   'LOG_DELETE',
@@ -81,7 +80,6 @@ const SETTINGS_ACTION_TYPES = new Set([
   'SETTINGS_SET_HOME_QUOTE_INDEX',
   'SETTINGS_SET_QUOTE_ROTATE_MODE',
   'SETTINGS_HOME_QUOTE_ROTATE_NEXT',
-  'NOTE_SET_VIEW',
   'SETTINGS_SET_DASHBOARD_LAYOUT',
   'SETTINGS_RESET_DASHBOARD_LAYOUT',
   'SETTINGS_SET_COL_WIDTHS',
@@ -152,7 +150,6 @@ function applySpaceDomainAction(spaces: Space[], currentSpaceId: string, action:
       case 'NOTE_UPDATE':
       case 'NOTE_DELETE':
       case 'NOTE_REORDER':
-      case 'NOTE_TOGGLE_EXPANDED':
       case 'NOTE_TOGGLE_CONTENT_HIDDEN':
         return notesReducer(space, action);
       case 'LOG_CREATE':
@@ -201,7 +198,7 @@ function normalizeImportedSpace(raw: Partial<Space> & { id?: string }): Space {
           completedDates: Array.isArray(h.completedDates) ? h.completedDates : [],
         }))
       : [],
-    notes: Array.isArray(raw.notes) ? raw.notes.map((n) => ({ ...n, expanded: n.expanded ?? false, hidden: n.hidden ?? false })) : [],
+    notes: Array.isArray(raw.notes) ? raw.notes.map((n) => ({ ...n, hidden: n.hidden ?? false })) : [],
     logs: normalizeLogEntries(raw.logs),
   };
 }

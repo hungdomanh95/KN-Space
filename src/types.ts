@@ -56,7 +56,6 @@ export interface Note {
   color: string;
   updatedAt: number; // epoch ms
   order: number;
-  expanded: boolean; // view list: show hết nội dung thay vì clamp 4 dòng
   hidden: boolean;   // ẩn nội dung (note bảo mật) — persist để giữ trạng thái sau reload
   createdBy?: string; // userId — chỉ set trong shared space
   createdAt?: string; // ISO timestamp lúc tạo — dùng hiện giờ gửi trong MobileChatScreen (khác updatedAt vì đó là lần sửa cuối)
@@ -229,7 +228,6 @@ export interface CollapsedBlocks {
 
 export type TaskFilter = 'all' | 'pending' | 'done';
 export type NoteSortBy = 'order' | 'title' | 'recent';
-export type NoteView = 'grid' | 'list';
 
 /** Tần suất đổi quote Home: 'daily' = theo dayIndex (mặc định), các giá trị khác đổi theo sự kiện/interval. */
 export type QuoteRotateMode = 'daily' | 'onopen' | 'every15m' | 'every1h';
@@ -247,7 +245,6 @@ export interface Settings {
   homeBackground: HomeBackground;
   homeQuotes: HomeQuotes;
   collapsedBlocks: CollapsedBlocks;
-  noteView: NoteView;
   /**
    * Màn cuối cùng user rời đi (Home/Dashboard) — PHẢI persist để mở tab mới
    * luôn mở lại đúng màn cuối (yêu cầu cố định, không phải setting cho chọn).
