@@ -10,6 +10,7 @@ import { TaskFormModal } from './TaskFormModal';
 import { useCurrentUserId } from '../../state/useCurrentUserId';
 import { useSpaceMembers } from '../../state/useSpaceMembers';
 import { useMediaQuery } from '../../layout/useMediaQuery';
+import { useMobileLayout } from '../../layout/useMobileLayout';
 import { getMemberColor, getMemberDisplayName } from '../../utils/memberColors';
 import type { Task, TaskFilter } from '../../types';
 
@@ -66,6 +67,10 @@ function TaskRow({ task, draggedId, onDragStartId, onDragEndAll, onEdit, onDelet
   const isMobile = useMediaQuery('(max-width: 639px)');
   const avatarSize = isMobile ? 20 : 16;
   const assigneeVisibleCount = isMobile ? 2 : 3;
+  // Ngưỡng chuyển mô hình UI mobile thật (~999/1010px hysteresis) — khác hẳn `isMobile` ở trên
+  // (chỉ phục vụ cỡ avatar theo breakpoint Tailwind 639px, xem shared-space-task-assign-notify.md
+  // mục 5.2). Dùng riêng để ẩn kéo-thả trên mobile (docs/features/an-keo-tha-tren-mobile.md).
+  const isMobileBlocksOnly = useMobileLayout();
 
   function armDraggable() {
     if (rowRef.current) rowRef.current.draggable = true;
@@ -120,14 +125,16 @@ function TaskRow({ task, draggedId, onDragStartId, onDragEndAll, onEdit, onDelet
       ) : (
         <span style={{ width: 16, minWidth: 16 }} />
       )}
-      <span
-        className="flex h-6 w-6 flex-none cursor-grab items-center justify-center text-[var(--text-dim)] active:cursor-grabbing"
-        title="Kéo để đổi thứ tự"
-        aria-label="Kéo để đổi thứ tự việc"
-        onMouseDown={armDraggable}
-      >
-        <GripVertical className="icon h-[13px] w-[13px]" size={13} />
-      </span>
+      {!isMobileBlocksOnly && (
+        <span
+          className="flex h-6 w-6 flex-none cursor-grab items-center justify-center text-[var(--text-dim)] active:cursor-grabbing"
+          title="Kéo để đổi thứ tự"
+          aria-label="Kéo để đổi thứ tự việc"
+          onMouseDown={armDraggable}
+        >
+          <GripVertical className="icon h-[13px] w-[13px]" size={13} />
+        </span>
+      )}
       <Checkbox.Root
         checked={task.done}
         onCheckedChange={() => dispatch({ type: 'TASK_TOGGLE_DONE', payload: { id: task.id } })}

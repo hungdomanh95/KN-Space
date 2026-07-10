@@ -78,4 +78,104 @@ Tạo `docs/features/storage-architecture-fix-progress.md` theo mẫu chuẩn, c
 ## 5. Ngoài phạm vi (không làm đợt này)
 
 - Khôi phục Supabase Realtime (đã quyết định không làm, xem mục 3).
-- Tách toàn bộ Task/Note/Habit/Reminder/Log ra bảng riêng theo từng entity (mức độ granularity cao hơn per-Space) — cân nhắc sau nếu per-Space vẫn chưa đủ trong thực tế dùng, không làm ngay vì chi phí/rủi ro migration lớn hơn nhiều so với lợi ích hiện tại.
+- ~~Tách toàn bộ Task/Note/Habit/Reminder/Log ra bảng riêng theo từng entity (mức độ granularity cao hơn per-Space) — cân nhắc sau nếu per-Space vẫn chưa đủ trong thực tế dùng, không làm ngay vì chi phí/rủi ro migration lớn hơn nhiều so với lợi ích hiện tại.~~ **Đã lên kế hoạch (2026-07-10)** — chủ dự án xác nhận per-Space vẫn còn hở (retry hết lượt chỉ đồng bộ lại `version`, không merge nội dung mới nhất, item của bên thua cuộc bị ghi đè mất ngay ở lần retry "thành công"). Xem `docs/features/item-level-entity-tables.md` cho thiết kế kỹ thuật đầy đủ (schema, RLS, storage layer, kế hoạch cuốn chiếu theo từng entity) — tài liệu phân tích, chưa code/chưa đụng DB thật.
+
+---
+
+## 6. Bổ sung — hoàn thiện banner cảnh báo khi hết lượt retry (2026-07-10, `ba`)
+
+> Phần còn thiếu của chính Phần B mục 4 Bước 3 — **không phải tính năng mới**, mà là khe hở còn sót lại
+> trong đúng cơ chế vừa được xây để chống mất dữ liệu. Phát hiện trong đợt rà soát/brainstorm tổng thể
+> 2026-07-10, đã đối chiếu code thật (`AppStateContext.tsx`, `supabaseStore.ts`) trước khi ghi nhận.
+
+### 6.1 Root cause / vì sao vẫn cần làm dù Phần B đã "xong"
+
+`attemptSavePrivate()`/`attemptSaveShared()` (`src/state/AppStateContext.tsx`) đã có auto-retry 3 lần khi
+gặp conflict (version-check thất bại) — đúng cơ chế Phần B mô tả. Nhưng nhánh **hết lượt retry**
+(`retriesLeft` về 0, vẫn conflict) chỉ `console.warn(...)` rồi `return false` — giá trị trả về này bị bỏ
+qua ở nơi gọi (`void attemptSavePrivate(sid)` trong effect debounce). Không có banner/toast nào báo cho
+người dùng biết thay đổi của họ **chưa lên được server**.
+
+Đối chiếu hạ tầng banner đã có:
+- `setPrivateFallbackActive(active: boolean)` đã tồn tại trong `src/storage/supabaseStore.ts`, đang được
+  gọi đúng ở luồng **tạo mới Space**/**import** khi thất bại (`AppStateContext.tsx` dòng ~243/246,
+  ~485/488) — nhưng **không** được gọi trong nhánh hết-retry của `attemptSavePrivate()` (dòng ~212).
+- `setSharedFallbackActive()` — hàm tương ứng cho Shared Space — được **nhắc tới trong comment**
+  (`supabaseStore.ts` dòng ~202-203, liệt kê "gộp OR vào cùng 1 banner duy nhất") nhưng **chưa từng được
+  định nghĩa** trong repo (đã grep toàn bộ `src/` xác nhận). `attemptSaveShared()` hết-retry (dòng ~318)
+  cũng chỉ `console.warn`.
+
+**Hệ quả:** nếu 1 client bị conflict liên tục qua cả 3 lần retry (kịch bản hiếm — 2+ tab cùng ghi dồn dập
+vào đúng 1 Space trong vài trăm mili-giây, hoặc member khác trong Shared Space ghi liên tục cùng lúc) —
+thay đổi của người dùng biến mất khỏi server nhưng UI hoàn toàn im lặng, người dùng tưởng đã lưu xong. Đây
+đúng là **dạng lỗi gốc** mà toàn bộ Phần B được xây ra để chặn — chỉ còn đúng 1 khe hở cuối cùng chưa nối
+dây, xác suất thấp hơn nhiều so với bug gốc nhưng cùng bản chất "mất dữ liệu âm thầm".
+
+### 6.2 Touchpoint & luồng
+
+1. User đang sửa dữ liệu ở 1 Space, trong lúc 1 client khác (chính họ mở 2 tab, hoặc member Shared Space
+   khác) cũng đang ghi dồn dập vào đúng Space đó.
+2. Debounce 600ms (private)/800ms (shared) trôi qua → `attemptSavePrivate`/`attemptSaveShared` chạy, dính
+   conflict 3 lần liên tiếp (`retriesLeft` về 0).
+3. **Hiện tại:** im lặng hoàn toàn. **Sau khi sửa:** banner cảnh báo hiện lên — tái dùng đúng UI banner đã
+   có (`App.tsx` dòng ~173-181: góc dưới-phải, icon `AlertTriangle`, viền `--reminder-color`).
+4. Banner tự tắt khi lần save kế tiếp của đúng kênh đó (private hoặc shared) thành công — không cần thao
+   tác gì từ user, đúng hành vi banner hiện tại của kênh `settings`.
+
+### 6.3 UX — tái dùng nguyên banner đã có, KHÔNG tạo UI mới
+
+Đề xuất: dùng lại **đúng 1 banner đã có**, không tạo banner riêng phân biệt "lỗi mạng" và "lỗi conflict".
+Lý do:
+- Đúng tinh thần gọn nhẹ của dự án — không nhân bản UI cho 1 tình huống hiếm, cùng bản chất "chưa lưu
+  được, thử lại sau".
+- Nội dung hiện tại ("có thể do mất mạng... sẽ tự thử lưu lại ở lần sửa kế tiếp") đã dùng chữ "có thể" —
+  đủ tổng quát, không sai lệch dù nguyên nhân thực là conflict thay vì mất mạng.
+- Điểm chưa hoàn toàn chính xác (chấp nhận được, không sửa chữ): câu "tự thử lưu lại ở lần sửa kế tiếp"
+  chưa nhắc tới việc hệ thống **cũng tự thử lại khi tab bị ẩn/đóng** (`visibilitychange` handler đã có,
+  gọi lại `attemptSavePrivate`/`attemptSaveShared` cho các pending còn treo) — không chỉ đợi "lần sửa kế
+  tiếp". Không sai, chỉ chưa đủ chi tiết — không cần sửa vì làm phức tạp hơn giá trị mang lại.
+
+### 6.4 Việc cần làm
+
+1. Viết `setSharedFallbackActive(active: boolean)` trong `supabaseStore.ts`, mirror chính xác
+   `setPrivateFallbackActive` (cùng cơ chế OR vào `notifyFallback()`).
+2. Trong `attemptSavePrivate()`: gọi `setPrivateFallbackActive(true)` ở nhánh hết-retry (cạnh
+   `console.warn` hiện có, dòng ~212), và `setPrivateFallbackActive(false)` ở nhánh `result.ok` thành công
+   (dòng ~200-205, hiện chưa gọi).
+3. Tương tự cho `attemptSaveShared()` với `setSharedFallbackActive`.
+4. Thêm unit test cho đúng 2 nhánh "hết retry → gọi fallback callback" (private + shared) — hiện 2 hàm
+   này **không có test nào** dù là chỗ rủi ro nhất trong app. Test tối thiểu: mock `savePrivateSpace`/
+   `saveSharedSpace` luôn trả `conflict: true`, gọi `attemptSavePrivate`/`attemptSaveShared`, xác nhận
+   callback fallback được gọi đúng 1 lần **sau khi** hết 3 lượt retry (không gọi sớm hơn), và được gọi lại
+   với `false` ngay khi 1 lượt save kế tiếp thành công.
+
+### 6.5 Edge Cases
+
+| Case | Hành vi mong đợi |
+|---|---|
+| Save Space A hết-retry (banner bật) → save Space B (khác Space) thành công ngay sau đó | Banner **vẫn hiện** — đang OR nhiều kênh, Space A vẫn chưa lưu được. Hạn chế đã biết của thiết kế "1 banner boolean chung, không chỉ đích danh Space nào lỗi" — chấp nhận được ở quy mô hiện tại, không mở rộng thành banner theo từng Space trong đợt này (xem câu hỏi mở #1). |
+| Cùng 1 Space, hết-retry rồi lại conflict tiếp ở lượt kế | Banner giữ nguyên `true` cho tới khi có 1 lượt `ok: true` — không giới hạn số lần hiện lại. |
+| User đóng tab quá nhanh, trước khi `visibilitychange` flush kịp chạy xong | Rủi ro mất thay đổi đã biết, ngoài phạm vi đợt vá này (không có offline-queue, đã chốt ở `requirements.md` mục 10) — không xử lý thêm. |
+
+### 6.6 Acceptance Criteria
+
+- AC1: Mock `savePrivateSpace` luôn trả `{ ok: false, conflict: true }` → sau đúng 3 lần retry,
+  `setPrivateFallbackActive(true)` được gọi (kiểm bằng unit test).
+- AC2: Ngay sau AC1, mock đổi sang trả `{ ok: true }` cho lượt save kế tiếp của cùng Space →
+  `setPrivateFallbackActive(false)` được gọi.
+- AC3: Lặp lại AC1/AC2 cho `saveSharedSpace`/`setSharedFallbackActive` (hàm mới).
+- AC4: Test tay: banner **không** xuất hiện trong luồng dùng bình thường (không conflict) — không có
+  false-positive.
+- AC5: `npx tsc --noEmit` + `npm run build` + `npx vitest run` pass.
+
+### 6.7 Câu hỏi mở
+
+**Không còn câu hỏi mở nào chặn bắt đầu code.** Cả 2 câu dưới đây đã được chủ dự án xác nhận (2026-07-10),
+theo đúng default `ba` đề xuất:
+
+1. ~~Có cần banner phân biệt theo từng Space (thay vì 1 boolean chung)?~~ **Đã chốt: KHÔNG cần** — giữ 1
+   banner chung như hiện tại (đúng gọn nhẹ, tình huống hiếm, banner hiện tại vốn đã không chỉ đích danh
+   nguyên nhân/Space).
+2. ~~Xác nhận việc tái dùng nguyên banner cũ thay vì tạo thông điệp riêng cho conflict?~~ **Đã chốt: tái
+   dùng nguyên banner lỗi lưu đã có** (mục 6.3, kênh `settings`) — không viết message riêng cho nhánh
+   hết-retry conflict.

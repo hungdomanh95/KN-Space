@@ -36,23 +36,27 @@ supabase/schema.sql
 ```
 
 Nguyên tắc khi triển khai:
-1. Giữ bundle nhỏ và dependency có chủ đích: React/TypeScript/Vite/Tailwind + `@supabase/supabase-js` + `lucide-react` cho icon; tránh UI framework nặng nếu chưa cần.
+1. Giữ bundle nhỏ và dependency có chủ đích: React/TypeScript/Vite/Tailwind + `@supabase/supabase-js` + `lucide-react` cho icon; tránh UI framework nặng nếu chưa cần. Muốn thêm dependency mới ngoài danh sách này (vd 1 thư viện chart), phải nêu lý do + cân nhắc ảnh hưởng bundle size và **xin xác nhận trước khi `npm install`**, không tự quyết rồi báo sau.
 2. Persistence: mọi mutation (task/note/habit/reminder/space/theme/layout) qua `storage/supabaseStore.ts`, debounce 600ms trước khi ghi Supabase. Không có Realtime — đồng bộ đa máy chỉ xảy ra khi máy kia tự load lại/mở lại app. Shared Space dùng cơ chế item-level Last-Write-Wins theo `updatedAt` khi xung đột — không dựng merge field-level.
 3. RLS: Space cá nhân ràng buộc `auth.uid() = user_id`; Shared Space dựa trên `space_members` (Owner/Member). Không tự nới lỏng RLS để "cho dễ test".
 4. Responsive bắt buộc: ngưỡng chuyển mô hình UI mobile/desktop là **~1000px** (vào mobile `≤999px`, thoát `≥1010px` — hysteresis 2 mốc có chủ đích, chống nhảy qua-lại khi resize dao động sát biên, xem `src/layout/useMobileLayout.ts`), **KHÔNG phải** breakpoint Tailwind `≤639px` (breakpoint đó vẫn tồn tại riêng cho vài tinh chỉnh responsive cục bộ nhỏ, không phải ngưỡng chuyển mô hình UI). Desktop đầy đủ 6 khối dữ liệu + Widget điều hướng gộp. Mobile không còn màn Home, vào thẳng UI chính với 2 tab qua `MobileTabBar`: **"Trò chuyện"** (mặc định, `MobileChatScreen` — chat-style gộp Việc cần làm + Ghi chú + Nhật ký nhanh thành bong bóng/dòng log theo thời gian) và **"Chi tiết"** (accordion 3 khối: Việc cần làm/Ghi chú/Nhật ký nhanh). Nhắc việc/Thói quen/Thông báo/Widget điều hướng vẫn ẩn hoàn toàn trên cả 2 tab mobile — phạm vi dài hạn đã chốt, không tự mở rộng thêm khối cho mobile trừ khi ba/requirements yêu cầu rõ.
 5. Giữ đủ tính năng đã chốt: 2 màn Home/Dashboard, 6 khối dữ liệu (gồm "Nhật ký nhanh") + Widget điều hướng gộp (đã gộp "Hôm nay"), đa Space (cá nhân + chung), Grid/List note, streak thói quen, modal tuỳ biến (không `window.confirm`), settings 3 tab, export/import JSON.
 
-**Tư duy end-to-end khi thêm/sửa 1 tính năng:** đi xuyên suốt từ schema Supabase (`supabase/schema.sql`) → hàm đọc/ghi trong `storage/` → state trong `state/AppStateContext.tsx` → component UI, giữ **type nhất quán ở mọi tầng** (field trong `types.ts` phải khớp cột DB thật, không tự bịa field ở FE rồi để lệch với schema). Nếu đổi schema DB, luôn cân nhắc dữ liệu hiện có (migration/backfill) — đây là app đã có dữ liệu thật, không phải project mới tinh.
+**Tư duy end-to-end khi thêm/sửa 1 tính năng:** đi xuyên suốt từ schema Supabase (`supabase/schema.sql`) → hàm đọc/ghi trong `storage/` → state trong `state/AppStateContext.tsx` → component UI, giữ **type nhất quán ở mọi tầng** (field trong `types.ts` phải khớp cột DB thật, không tự bịa field ở FE rồi để lệch với schema). Nếu đổi schema DB, luôn cân nhắc dữ liệu hiện có (migration/backfill) — đây là app đã có dữ liệu thật, không phải project mới tinh: viết migration là 1 khối SQL riêng (không sửa trực tiếp `schema.sql` cũ mà không có đường lùi), kiểm tra ảnh hưởng của cột `NOT NULL`/`DEFAULT` mới lên các dòng dữ liệu đang có, tránh `ALTER`/`DROP` phá hoại không hồi phục được nếu chưa chắc chắn — theo đúng pattern các file `docs/features/*-schema.sql`/`*-fix.sql` đã có.
+
+**Accessibility là trách nhiệm implement, không chỉ trách nhiệm QC:** khi tài liệu `ba` mô tả hành vi accessibility (aria-label cho nút icon-only, focus state, contrast khi đổi theme, role cho tab/dialog...), implement đúng ngay lúc code — không để `ba` phát hiện thiếu ở vòng QC rồi phải quay lại sửa. Tham khảo pattern accessibility đã có trong `AppLayout.tsx` (tablist/tab, `aria-expanded`/`aria-controls`) và `Modal.tsx` (`aria-describedby`) khi làm component mới có tương tác tương tự.
 
 Checklist tự rà trước khi báo "xong" (rút gọn cho quy mô dự án, không áp fullstack checklist doanh nghiệp):
 - Type xuyên suốt DB → storage → state → UI khớp nhau, không có chỗ phải `as any`/ép kiểu ngầm để né lỗi.
 - Trạng thái loading/error khi gọi Supabase có hiển thị được cho user, không chỉ `console.error` âm thầm.
 - RLS đúng theo Space (cá nhân: `auth.uid()`; Shared Space: `space_members`) — đã tự kiểm tra chứ không giả định.
 - Không phá cơ chế đồng bộ load-on-open hiện có (debounce 600ms, không Realtime) khi thêm luồng ghi dữ liệu mới.
+- Nếu đổi logic trong `state/reducers/*` hoặc `storage/normalize.ts`: chạy test hiện có trong `src/__tests__` (`npm test` nếu có script, hoặc lệnh test runner đang dùng) + cập nhật/thêm test tương ứng — không để test cũ lỗi thời âm thầm pass nhầm hoặc fail mà không ai biết.
 - `npx tsc --noEmit` + `npm run build` pass trước khi báo xong (bắt buộc, xem mục dưới).
 
 Sau khi sửa code xong một phần:
 - Chạy `npx tsc --noEmit` và `npm run build` trước khi báo "xong" — không đợi nhắc.
+- Với thay đổi có bề mặt UI/luồng tương tác: tự `npm run dev` và thao tác qua đúng luồng vừa sửa trước khi báo xong — tsc/build chỉ đảm bảo compile, không bắt được lỗi runtime/console error/logic sai; không để `ba` là người đầu tiên chạy app thật rồi phát hiện lỗi cơ bản.
 - Chỉ `git commit`/`git push` khi user yêu cầu rõ ràng.
 - Không tự mở rộng phạm vi ngoài requirements; nếu thiếu thông tin quan trọng, dừng và hỏi thay vì tự đoán. Luôn trả lời bằng tiếng Việt.
 

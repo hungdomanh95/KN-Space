@@ -1,7 +1,7 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as Checkbox from '@radix-ui/react-checkbox';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { Check, ChevronDown, ListChecks, Pencil, ScrollText, SendHorizontal, Settings2, Trash2, X } from 'lucide-react';
+import { Check, ChevronDown, ListChecks, Pencil, ScrollText, Search, SendHorizontal, Settings2, Trash2, X } from 'lucide-react';
 import { BlockShell } from '../../components/BlockShell';
 import { DatePicker } from '../../components/DatePicker';
 import { EmptyState } from '../../components/EmptyState';
@@ -245,26 +245,47 @@ export function LogsBlock({
   const [viewMode, setViewMode] = useState<LogsViewMode>('list');
   // Chỉ 1 dòng được sửa ngày cùng lúc — id log đang mở `<DatePicker>` inline (mục 5.1 tài liệu).
   const [editingDateId, setEditingDateId] = useState<string | null>(null);
+  // Tìm kiếm nội dung log (docs/features/tim-kiem-log-va-bulk-actions-task.md PHẦN A) — cục bộ
+  // trong component này (không theo `state.ui` global của NotesBlock), vì `sortBy`/`isSelecting`/
+  // `viewMode` ở đây đều là local state cùng cơ chế reset qua `useEffect` theo `space.id` bên dưới
+  // — giữ 1 kiểu state nhất quán trong cùng 1 file quan trọng hơn đồng nhất tuyệt đối với
+  // NotesBlock (mục A.1 tài liệu).
+  const [logSearch, setLogSearch] = useState('');
 
   // Tự thoát chế độ chọn khi đổi Space (mục 5.3) — đổi tab mobile/thu gọn khối trong accordion
   // đã tự xử lý bằng cách khác: cả 2 sự kiện đó UNMOUNT hẳn LogsBlock trong AppLayout (xem
   // renderBlock('logs', ...) chỉ được gọi khi tab "Chi tiết" đang mở VÀ khối đang expanded),
   // nên state cục bộ này tự mất theo vòng đời component — không cần theo dõi thêm 2 dependency
   // đó ở đây (đơn giản hơn cách nêu ở nhat-ky-nhanh.md mục 5.3, cùng kết quả quan sát được).
-  const spaceIdRef = useRef(space.id);
-  if (spaceIdRef.current !== space.id) {
-    spaceIdRef.current = space.id;
-    if (isSelecting) {
-      setIsSelecting(false);
-      setSelectedIds(new Set());
-    }
-    if (editingDateId) setEditingDateId(null);
+  //
+  // Dùng `useEffect` theo dõi `space.id` (KHÔNG dùng pattern "set state trong lúc render" qua
+  // `useRef` như bản cũ) — bản cũ mutate 1 ref làm cờ gate rồi gọi setState có điều kiện ngay
+  // trong thân render; dưới React 18 StrictMode (dev), React gọi lại thân component 2 lần cho
+  // cùng 1 lượt cập nhật để dò side-effect không thuần khiết. Việc mutate ref rò rỉ sang lượt gọi
+  // thứ 2 (ref đã đổi) trong khi state (isSelecting/logSearch/...) của lượt gọi thứ 2 lại tính từ
+  // snapshot TRƯỚC đó (chưa reset) — kết quả là điều kiện reset bị bỏ qua ở đúng lượt được commit,
+  // state cũ (vd `logSearch`) bị giữ lại dù `space.id` đã đổi. Đã verify lại bằng bản dựng dev
+  // thật (react?dev qua esm.sh) trong Playwright: bản `useRef` cho kết quả sai (`isSelecting`
+  // không reset), đổi sang `useEffect` cho kết quả đúng ổn định. `useEffect` không dính vấn đề này
+  // vì chỉ chạy đúng 1 lần sau khi giá trị `space.id` thực sự đổi và được commit (StrictMode chỉ
+  // double-invoke effect ở MOUNT, không phải mỗi lần dependency đổi) — đánh đổi 1 lượt render thừa
+  // (khung UI cũ hiện đúng 1 frame trước khi reset) là chấp nhận được cho hành vi ephemeral này.
+  const prevSpaceIdRef = useRef(space.id);
+  useEffect(() => {
+    if (prevSpaceIdRef.current === space.id) return;
+    prevSpaceIdRef.current = space.id;
+    setIsSelecting(false);
+    setSelectedIds(new Set());
+    setEditingDateId(null);
     // Space mới có thể không bật "Dùng để log chi tiêu" — tránh kẹt ở tab Tổng hợp cho Space
     // không có tab đó (nút đã bị ẩn khỏi segmented control, xem điều kiện render phía dưới).
-    if (viewMode === 'summary') setViewMode('list');
-  }
+    setViewMode((mode) => (mode === 'summary' ? 'list' : mode));
+    setLogSearch('');
+  }, [space.id]);
 
-  const list = sortLogsForDisplay(space.logs, sortBy);
+  const sortedList = sortLogsForDisplay(space.logs, sortBy);
+  const query = logSearch.trim().toLowerCase();
+  const list = query ? sortedList.filter((log) => log.content.toLowerCase().includes(query)) : sortedList;
 
   function exitSelection() {
     setIsSelecting(false);
@@ -429,7 +450,7 @@ export function LogsBlock({
         )
       }
     >
-      <div className="flex items-center justify-between gap-2 border-b border-[color:var(--border-hairline)] px-4 py-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[color:var(--border-hairline)] px-4 py-2.5">
         <div className="segmented-options" role="group" aria-label="Chuyển chế độ hiển thị Nhật ký nhanh">
           <button type="button" className={viewMode === 'list' ? 'active' : ''} aria-pressed={viewMode === 'list'} onClick={() => handleSetViewMode('list')}>
             Danh sách
@@ -440,33 +461,51 @@ export function LogsBlock({
             </button>
           )}
         </div>
-        <DropdownMenu.Root>
-          <DropdownMenu.Trigger asChild>
-            <button
-              type="button"
-              aria-label="Tuỳ chọn Nhật ký nhanh"
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[color:var(--border)]
-                bg-[var(--raised)] text-[var(--text-dim)] transition-[border-color,color] duration-150
-                hover:border-[color:var(--accent)] hover:text-[var(--accent)]"
-            >
-              <Settings2 className="icon" size={13} />
-            </button>
-          </DropdownMenu.Trigger>
-          <DropdownMenu.Portal>
-            <DropdownMenu.Content align="end" sideOffset={8} className="space-menu-surface" style={{ minWidth: 240 }}>
-              <DropdownMenu.Item
-                className="space-menu-item flex items-center justify-between gap-3"
-                onSelect={(e) => {
-                  e.preventDefault();
-                  handleToggleExpenseTracking();
-                }}
+        <div className="flex flex-1 items-center justify-end gap-2">
+          {viewMode === 'list' && (
+            <div className="relative">
+              <Search className="icon pointer-events-none absolute left-1.5 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" size={12} />
+              <input
+                type="text"
+                value={logSearch}
+                onChange={(e) => setLogSearch(e.target.value)}
+                placeholder="Tìm nhật ký..."
+                aria-label="Tìm kiếm nội dung log"
+                className="w-[132px] rounded-md border border-[color:var(--border-hairline)] bg-transparent py-1 pl-6 pr-2
+                  text-[0.75rem] text-[var(--text)] transition-[border-color,background-color,width] duration-150
+                  [transition-timing-function:var(--ease-standard)] hover:border-[color:var(--border)] hover:bg-[var(--raised)]
+                  focus:w-[176px] focus:border-[color:var(--accent)] focus:bg-[var(--raised)] focus:outline-none"
+              />
+            </div>
+          )}
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger asChild>
+              <button
+                type="button"
+                aria-label="Tuỳ chọn Nhật ký nhanh"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[color:var(--border)]
+                  bg-[var(--raised)] text-[var(--text-dim)] transition-[border-color,color] duration-150
+                  hover:border-[color:var(--accent)] hover:text-[var(--accent)]"
               >
-                <span>Dùng Nhật ký để log chi tiêu</span>
-                {space.enabledBlocks.expenseTracking && <Check className="icon shrink-0" size={13} />}
-              </DropdownMenu.Item>
-            </DropdownMenu.Content>
-          </DropdownMenu.Portal>
-        </DropdownMenu.Root>
+                <Settings2 className="icon" size={13} />
+              </button>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content align="end" sideOffset={8} className="space-menu-surface" style={{ minWidth: 240 }}>
+                <DropdownMenu.Item
+                  className="space-menu-item flex items-center justify-between gap-3"
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    handleToggleExpenseTracking();
+                  }}
+                >
+                  <span>Dùng Nhật ký để log chi tiêu</span>
+                  {space.enabledBlocks.expenseTracking && <Check className="icon shrink-0" size={13} />}
+                </DropdownMenu.Item>
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
+        </div>
       </div>
       {viewMode === 'summary' ? (
         <div className="block-body">
@@ -505,11 +544,17 @@ export function LogsBlock({
           </div>
           <div className="block-body">
             {list.length === 0 ? (
-              <EmptyState
-                icon={ScrollText}
-                title="Chưa có log nào"
-                hint="Nhập ở ô phía trên để ghi log (desktop), hoặc gõ nhanh qua tab Trò chuyện trên điện thoại."
-              />
+              query ? (
+                <p className="px-4 py-6 text-center text-[0.8125rem] italic text-[var(--text-dim)]">
+                  Không tìm thấy log phù hợp
+                </p>
+              ) : (
+                <EmptyState
+                  icon={ScrollText}
+                  title="Chưa có log nào"
+                  hint="Nhập ở ô phía trên để ghi log (desktop), hoặc gõ nhanh qua tab Trò chuyện trên điện thoại."
+                />
+              )
             ) : (
               list.map((log) => {
                 const creator = getCreatorInfo(log);

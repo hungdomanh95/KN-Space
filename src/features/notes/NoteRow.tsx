@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Check, Copy, Eye, EyeOff, FileText, GripVertical, Link2, Lock, Pencil, Trash2 } from 'lucide-react';
 import { useAppState } from '../../state/AppStateContext';
+import { useMobileLayout } from '../../layout/useMobileLayout';
 import { MemberAvatar } from '../../components/MemberAvatar';
 import { detectNoteKind, formatNoteDate, notePreviewText } from './noteUtils';
 import type { Note, NoteSortBy } from '../../types';
@@ -41,6 +42,9 @@ export function NoteRow({
   creatorInfo,
 }: NoteRowProps) {
   const { dispatch } = useAppState();
+  // Ẩn kéo-thả trên mobile (docs/features/an-keo-tha-tren-mobile.md, phương án (b) — dropdown sort
+  // giữ nguyên "Thứ tự thủ công", chỉ ẩn grip khi ở mô hình UI mobile).
+  const isMobileBlocksOnly = useMobileLayout();
   const rowRef = useRef<HTMLDivElement>(null);
   const [dropHint, setDropHint] = useState<'before' | 'after' | null>(null);
   const [copied, setCopied] = useState(false);
@@ -121,7 +125,7 @@ export function NoteRow({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {sortBy === 'order' && (
+      {sortBy === 'order' && !isMobileBlocksOnly && (
         <span className="nr-grip" title="Kéo để đổi thứ tự" aria-label="Kéo để đổi thứ tự" onMouseDown={armDraggable} onClick={(e) => e.stopPropagation()}>
           <GripVertical className="icon h-[13px] w-[13px]" size={13} />
         </span>
