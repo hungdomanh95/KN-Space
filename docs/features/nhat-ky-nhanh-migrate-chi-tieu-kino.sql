@@ -1,3 +1,7 @@
+-- ĐÃ GỘP vào supabase/schema.sql (2026-07-09) — chỉ giữ làm lịch sử, KHÔNG chạy lại file này.
+-- (Ghi chú: đây là script sửa DATA 1 lần cho 1 Space cụ thể, không phải DDL/schema —
+-- không có gì để "gộp" về mặt cấu trúc bảng, nhưng vẫn đánh dấu để nhất quán quy ước.)
+
 -- =============================================================================
 -- Migrate 1 lần: chuyển TOÀN BỘ "Việc cần làm" (Task) -> "Nhật ký nhanh" (Log)
 -- cho ĐÚNG 1 Shared Space có tên "Chi tiêu gia đình Kino".

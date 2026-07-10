@@ -1,3 +1,5 @@
+-- ĐÃ GỘP vào supabase/schema.sql (2026-07-09) — chỉ giữ làm lịch sử, KHÔNG chạy lại file này.
+
 -- =============================================================================
 -- Fix bug: enabledBlocks của Shared Space bị hard-code cứng ở client
 -- Xem docs/features/shared-space.md mục 6.1 và src/storage/sharedSpaceStore.ts

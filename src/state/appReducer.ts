@@ -32,7 +32,15 @@ export type AppAction =
   | { type: 'SPACE_SWITCH'; payload: { id: string } }
   | { type: 'IMPORT_DATA'; payload: ExportPayload }
   | { type: 'SET_STORAGE_FALLBACK_ACTIVE'; payload: { active: boolean } }
-  | { type: 'SCREEN_NAVIGATE'; payload: { screen: Screen } };
+  | { type: 'SCREEN_NAVIGATE'; payload: { screen: Screen } }
+  /**
+   * Metadata thuần cho tầng lưu trữ (Bước 3, docs/features/storage-architecture-fix.md mục 4) —
+   * đánh dấu 1 Space cá nhân VỪA lưu thành công lên `kn_private_spaces` lần đầu (INSERT), gắn
+   * `_privateVersion` để các lượt sửa sau đó dùng đúng optimistic-lock version. KHÔNG phải action
+   * người dùng, chỉ `AppStateContext.tsx` tự dispatch sau khi `createPrivateSpace()`/
+   * `upsertPrivateSpaces()` trả kết quả.
+   */
+  | { type: 'SPACE_SET_PRIVATE_VERSION'; payload: { id: string; version: number } };
 
 const SPACE_DOMAIN_ACTION_TYPES = new Set([
   'TASK_CREATE',
@@ -56,6 +64,7 @@ const SPACE_DOMAIN_ACTION_TYPES = new Set([
   'LOG_CREATE',
   'LOG_DELETE',
   'LOG_DELETE_MANY',
+  'LOG_PATCH_EXPENSE',
 ]);
 
 const SETTINGS_ACTION_TYPES = new Set([
@@ -149,6 +158,7 @@ function applySpaceDomainAction(spaces: Space[], currentSpaceId: string, action:
       case 'LOG_CREATE':
       case 'LOG_DELETE':
       case 'LOG_DELETE_MANY':
+      case 'LOG_PATCH_EXPENSE':
         return logsReducer(space, action);
       default:
         return space;
@@ -171,6 +181,9 @@ function normalizeImportedSpace(raw: Partial<Space> & { id?: string }): Space {
       // Import cũ (trước khi có Nhật ký nhanh, xem docs/features/nhat-ky-nhanh.md) không có
       // field này -> mặc định hiện, không tự ẩn khối của user cũ.
       logs: raw.enabledBlocks?.logs ?? true,
+      // File export cũ (trước khi có tính năng Tổng hợp chi tiêu) không có field này -> mặc định
+      // `true`, không mất tab đột ngột khi restore lại Space đã từng dùng tính năng này.
+      expenseTracking: raw.enabledBlocks?.expenseTracking ?? true,
     },
     tasks: Array.isArray(raw.tasks)
       ? raw.tasks.map((t, idx) => ({ ...t, content: t.content ?? '', order: t.order ?? idx }))
@@ -216,6 +229,14 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 
     case 'SET_STORAGE_FALLBACK_ACTIVE':
       return { ...state, storageFallbackActive: action.payload.active };
+
+    case 'SPACE_SET_PRIVATE_VERSION':
+      return {
+        ...state,
+        spaces: state.spaces.map((s) =>
+          s.id === action.payload.id ? { ...s, _privateVersion: action.payload.version } : s,
+        ),
+      };
 
     case 'TASK_SET_FILTER':
       return { ...state, ui: { ...state.ui, taskFilter: action.payload.filter } };

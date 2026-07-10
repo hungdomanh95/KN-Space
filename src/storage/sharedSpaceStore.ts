@@ -26,7 +26,12 @@ import type { EnabledBlocks, Space, SharedSpaceMember, SpaceInvite } from '../ty
  * docs/features/shared-space.md mục 6.1.
  */
 function defaultSharedEnabledBlocks(): EnabledBlocks {
-  return { tasks: true, reminder: true, habits: false, notes: true, reminders: true, logs: true };
+  // `expenseTracking: true` — Shared Space không có luồng tạo mới phân biệt được "vừa tạo" (RPC
+  // `create_shared_space` dùng default cột DB, không set field này qua code), nên dùng chung 1
+  // mặc định `true` cho cả Space mới lẫn cũ (khác Space cá nhân, nơi phân biệt được qua
+  // `defaultEnabledBlocks()` ở reducers/spaces.ts). User tự tắt qua menu khối Nhật ký nhanh nếu
+  // Shared Space mới tạo không dùng để log chi tiêu.
+  return { tasks: true, reminder: true, habits: false, notes: true, reminders: true, logs: true, expenseTracking: true };
 }
 
 /**
@@ -45,6 +50,7 @@ export function normalizeSharedEnabledBlocks(raw: unknown): EnabledBlocks {
     notes: typeof r.notes === 'boolean' ? r.notes : fallback.notes,
     reminders: typeof r.reminders === 'boolean' ? r.reminders : fallback.reminders,
     logs: typeof r.logs === 'boolean' ? r.logs : fallback.logs,
+    expenseTracking: typeof r.expenseTracking === 'boolean' ? r.expenseTracking : fallback.expenseTracking,
   };
 }
 

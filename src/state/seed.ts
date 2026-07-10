@@ -108,7 +108,9 @@ export function createSeedSpaces(): Space[] {
     id: crypto.randomUUID(),
     name: 'Cá nhân',
     order: 0,
-    enabledBlocks: { tasks: true, reminder: true, habits: true, notes: true, reminders: true, logs: true },
+    // Space đầu tiên của user mới — coi như Space MỚI, mặc định TẮT tab Tổng hợp chi tiêu (giống
+    // `defaultEnabledBlocks()` ở reducers/spaces.ts), user tự bật nếu muốn dùng làm sổ chi tiêu.
+    enabledBlocks: { tasks: true, reminder: true, habits: true, notes: true, reminders: true, logs: true, expenseTracking: false },
     tasks: [],
     reminders: [],
     habits: [],

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ChevronsDown } from 'lucide-react';
 import { formatGreeting, formatHomeClock, formatHomeDate, todayQuote } from './homeContent';
-import { useAppState, useCurrentSpace } from '../../state/AppStateContext';
+import { useAppState, useCurrentSpaceOrNull } from '../../state/AppStateContext';
 
 interface HomeScreenProps {
   onEnterDashboard: () => void;
@@ -14,7 +14,13 @@ function todayStr(): string {
 /** Màn Home (Tabliss-style): đồng hồ real-time + ngày + lời chào theo buổi + 1 quote/ngày. */
 export function HomeScreen({ onEnterDashboard }: HomeScreenProps) {
   const { state } = useAppState();
-  const space = useCurrentSpace();
+  // Nullable (không phải `useCurrentSpace()` throw) — Home là 1 trong 2 điểm ENTRY cấp cao nhất
+  // luôn mount song song AppLayout (đổi hiện/ẩn qua CSS opacity, không unmount, xem App.tsx) nên
+  // PHẢI tự chịu được trường hợp chưa có Space nào (xem NoSpaceScreen/useCurrentSpaceOrNull).
+  // Home không thực sự cần dữ liệu Space để hoạt động (đồng hồ/lời chào/quote độc lập) — chỉ có
+  // badge "X việc cần làm hôm nay" phụ thuộc, nên khi null chỉ ẩn badge đó, không cần dựng riêng
+  // 1 màn "Chưa có Space" ở đây (đã có ở AppLayout, nơi thực sự cần Space để dựng Dashboard).
+  const space = useCurrentSpaceOrNull();
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -24,7 +30,7 @@ export function HomeScreen({ onEnterDashboard }: HomeScreenProps) {
 
   const clock = formatHomeClock(now);
   const today = todayStr();
-  const taskCount = space.tasks.filter((t) => t.date === today && !t.done).length;
+  const taskCount = space ? space.tasks.filter((t) => t.date === today && !t.done).length : 0;
 
   // Crossfade khi đổi quote (fade-out ngắn rồi fade-in, không đổi tức thì — mục 4.5/7
   // requirements): giữ `displayedQuote` tách khỏi giá trị mới nhất, chỉ cập nhật SAU khi đã

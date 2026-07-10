@@ -1,3 +1,7 @@
+-- ĐÃ GỘP vào supabase/schema.sql (2026-07-09) — chỉ giữ làm lịch sử, KHÔNG chạy lại file này.
+-- (Ghi chú: đây là script sửa DATA 1 lần cho 1 Space cụ thể, không phải DDL/schema —
+-- không có gì để "gộp" về mặt cấu trúc bảng, nhưng vẫn đánh dấu để nhất quán quy ước.)
+
 -- =============================================================================
 -- FIX LẦN 2 (sau migrate ban đầu): sửa lại `createdAt` bị sai cho 9/14 Log
 -- trong Shared Space "Chi tiêu gia đình Kino".

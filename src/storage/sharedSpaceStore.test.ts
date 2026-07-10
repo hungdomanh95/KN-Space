@@ -14,6 +14,7 @@ describe('normalizeSharedEnabledBlocks', () => {
       notes: true,
       reminders: true,
       logs: false,
+      expenseTracking: false,
     });
     expect(result).toEqual({
       tasks: false,
@@ -22,6 +23,7 @@ describe('normalizeSharedEnabledBlocks', () => {
       notes: true,
       reminders: true,
       logs: false,
+      expenseTracking: false,
     });
   });
 
@@ -46,6 +48,7 @@ describe('normalizeSharedEnabledBlocks', () => {
       notes: true,
       reminders: true,
       logs: true,
+      expenseTracking: true,
     });
   });
 
@@ -58,6 +61,7 @@ describe('normalizeSharedEnabledBlocks', () => {
       notes: true,
       reminders: true,
       logs: true,
+      expenseTracking: true,
     });
   });
 

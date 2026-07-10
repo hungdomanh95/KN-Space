@@ -3,8 +3,14 @@ import { defaultDashboardLayout, defaultSettings, findReminderHeight, findSettin
 
 /**
  * Chuẩn hoá `logs[]` (Nhật ký nhanh, xem docs/features/nhat-ky-nhanh.md). Dữ liệu thiếu field
- * này -> fallback `[]`, không crash. Mỗi entry bất biến (chỉ tạo/xoá) nên chỉ cần `id`/`content`/
- * `createdAt` hợp lệ, không có `updatedAt`/`order` để normalize như Task/Note.
+ * này -> fallback `[]`, không crash. `id`/`content`/`createdAt` là phần lõi bất biến, không có
+ * `updatedAt`/`order` để normalize như Task/Note.
+ *
+ * 3 field mới của tính năng Quản lý chi tiêu (`docs/features/quan-ly-chi-tieu.md` mục 8/9) —
+ * `expenseDate`/`categoryOverride`/`excluded` — đều OPTIONAL: data cũ thiếu field nào thì bỏ hẳn
+ * key đó (không set giá trị giả), để tầng tính toán (`features/logs/expenseUtils.ts`) tự áp dụng
+ * default đúng edge-case bảng mục 8: `expenseDate` absent -> dùng ngày phần `createdAt`,
+ * `categoryOverride` absent -> auto-detect theo `content`, `excluded` absent -> coi như `false`.
  */
 export function normalizeLogEntries(raw: unknown): LogEntry[] {
   if (!Array.isArray(raw)) return [];
@@ -16,6 +22,9 @@ export function normalizeLogEntries(raw: unknown): LogEntry[] {
       content: l.content as string,
       createdAt: typeof l.createdAt === 'string' && l.createdAt ? l.createdAt : new Date().toISOString(),
       ...(typeof l.createdBy === 'string' && l.createdBy ? { createdBy: l.createdBy } : {}),
+      ...(typeof l.expenseDate === 'string' && l.expenseDate ? { expenseDate: l.expenseDate } : {}),
+      ...(typeof l.categoryOverride === 'string' && l.categoryOverride ? { categoryOverride: l.categoryOverride } : {}),
+      ...(typeof l.excluded === 'boolean' && l.excluded ? { excluded: true } : {}),
     }));
 }
 
@@ -34,6 +43,10 @@ export function normalizeSpace(space: Space): Space {
       reminders: true,
       // Dữ liệu thiếu field `logs` (Nhật ký nhanh) -> mặc định hiện, không tự ẩn.
       logs: space.enabledBlocks?.logs ?? true,
+      // Dữ liệu thiếu field `expenseTracking` (Space đã tồn tại trước khi field này ra đời) ->
+      // mặc định `true`, không mất tab "Tổng hợp" đột ngột. Space MỚI luôn có key tường minh
+      // (`false`, xem `defaultEnabledBlocks()`) nên không rơi vào nhánh default này.
+      expenseTracking: space.enabledBlocks?.expenseTracking ?? true,
     },
     tasks: Array.isArray(space.tasks)
       ? space.tasks.map((t, idx) => ({
@@ -61,6 +74,11 @@ export function normalizeSpace(space: Space): Space {
     notes: Array.isArray(space.notes) ? space.notes.map((n) => ({ ...n, expanded: n.expanded ?? false, hidden: n.hidden ?? false })) : [],
     logs: normalizeLogEntries(space.logs),
     ...(space.isShared ? { isShared: true as const, sharedSpaceId: space.sharedSpaceId, _sharedVersion: space._sharedVersion } : {}),
+    // _privateVersion: chỉ giữ khi có giá trị số hợp lệ (hàng đã tồn tại trên kn_private_spaces) —
+    // `undefined` (Space vừa tạo cục bộ, chưa từng lưu) phải BỊ BỎ HẲN khỏi object trả về, không
+    // set `undefined` tường minh, để tầng storage (AppStateContext) phân biệt đúng "chưa từng lưu"
+    // (không có key) với "đã lưu, version X" — xem comment field trong types.ts.
+    ...(typeof space._privateVersion === 'number' ? { _privateVersion: space._privateVersion } : {}),
   };
 }
 

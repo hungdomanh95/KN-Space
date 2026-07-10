@@ -63,15 +63,28 @@ export interface Note {
 }
 
 /**
- * Nhật ký nhanh (`docs/features/nhat-ky-nhanh.md`) — record bất biến (chỉ tạo/xoá, không sửa),
- * không có tiêu đề/ngày-giờ hẹn/trạng thái hoàn thành/`order` thủ công. Sắp xếp CHỈ theo
- * `createdAt` (ISO timestamp) — nguồn sự thật duy nhất, không có `updatedAt`.
+ * Nhật ký nhanh (`docs/features/nhat-ky-nhanh.md`) — record gần như bất biến: `content`/
+ * `createdBy`/`createdAt` KHÔNG sửa được sau khi tạo, không có tiêu đề/giờ hẹn/trạng thái hoàn
+ * thành/`order` thủ công. Sắp xếp CHỈ theo `createdAt` (ISO timestamp) — nguồn sự thật duy nhất,
+ * không có `updatedAt`.
+ *
+ * Mở rộng cho tính năng Quản lý/phân loại chi tiêu (`docs/features/quan-ly-chi-tieu.md` mục 6.3/9)
+ * — đúng 1 khe hẹp: 3 field optional bên dưới SỬA được, tách bạch hoàn toàn khỏi `content` gốc.
+ * `amount`/hạng mục tự nhận diện KHÔNG lưu ở đây — tính lại client-side mỗi lần xem
+ * (`features/logs/expenseUtils.ts`), chỉ 3 field dưới đây là state thật (user chủ động sửa).
  */
 export interface LogEntry {
   id: string;
   content: string; // nội dung log, bắt buộc không rỗng sau trim() — validate ở client
   createdBy?: string; // userId — chỉ set trong shared space, giống Task/Note
   createdAt: string; // ISO timestamp — dùng để sort, KHÔNG có updatedAt (bất biến)
+  /** Ngày giao dịch thực tế, "YYYY-MM-DD". Absent = dùng ngày phần `createdAt` (xem `getLogExpenseDate`). */
+  expenseDate?: string;
+  /** Hạng mục user tự chọn (1 trong preset cố định, `EXPENSE_CATEGORIES`), đè lên kết quả tự nhận
+   *  diện theo `content`. Absent = dùng auto-detect (xem `getLogCategory`). */
+  categoryOverride?: string;
+  /** true = loại khỏi Tổng hợp dù `content` có parse ra số tiền. Absent = coi như `false`. */
+  excluded?: boolean;
 }
 
 export interface EnabledBlocks {
@@ -82,6 +95,14 @@ export interface EnabledBlocks {
   reminders: boolean;
   /** Bật/tắt khối "Nhật ký nhanh" theo từng Space, giống Task/Note/Habit (xem docs/features/nhat-ky-nhanh.md). */
   logs: boolean;
+  /**
+   * Bật tab "Tổng hợp" (phân loại/tổng hợp chi tiêu, xem docs/features/quan-ly-chi-tieu.md) trong
+   * khối Nhật ký nhanh. Theo Space chứ không phải toàn app — không phải Space nào cũng dùng Nhật ký
+   * nhanh để log chi tiêu. Space cá nhân MỚI tạo mặc định `false` (`defaultEnabledBlocks()`); Space
+   * đã tồn tại trước khi field này ra đời mặc định `true` khi thiếu key (xem các hàm
+   * `normalize*EnabledBlocks()`), để không mất tab đột ngột ở Space đang dùng thật.
+   */
+  expenseTracking: boolean;
 }
 
 export type ThemeMode = 'light' | 'dark';
@@ -186,6 +207,14 @@ export interface Space {
   sharedSpaceId?: string;
   /** version optimistic lock từ kn_shared_spaces — dùng nội bộ để save, không hiển thị UI */
   _sharedVersion?: number;
+  /**
+   * version optimistic lock từ `kn_private_spaces` (Space cá nhân, xem
+   * docs/features/storage-architecture-fix.md mục 4 Bước 3) — dùng nội bộ để save, không hiển thị
+   * UI. Chỉ có ý nghĩa khi `!isShared`. `undefined` = Space CHƯA từng được ghi lên DB (vừa tạo cục
+   * bộ qua `SPACE_CREATE`/import — tầng storage cần INSERT thay vì UPDATE); một số giá trị số =
+   * hàng đã tồn tại trên `kn_private_spaces`, dùng làm `expectedVersion` cho UPDATE.
+   */
+  _privateVersion?: number;
 }
 
 export interface CollapsedBlocks {

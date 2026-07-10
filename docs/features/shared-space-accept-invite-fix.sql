@@ -1,3 +1,5 @@
+-- ĐÃ GỘP vào supabase/schema.sql (2026-07-09) — chỉ giữ làm lịch sử, KHÔNG chạy lại file này.
+
 -- =============================================================================
 -- Fix: accept_invite — bỏ ERRCODE = 'PGRST', dùng RAISE EXCEPTION thường
 -- =============================================================================

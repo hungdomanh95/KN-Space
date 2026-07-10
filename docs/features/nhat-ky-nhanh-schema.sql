@@ -1,3 +1,5 @@
+-- ĐÃ GỘP vào supabase/schema.sql (2026-07-09) — chỉ giữ làm lịch sử, KHÔNG chạy lại file này.
+
 -- =============================================================================
 -- Nhật ký nhanh (LogEntry) — bổ sung schema cho Shared Space
 -- Xem docs/features/nhat-ky-nhanh.md mục 9 và

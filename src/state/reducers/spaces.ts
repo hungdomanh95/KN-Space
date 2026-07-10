@@ -18,7 +18,11 @@ function forceRemindersEnabled(blocks: EnabledBlocks): EnabledBlocks {
 }
 
 export function defaultEnabledBlocks(): EnabledBlocks {
-  return { tasks: true, reminder: true, habits: true, notes: true, reminders: true, logs: true };
+  // `expenseTracking: false` — Space MỚI tạo mặc định TẮT tab "Tổng hợp" chi tiêu, user tự bật ở
+  // menu khối Nhật ký nhanh nếu Space này dùng để log chi tiêu (xem docs/features/quan-ly-chi-tieu.md).
+  // Space CŨ đã tồn tại trước field này ra đời không đi qua hàm này — đọc lại qua
+  // `normalizeSpace()`, mặc định `true` (xem `storage/normalize.ts`).
+  return { tasks: true, reminder: true, habits: true, notes: true, reminders: true, logs: true, expenseTracking: false };
 }
 
 function emptySpace(name: string, order: number, enabledBlocks: EnabledBlocks): Space {

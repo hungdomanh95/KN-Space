@@ -2,7 +2,8 @@ import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { BookOpen, CheckSquare, ChevronUp, MessageCircle, ListChecks, ScrollText, type LucideIcon } from 'lucide-react';
 import { MobileChatScreen } from './MobileChatScreen';
-import { useCurrentSpace } from '../state/AppStateContext';
+import { useCurrentSpaceOrNull } from '../state/AppStateContext';
+import { NoSpaceScreen } from '../features/spaces/NoSpaceScreen';
 import { TasksBlock } from '../features/tasks/TasksBlock';
 import { RemindersBlock } from '../features/reminders/RemindersBlock';
 import { HabitsBlock } from '../features/habits/HabitsBlock';
@@ -91,7 +92,12 @@ interface SubColSplitterGeom {
  *   tính xong, đặt splitter ẨN đè giữa khoảng gap 12px sẵn có (không thay thế gap).
  */
 export function AppLayout({ onGoHome }: AppLayoutProps) {
-  const space = useCurrentSpace();
+  // Nullable ở đây (không phải `useCurrentSpace()` throw) — đây là 1 trong 2 điểm ENTRY cấp cao
+  // nhất (cùng `HomeScreen`) phải tự xử lý mềm trường hợp chưa có Space nào (xem
+  // `NoSpaceScreen`/`useCurrentSpaceOrNull` để biết lý do). Mọi hook bên dưới PHẢI vẫn gọi vô
+  // điều kiện (rules of hooks) dù `space` có null hay không — chỉ return sớm `<NoSpaceScreen />`
+  // SAU khi toàn bộ hook đã chạy xong (trước đoạn JSX chính, xem cuối phần khai báo hook).
+  const space = useCurrentSpaceOrNull();
   const {
     layout,
     draggedId,
@@ -144,6 +150,10 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
   const [mobileTab, setMobileTab] = useState<'chat' | 'details'>('chat');
 
   function isBlockVisible(id: LayoutBlockKey): boolean {
+    // `space` null (chưa có Space nào) — kết quả hàm này không còn ý nghĩa vì cả nhánh JSX dùng
+    // nó đều bị bỏ qua (return sớm `<NoSpaceScreen />` bên dưới trước khi tới JSX chính), nhưng
+    // `useMemo`/`useLayoutEffect` vẫn phải chạy được (rules of hooks) nên không thể throw ở đây.
+    if (!space) return false;
     // `settings` (DashboardCorner) là chrome điều hướng (home/space/cài đặt), không phải khối
     // nội dung — luôn hiện cả trên mobile, không tính vào MOBILE_VISIBLE_BLOCKS.
     if (isMobileBlocksOnly && id !== 'settings' && !MOBILE_VISIBLE_BLOCKS.has(id)) return false;
@@ -164,7 +174,7 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
   const { layout: visibleLayout, colMap, slotMap } = useMemo(
     () => deriveVisibleLayout(layout, isBlockVisible),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [layout, space.enabledBlocks],
+    [layout, space?.enabledBlocks],
   );
 
   // ---- PASS 2: đo rect thật, đặt splitter đè giữa gap 12px sẵn có (port renderCols() PASS 2). ----
@@ -276,6 +286,14 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
     vv.addEventListener('resize', adjust);
     return () => vv.removeEventListener('resize', adjust);
   }, [isMobileBlocksOnly]);
+
+  // Toàn bộ hook đã gọi xong ở trên (rules of hooks: không được return sớm trước đó) — từ đây
+  // trở đi TypeScript tự narrow `space` từ `Space | null` về `Space` cho phần còn lại của hàm
+  // (renderBlock/renderSlot/accordionCount/2 nhánh JSX bên dưới), không cần lặp lại `!space` ở
+  // từng nơi. Không có Space nào -> hiện màn hình thân thiện thay vì crash (xem NoSpaceScreen).
+  if (!space) {
+    return <NoSpaceScreen />;
+  }
 
   function dragHandlersFor(id: LayoutBlockKey, allowSide: boolean) {
     return {
@@ -505,12 +523,15 @@ export function AppLayout({ onGoHome }: AppLayoutProps) {
 
   /** Số lượng hiển thị trên thanh tóm tắt khi 1 khối accordion mobile đang thu nhỏ (xem
    * MobileCollapsedSummary) — "Việc cần làm" đếm số CHƯA xong (giống trước), "Ghi chú"/"Nhật ký"
-   * đếm tổng số item. */
-  function accordionCount(id: MobileAccordionBlockId): number {
+   * đếm tổng số item. Arrow function (không phải `function` declaration) — TypeScript chỉ giữ
+   * được narrowing `space: Space | null` -> `Space` (từ guard `if (!space) return ...` phía
+   * trên) xuyên qua closure với const binding định nghĩa SAU điểm narrow; `function` declaration
+   * bị hoist nên mất narrowing đó (đã xác nhận qua lỗi `tsc`). */
+  const accordionCount = (id: MobileAccordionBlockId): number => {
     if (id === 'tasks') return space.tasks.filter((t) => !t.done).length;
     if (id === 'notes') return space.notes.length;
     return space.logs.length;
-  }
+  };
 
   // Mobile thật: KHÔNG dùng hệ thống cột tự do bên dưới (3 cột desktop chia đều 1/3 chiều cao
   // khi dồn dọc, kể cả cột chỉ chứa "settings" cao vài chục px — để lại khoảng trống lớn lộ

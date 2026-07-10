@@ -1,3 +1,5 @@
+-- ĐÃ GỘP vào supabase/schema.sql (2026-07-09) — chỉ giữ làm lịch sử, KHÔNG chạy lại file này.
+
 -- =============================================================================
 -- KN-Space — Schema cho tính năng Shared Space (Phase 3)
 -- =============================================================================
@@ -56,9 +58,6 @@ create trigger kn_shared_spaces_before_update
   before update on public.kn_shared_spaces
   for each row execute function public.kn_shared_spaces_before_update();
 
--- Bật Realtime để đồng bộ giữa các thành viên đang mở cùng space
-alter publication supabase_realtime add table public.kn_shared_spaces;
-
 
 -- =============================================================================
 -- BẢNG 2: kn_space_members
@@ -81,8 +80,6 @@ create table if not exists public.kn_space_members (
 );
 
 alter table public.kn_space_members enable row level security;
-
-alter publication supabase_realtime add table public.kn_space_members;
 
 
 -- =============================================================================
@@ -471,9 +468,10 @@ grant  execute on function public.create_shared_space(text) to authenticated;
 -- 3. ACCEPT INVITE: gọi `select accept_invite('<token>')` khi user bấm link.
 --    Function validate → INSERT member → UPDATE accepted_at, trả về space_id để redirect.
 --
--- 4. REALTIME SYNC: kn_shared_spaces và kn_space_members đã được thêm vào
---    supabase_realtime publication. Client subscribe channel 'shared_space:<space_id>'
---    để nhận UPDATE real-time.
+-- 4. ĐỒNG BỘ ĐA THIẾT BỊ: KHÔNG dùng Realtime (đã gỡ khỏi code từ commit
+--    `aa00fae`, 2026-07-01). Client chỉ đọc dữ liệu mới nhất khi tự load lại
+--    (mở app / chuyển Space / F5) — sửa ở máy A không tự đẩy sang máy B đang
+--    mở sẵn.
 --
 -- 5. CONFLICT RESOLUTION (last-write-wins theo item):
 --    Mỗi task/note/reminder trong JSONB PHẢI có trường "updatedAt" (ISO 8601).

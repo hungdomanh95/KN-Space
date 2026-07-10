@@ -1,3 +1,5 @@
+-- ĐÃ GỘP vào supabase/schema.sql (2026-07-09) — chỉ giữ làm lịch sử, KHÔNG chạy lại file này.
+
 -- =============================================================================
 -- FIX: RLS infinite recursion trên kn_space_members
 -- Nguyên nhân: policy SELECT tự query lại bảng kn_space_members → đệ quy.

@@ -1,6 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
+import { previewLegacySpacesMigration, runLegacySpacesMigration } from './storage/migrateLegacySpaces';
 import './styles.css';
 
 const container = document.getElementById('root');
@@ -11,6 +12,28 @@ createRoot(container).render(
     <App />
   </React.StrictMode>,
 );
+
+// Migration Space cá nhân cũ (kn_space_state.spaces[]) -> kn_private_spaces (Bước 4,
+// docs/features/storage-architecture-fix.md mục 4). CHỦ Ý expose qua `window`, không tự chạy khi
+// load app — chỉ gọi tay qua Console/Playwright, đúng tinh thần "hành động rõ ràng, 1 lần, không
+// phải tính năng lâu dài của app". An toàn theo user đang đăng nhập (RLS + filter user_id), không
+// cần service-role key.
+//
+// Cách dùng (mở DevTools Console khi đã đăng nhập):
+//   await window.knMigrateLegacySpaces.preview()  // dry-run, chỉ đọc — xem trước sẽ migrate gì
+//   await window.knMigrateLegacySpaces.run()      // thực thi migrate thật (idempotent, gọi lại an toàn)
+declare global {
+  interface Window {
+    knMigrateLegacySpaces: {
+      preview: typeof previewLegacySpacesMigration;
+      run: typeof runLegacySpacesMigration;
+    };
+  }
+}
+window.knMigrateLegacySpaces = {
+  preview: previewLegacySpacesMigration,
+  run: runLegacySpacesMigration,
+};
 
 // Đăng ký Service Worker (PWA + Push Notification — Phần 1, xem docs/features/push-notification.md).
 // Chỉ đăng ký ở bản build production (`import.meta.env.PROD`): SW này bị tắt ở `vite dev`

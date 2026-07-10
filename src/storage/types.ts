@@ -1,15 +1,12 @@
-import type { Settings, Space } from '../types';
+import type { Settings } from '../types';
 
-export interface LoadResult {
-  spaces: Space[];
-  currentSpaceId: string;
-  settings: Settings;
-  /** true nếu lần lưu gần nhất lên Supabase thất bại (mất mạng/lỗi) — dữ liệu chỉ còn ở state cục bộ. */
-  storageFallbackActive: boolean;
-}
-
-export interface SaveSnapshot {
-  spaces: Space[];
-  currentSpaceId: string;
+/**
+ * Snapshot cho luồng lưu `settings` — cột duy nhất của `kn_space_state` còn được ghi lại sau lần
+ * khởi tạo hàng (xem `supabaseStore.ts`). Space cá nhân (`spaces`) từ Bước 3
+ * (docs/features/storage-architecture-fix.md mục 4) đã chuyển hẳn sang bảng `kn_private_spaces`,
+ * đọc/ghi theo TỪNG HÀNG qua `privateSpaceStore.ts` — không còn khái niệm "snapshot cả mảng
+ * spaces" nữa.
+ */
+export interface SettingsSnapshot {
   settings: Settings;
 }

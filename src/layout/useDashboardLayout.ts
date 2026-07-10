@@ -38,7 +38,7 @@ export type ActiveSplitter =
  * Quyết định kỹ thuật khác demo: demo mutate trực tiếp `colsState` và gọi `renderCols()` mỗi
  * lần `mousemove` (vanilla, không qua reducer). Ở đây dùng 1 state LOCAL `layout` (mirror từ
  * dữ liệu đã persist) để cập nhật mượt trong lúc kéo-resize, chỉ DISPATCH xuống reducer toàn
- * cục (kéo theo lưu storage) lúc `mouseup` — tránh dispatch/scheduleSave dồn dập theo từng
+ * cục (kéo theo lưu storage) lúc `mouseup` — tránh dispatch/scheduleSettingsSave dồn dập theo từng
  * pixel di chuyển trong lúc kéo (resize có thể bắn hàng chục lần/giây).
  * Kéo-thả đổi vị trí (dropOnTarget/dropOnColumnEnd) ít tần suất hơn (1 lần/lượt thả) nên
  * dispatch ngay khi drop, không cần đợi mouseup riêng.

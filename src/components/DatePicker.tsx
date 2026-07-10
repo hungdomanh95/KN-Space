@@ -18,6 +18,13 @@ import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
 interface DatePickerProps {
   value: string;
   onChange: (v: string) => void;
+  /**
+   * Tự mở popover ngay khi mount — dùng cho chỗ chèn DatePicker vào giữa flow tương tác khác (vd
+   * sửa ngày giao dịch inline trong `LogsBlock.tsx`, xem `docs/features/quan-ly-chi-tieu.md` mục
+   * 5.1) thay vì phải bấm thêm 1 lần vào trigger mới thấy lịch. Mặc định `false` — không đổi hành
+   * vi ở mọi chỗ dùng `<DatePicker>` hiện có (TaskFormModal/ReminderFormModal...).
+   */
+  autoOpen?: boolean;
 }
 
 /** Parse `"YYYY-MM-DD"` -> `Date` local (KHÔNG dùng `new Date(string)` — hiểu chuỗi ISO là
@@ -109,8 +116,8 @@ function formatWeekdayNameVi(weekday: Date): string {
   return format(weekday, 'ccccc', { locale: vi });
 }
 
-export function DatePicker({ value, onChange }: DatePickerProps) {
-  const [open, setOpen] = useState(false);
+export function DatePicker({ value, onChange, autoOpen = false }: DatePickerProps) {
+  const [open, setOpen] = useState(autoOpen);
   const selected = parseDateStr(value);
   const display = selected ? formatDisplay(selected) : '';
   const triggerLabel = display ? `Ngày đã chọn: ${display}, bấm để đổi` : 'Chọn ngày';
