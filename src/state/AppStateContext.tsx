@@ -32,6 +32,7 @@ import {
   computeTaskUpdateNotifyEffect,
   computeTaskToggleDoneNotifyEffect,
 } from './sharedTaskNotifyEffects';
+import { flushAllPendingLogPersist, handleLogActionForPersist, isLogAction } from './itemPersist';
 
 interface AppStateContextValue {
   state: AppState;
@@ -430,6 +431,9 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           sharedSaveTimersRef.current.forEach((t) => clearTimeout(t));
           sharedSaveTimersRef.current.clear();
         }
+        // Flush Log item-level còn pending (mirror 2 nhánh trên, xem itemPersist.ts) — no-op khi
+        // LOG_ITEM_PERSIST_ENABLED === false (hàng đợi luôn rỗng trong trường hợp đó).
+        flushAllPendingLogPersist();
       } else if (document.visibilityState === 'visible') {
         void refreshStaleSpaces();
       }
@@ -577,6 +581,14 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         // Task bị xoá trước khi debounce 15s kịp chạy — huỷ lịch, tránh notify về task không còn tồn tại.
         cancelCompletedNotify(action.payload.id);
       }
+    }
+
+    // Persist item-level cho Log (Bước 1, docs/features/item-level-entity-tables.md) — ĐỘC LẬP với
+    // luồng save Space-level ở trên (bảng riêng `kn_private_logs`/`kn_shared_logs`, debounce theo
+    // itemId). No-op hoàn toàn khi `LOG_ITEM_PERSIST_ENABLED === false` (xem `itemPersist.ts`) —
+    // Nhật ký nhanh tiếp tục lưu qua cột `logs` jsonb như cũ, không đổi hành vi hiện tại.
+    if (currentSpace && isLogAction(action)) {
+      actionToDispatch = handleLogActionForPersist(currentSpace, action);
     }
 
     dispatch(actionToDispatch);

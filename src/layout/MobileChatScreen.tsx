@@ -23,15 +23,18 @@ export function MobileChatScreen() {
 
   // Merge task + note + log từ space, sort theo `createdAt` (KHÔNG dùng `order` như trước —
   // `LogEntry` không có field `order`, chỉ có `createdAt`, xem nhat-ky-nhanh.md mục 5.2.1).
-  // So sánh chuỗi ISO tăng dần → cũ nhất đứng đầu mảng, mới nhất cuối mảng (hiện cũ→mới, mới
-  // nhất dưới cùng, đúng hành vi cũ). Item thiếu `createdAt` (dữ liệu cũ) coi như cũ nhất.
+  // So theo mốc thời gian thực (Date.getTime, KHÔNG dùng localeCompare — timestamp cũ hậu tố
+  // `Z` và timestamp Postgres trả về hậu tố `+00:00` so chuỗi sai thứ tự, xem
+  // item-level-entity-tables-progress.md mục "Phát hiện mới") → cũ nhất đứng đầu mảng, mới
+  // nhất cuối mảng (hiện cũ→mới, mới nhất dưới cùng, đúng hành vi cũ). Item thiếu `createdAt`
+  // (dữ liệu cũ) coi như cũ nhất (getTime() === 0 khi input rỗng).
   const bubbles = useMemo<ChatBubble[]>(() => {
     const all = [
       ...space.tasks.slice(0, 30).map((t) => ({ ...t, _type: 'task' as const })),
       ...space.notes.slice(0, 30).map((n) => ({ ...n, _type: 'note' as const })),
       ...space.logs.slice(0, 30).map((l) => ({ ...l, _type: 'log' as const })),
     ]
-      .sort((a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? ''))
+      .sort((a, b) => new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime())
       .slice(0, 75); // tăng từ 50 → 75 (nhat-ky-nhanh.md mục 6.5, đủ chỗ cho 30 task+30 note+30 log)
 
     return all.map((item) => {

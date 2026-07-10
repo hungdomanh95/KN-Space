@@ -2,6 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { previewLegacySpacesMigration, runLegacySpacesMigration } from './storage/migrateLegacySpaces';
+import { previewLegacyLogsMigration, runLegacyLogsMigration } from './storage/migrateLegacyLogs';
 import './styles.css';
 
 const container = document.getElementById('root');
@@ -33,6 +34,28 @@ declare global {
 window.knMigrateLegacySpaces = {
   preview: previewLegacySpacesMigration,
   run: runLegacySpacesMigration,
+};
+
+// Migration Nhật ký nhanh (logs[] cũ, jsonb) -> kn_private_logs/kn_shared_logs (Bước 1 entity Log,
+// docs/features/item-level-entity-tables.md). CHỈ chạy được SAU KHI đã chạy
+// docs/features/item-level-log-schema.sql trên Supabase Dashboard — trước đó mọi lệnh trả lỗi
+// "relation does not exist" (an toàn, không ghi sai gì). Cùng nguyên tắc `knMigrateLegacySpaces` ở
+// trên: gọi tay qua Console, không tự chạy khi load app.
+//
+// Cách dùng (mở DevTools Console khi đã đăng nhập):
+//   await window.knMigrateLogs.preview()  // dry-run, chỉ đọc — xem trước sẽ migrate gì
+//   await window.knMigrateLogs.run()      // thực thi migrate thật (idempotent, gọi lại an toàn)
+declare global {
+  interface Window {
+    knMigrateLogs: {
+      preview: typeof previewLegacyLogsMigration;
+      run: typeof runLegacyLogsMigration;
+    };
+  }
+}
+window.knMigrateLogs = {
+  preview: previewLegacyLogsMigration,
+  run: runLegacyLogsMigration,
 };
 
 // Đăng ký Service Worker (PWA + Push Notification — Phần 1, xem docs/features/push-notification.md).

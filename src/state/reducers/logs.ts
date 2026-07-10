@@ -14,9 +14,15 @@ import type { LogEntry, Space } from '../../types';
  * dùng `string | null` (khác `expenseDate`/`excluded` dùng optional thường): `null` = xoá override
  * (quay lại auto-detect), `undefined` = không đổi field này trong lần patch — cần phân biệt rõ 2
  * trạng thái vì đây là field có thể "xoá về mặc định", không chỉ "đổi giá trị".
+ *
+ * `LOG_CREATE.payload.id` (optional) — mirror TASK_CREATE (`reducers/tasks.ts`): cho phép caller
+ * (`state/itemPersist.ts` qua `smartDispatch`) tự sinh id TRƯỚC khi gọi reducer, dùng chung đúng id
+ * đó cho cả lượt tính descriptor persist item-level lẫn lượt dispatch thật — tránh 2 lần
+ * `crypto.randomUUID()` ra 2 id khác nhau cho cùng 1 log vừa tạo (xem docs/features/
+ * item-level-entity-tables.md mục 4.2). Absent = reducer tự sinh như cũ (mọi caller khác, vd test).
  */
 export type LogAction =
-  | { type: 'LOG_CREATE'; payload: { content: string; createdBy?: string } }
+  | { type: 'LOG_CREATE'; payload: { content: string; createdBy?: string; id?: string } }
   | { type: 'LOG_DELETE'; payload: { id: string } }
   | { type: 'LOG_DELETE_MANY'; payload: { ids: string[] } }
   | {
@@ -32,7 +38,7 @@ export function logsReducer(space: Space, action: LogAction): Space {
       const content = action.payload.content.trim();
       if (!content) return space;
       const newLog: LogEntry = {
-        id: crypto.randomUUID(),
+        id: action.payload.id ?? crypto.randomUUID(),
         content,
         createdAt: new Date().toISOString(),
         ...(action.payload.createdBy ? { createdBy: action.payload.createdBy } : {}),

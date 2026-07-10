@@ -160,7 +160,9 @@ export function ExpenseSummaryPanel({ logs, members, currentUserId }: ExpenseSum
         .map((log) => ({ log, amount: parseAmount(log.content), category: getLogCategory(log) }))
         .sort((a, b) => {
           const dateCmp = getLogExpenseDate(b.log).localeCompare(getLogExpenseDate(a.log));
-          return dateCmp !== 0 ? dateCmp : b.log.createdAt.localeCompare(a.log.createdAt);
+          return dateCmp !== 0
+            ? dateCmp
+            : new Date(b.log.createdAt).getTime() - new Date(a.log.createdAt).getTime();
         }),
     [rowsInRange],
   );

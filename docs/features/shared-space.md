@@ -192,29 +192,65 @@ Habit là dữ liệu cực kỳ cá nhân (chuỗi ngày hoàn thành từng ng
 > `false`** — không đổi so với trước, chỉ chuyển lớp ép cứng từ "toàn bộ enabledBlocks bị hard-code" sang
 > "chỉ riêng `habits` bị ép trong `normalizeSharedEnabledBlocks()`", đọc các field còn lại thật từ DB.
 
-### 6.2 Conflict resolution — Item-level Last-Write-Wins (LWW)
+### 6.2 Conflict resolution — Space-level blind Last-Write-Wins (đã cập nhật 2026-07-10, khớp code thật)
+
+> **Đính chính:** bản mô tả trước đây ở mục này ("item-level LWW theo `updatedAt`") **chưa từng được code
+> hiện thực** — đã xác nhận bằng cách `grep` toàn bộ `src/storage/`+`src/state/`, không có chỗ nào so
+> `updatedAt` giữa 2 phiên bản của cùng 1 item để quyết định "ai thắng" (xem
+> `docs/features/item-level-entity-tables.md` mục 1, Phát hiện 1). Nội dung dưới đây mô tả đúng cơ chế
+> THẬT đang chạy trên `main` (đã triển khai theo
+> `docs/features/conflict-handling-simplification.md`, chủ dự án đã đồng ý toàn bộ đề xuất).
 
 Khi 2+ người cùng sửa cùng lúc:
 
-- Mỗi item (task, note, reminder) có field `updatedAt: number` (epoch ms).
-- Khi có xung đột trên cùng 1 item: **item nào có `updatedAt` lớn hơn (mới hơn) thắng** — item kia bị ghi đè.
-- Granularity là **item**, không phải field bên trong item. Ví dụ: nếu người A sửa title, người B sửa content cùng lúc trên cùng 1 note → người nào save sau sẽ ghi đè toàn bộ note (bao gồm cả thay đổi của người kia).
-- Không có merge field-level, không có diff/patch, không có lịch sử version.
-- Đây là trade-off có chủ đích: đơn giản, đủ dùng cho quy mô nhỏ (2–10 người).
+- Granularity hiện tại là **cả Space** (`kn_shared_spaces`, 1 hàng chứa toàn bộ task/note/reminder/log của
+  Space đó dưới dạng `jsonb`), **không phải từng item riêng lẻ**. Mỗi lần lưu là 1 lần ghi đè nguyên khối
+  dữ liệu Space, không phân biệt item nào thực sự vừa đổi.
+- **Ghi thẳng blind write, last-write-wins đơn giản:** không còn version-check, không `WHERE version =
+  expected`, không retry. Ai **lưu sau cùng** (tính theo thời điểm request tới server) thắng vô điều
+  kiện — ghi đè toàn bộ dữ liệu Space, bất kể nội dung cũ hay mới hơn về mặt thời gian chỉnh sửa thật.
+- Ví dụ: người A sửa title Task X, người B sửa content Note Y cùng lúc trong CÙNG 1 Space → người nào lưu
+  sau sẽ ghi đè toàn bộ Space (gồm cả thay đổi của người kia nếu người kia lưu trước và người này chưa kịp
+  refresh) — không chỉ giới hạn ở đúng item bị sửa.
+- Không có merge field-level/item-level, không có diff/patch, không có lịch sử version.
+- Đây là trade-off có chủ đích: đơn giản, đủ dùng cho quy mô nhỏ (2–10 người). Xem phân tích đầy đủ vì sao
+  version-check bị bỏ (không chặn được đúng kịch bản gây sự cố thật) ở
+  `docs/features/conflict-handling-simplification.md` mục 1.
 
 **Hành vi khi bị ghi đè:**
 - Không có notification "dữ liệu của bạn đã bị ghi đè".
-- Người dùng tự nhận ra khi tự mở lại/reload app và thấy dữ liệu đổi khác (không có push tức thì — xem mục 6.3).
+- Người dùng tự nhận ra khi tự mở lại/reload app, hoặc khi tab tự refresh nền lúc quay lại active (xem mục
+  6.3) và thấy dữ liệu đổi khác — không có push tức thì.
 - Chấp nhận mất thay đổi trong các tình huống edit đồng thời — đây là hành vi đã biết, không phải bug.
+
+**Định hướng tương lai (chưa code):** khi tách 9 bảng entity riêng theo item (Task/Note/Habit/Reminder/Log
+— xem `docs/features/item-level-entity-tables.md`, đang tạm dừng chờ chủ dự án xác nhận thời điểm resume),
+granularity sẽ thu hẹp đúng xuống **item** (mỗi task/note/... là 1 hàng riêng) — nhưng vẫn dùng blind
+last-write-wins (không version-check per-item), chỉ khác đơn vị ghi đè từ "cả Space" xuống "từng item".
 
 ### 6.3 Đồng bộ giữa các thành viên (KHÔNG phải Realtime)
 
 > **Cập nhật 2026-07-03:** mục này ban đầu viết theo giả định dùng Supabase Realtime, nhưng Realtime đã bị **chủ động bỏ khỏi toàn bộ dự án** ở commit `aa00fae` (2026-07-01, tức 1 ngày trước khi tài liệu này được chốt) vì gây 5 bug mất dữ liệu — xem `docs/requirements.md` mục 2.1/10. Không có `.channel()`/`subscribe()` nào trong code, kể cả cho Shared Space. Nội dung dưới đây đã viết lại theo đúng thực tế.
 
-- **Không có push realtime.** Thành viên khác chỉ thấy thay đổi của bạn sau khi họ **tự mở lại/reload app** — kể cả khi đang online cùng lúc.
-- Không có offline queue — giữ nguyên hành vi Phase 2 (banner lỗi nếu save thất bại do mất kết nối).
-- Vì không có cơ chế "đẩy" thay đổi, rủi ro conflict LWW (mục 6.2) thực tế cao hơn giả định ban đầu ("đang online cùng lúc" không giúp giảm xung đột) — nếu cần giảm rủi ro mất dữ liệu khi nhiều người cùng sửa gần như đồng thời, cần bàn lại với `ba`/`dev` một giải pháp khác (không phải khôi phục Realtime, đã có quyết định bỏ hẳn).
-- **Cập nhật 2026-07-10:** đã bàn lại — xem `docs/features/conflict-handling-simplification.md`. Đề xuất bỏ version-check hiện tại (vốn không chặn được ca gây sự cố thật) + thêm refresh dữ liệu khi tab quay lại visible (thu hẹp cửa sổ RAM cũ). Chưa code — mục 6.2 ở trên (mô tả "LWW theo `updatedAt`") vẫn đang mô tả sai so với code thật (xem `docs/features/item-level-entity-tables.md` mục 1) và **chưa được sửa trong đợt này**, chỉ đánh dấu ở đây để không hiểu nhầm.
+- **Không có push realtime.** Thành viên khác chỉ thấy thay đổi của bạn sau khi họ **tự mở lại/reload app,
+  hoặc khi tab của họ tự chuyển sang trạng thái visible trở lại** (xem cập nhật bên dưới) — không có push
+  tức thì kể cả khi đang online cùng lúc.
+- Không có offline queue — giữ nguyên hành vi Phase 2 (banner lỗi mạng chung khi save thất bại thật sự do
+  mất kết nối/lỗi server, xem `docs/features/conflict-handling-simplification.md` mục 3).
+- **Đã giải quyết xong (2026-07-10, đã code + push lên `main`):** câu hỏi mở trước đây ở mục này ("cần bàn
+  lại với `ba`/`dev` một giải pháp khác") đã được trả lời đầy đủ ở
+  `docs/features/conflict-handling-simplification.md` — 2 hướng, làm CẢ HAI:
+  - **Hướng 1 — bỏ version-check + retry**, ghi thẳng blind last-write-wins (mục 6.2 ở trên).
+  - **Hướng 2 — tự refresh dữ liệu khi tab quay lại active:** khi `document.visibilityState` chuyển sang
+    `visible`, app tự fetch lại Space cá nhân + Shared Space, rồi với TỪNG Space: nếu Space đó **không có
+    thay đổi đang chờ lưu** → thay bằng bản mới fetch được; nếu Space đó **đang có thay đổi chưa lưu** (đang
+    gõ dở, debounce chưa trôi qua, hoặc save đang bay) → **bỏ qua**, không đè, để luồng debounce/flush hiện
+    có tự lưu bình thường. Thu hẹp cửa sổ "RAM cũ" từ hàng giờ (1 phiên mở tab) xuống còn khoảng thời gian
+    tab bị ẩn (thường vài giây tới vài phút). Không phải polling (không `setInterval`), không phải
+    Realtime (không `.channel()`/`subscribe()`).
+  - Giới hạn đã biết: nếu 1 tab giữ liên tục trạng thái focus/visible nhiều giờ không bao giờ chuyển
+    tab/minimize, RAM vẫn có thể cũ cho tới khi user F5 thủ công — chấp nhận được ở quy mô hiện tại, xem
+    `conflict-handling-simplification.md` mục 2.2/6.
 
 ---
 

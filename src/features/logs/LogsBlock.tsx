@@ -45,7 +45,9 @@ function truncate(text: string, maxLen: number): string {
 }
 
 function sortLogsForDisplay(logs: LogEntry[], sortBy: LogSortBy): LogEntry[] {
-  const sorted = [...logs].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const sorted = [...logs].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  );
   return sortBy === 'newest' ? sorted.reverse() : sorted;
 }
 
