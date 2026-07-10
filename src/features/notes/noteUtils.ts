@@ -1,8 +1,59 @@
-export function maskContent(text: string): string {
-  return (text || '')
-    .split('\n')
-    .map((line) => (line.trim() ? '*'.repeat(Math.min(line.length, 22)) : ''))
-    .join('\n');
+export function maskLine(line: string): string {
+  return line.trim() ? '*'.repeat(Math.min(line.length, 22)) : '';
+}
+
+/** Cộng/trừ độ sâu ngoặc + cặp `do`...`end` kiểu Ruby cho 1 dòng — dùng để biết dòng trắng có đang
+ * nằm GIỮA 1 khối code chưa đóng hay không (xem `groupLinesIntoBlocks`). */
+function lineDepthDelta(line: string): number {
+  let delta = 0;
+  for (const ch of line) {
+    if (ch === '{' || ch === '(' || ch === '[') delta++;
+    else if (ch === '}' || ch === ')' || ch === ']') delta--;
+  }
+  if (/\bdo(\s*\|[^|]*\|)?\s*$/.test(line)) delta++;
+  if (/^\s*end\s*$/.test(line)) delta--;
+  return delta;
+}
+
+/**
+ * Gom các DÒNG (không phải chuỗi) thành từng "cụm" — mỗi cụm là 1 mảng dòng, giữ nguyên dòng
+ * trắng bên trong nếu đang ở giữa 1 khối ngoặc/`do...end` chưa đóng (vd nội dung Ruby/Podspec
+ * nhiều dòng, chỉ tách cụm mới khi khối đã đóng, không tách theo MỌI dòng trắng mù quáng).
+ *
+ * Van an toàn: 2 dòng trắng liên tiếp LUÔN buộc tách cụm dù đang tưởng là chưa đóng khối — tránh
+ * gộp nhầm cả phần còn lại của note nếu lỡ nhận sai tín hiệu mở khối (vd 1 câu văn xuôi tình cờ
+ * kết thúc bằng chữ "do").
+ *
+ * Tách riêng bước này (thao tác trên MẢNG DÒNG THẬT) khỏi bước mask nội dung, để việc "ẩn nội
+ * dung" (thay chữ bằng `***`) không bao giờ làm lệch ranh giới cụm so với nội dung thật — xem
+ * `NoteViewModal.tsx`, nơi cả 2 bản hiển thị/thật đều gom theo ĐÚNG 1 lần gọi hàm này.
+ */
+export function groupLinesIntoBlocks(lines: string[]): string[][] {
+  const blocks: string[][] = [];
+  let current: string[] = [];
+  let depth = 0;
+  let consecutiveBlank = 0;
+  for (const line of lines) {
+    const isBlank = line.trim() === '';
+    if (isBlank) {
+      consecutiveBlank++;
+      if (depth > 0 && consecutiveBlank < 2) {
+        if (current.length > 0) current.push(line);
+        continue;
+      }
+      if (current.length > 0) {
+        blocks.push(current);
+        current = [];
+      }
+      depth = 0;
+      continue;
+    }
+    consecutiveBlank = 0;
+    current.push(line);
+    depth = Math.max(0, depth + lineDepthDelta(line));
+  }
+  if (current.length > 0) blocks.push(current);
+  return blocks;
 }
 
 /**
