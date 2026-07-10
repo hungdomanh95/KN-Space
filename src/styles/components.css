@@ -181,7 +181,7 @@
      document.querySelectorAll('.note-card')/classList.contains('dragging') trực tiếp (kỹ
      thuật kéo-thả arm/disarm draggable) — không thể đổi tên khi migrate sang Tailwind. */
   .notes-grid {
-    @apply grid w-full content-start gap-2.5 [grid-template-columns:repeat(auto-fill,minmax(180px,1fr))];
+    @apply grid w-full items-start content-start gap-2.5 [grid-template-columns:repeat(auto-fill,minmax(180px,1fr))];
   }
   .note-card {
     @apply relative cursor-pointer rounded-[10px] border border-[color:var(--border-hairline)] bg-[var(--note-card-bg)]
@@ -202,7 +202,7 @@
     @apply m-0 mb-[3px] font-bold;
   }
   .note-card .nc-content {
-    @apply overflow-hidden text-[var(--note-content-text)] [-webkit-box-orient:vertical] [-webkit-line-clamp:4] [display:-webkit-box] [line-clamp:4] whitespace-pre-wrap leading-[1.5];
+    @apply overflow-hidden break-words text-[var(--note-content-text)] [-webkit-box-orient:vertical] [-webkit-line-clamp:4] [display:-webkit-box] [line-clamp:4] whitespace-pre-wrap leading-[1.5];
   }
   .nc-date {
     @apply absolute bottom-[7px] right-[11px] text-[0.6562rem] font-medium text-[var(--text-dim)] opacity-70;
