@@ -70,31 +70,6 @@ interface AppStateContextValue {
   state: AppState;
   dispatch: React.Dispatch<AppAction>;
   isLoading: boolean;
-  /**
-   * Dispatch action + lưu ngay lập tức lên Supabase, ĐỢI kết quả thật (không debounce).
-   * Dùng cho nút "Lưu" trong modal Thêm/Sửa (Task/Note/Reminder/Habit) — nơi user cần biết
-   * chắc chắn dữ liệu đã lên server trước khi đóng modal (tránh mất task khi đóng app ngay
-   * sau khi thêm, lúc debounce 600ms nền còn đang chờ).
-   *
-   * KHÔNG dùng cho các thao tác nhỏ (tick checkbox, kéo-thả, đổi theme...) — những chỗ đó
-   * vẫn dùng `dispatch` thường + debounce nền như cũ để giữ cảm giác mượt.
-   *
-   * **CẢNH BÁO (phát hiện 2026-07-11 khi dọn dẹp jsonb, xem "Việc 1" trong
-   * item-level-entity-tables-progress.md):** HIỆN TẠI không có nơi nào trong codebase gọi
-   * `saveNow` (đã `grep` toàn repo, mọi modal Thêm/Sửa đều chỉ dùng `dispatch` thường/
-   * `smartDispatch`) — hàm này ĐANG LÀ DEAD CODE. Cài đặt bên dưới gọi THẲNG `dispatch` (raw,
-   * từ `useReducer`), KHÔNG đi qua `smartDispatch` — nghĩa là nếu sau này có chỗ nào gọi
-   * `saveNow()` cho action `TASK_CREATE`/`NOTE_UPDATE`/... thì action đó sẽ KHÔNG được
-   * `handleTaskActionForPersist()`/`handleNoteActionForPersist()`/... xử lý — dữ liệu KHÔNG
-   * được ghi vào bảng item-level (nguồn đọc thật hiện nay), CHỈ cập nhật RAM cục bộ. Từ khi
-   * Space-level (`savePrivateSpace`/`saveSharedSpace`) ngừng ghi `tasks`/`notes`/... (Việc 1),
-   * gọi `attemptSavePrivate`/`attemptSaveShared` ở đây cũng không còn "vô tình" cứu được dữ
-   * liệu entity nữa (trước đây còn có tác dụng phụ ghi kèm vào jsonb). TRƯỚC KHI dùng lại hàm
-   * này ở bất kỳ đâu, PHẢI đổi `dispatch(action)` bên dưới thành gọi qua cùng logic
-   * `smartDispatch` (hoặc refactor `smartDispatch` thành hàm thuần tái dùng được ở cả 2 nơi) —
-   * nếu không sẽ mất dữ liệu Task/Note/Habit/Reminder/Log tạo qua đường này.
-   */
-  saveNow: (action: AppAction) => Promise<{ ok: boolean; error?: string }>;
 }
 
 const AppStateContext = createContext<AppStateContextValue | null>(null);
@@ -979,89 +954,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     dispatch(actionToDispatch);
   }, [state.spaces, state.currentSpaceId, session?.user?.id]);
 
-  /**
-   * Dispatch + lưu ngay lập tức, đợi kết quả thật — xem giải thích ở khai báo type phía trên.
-   *
-   * Tính `nextState` bằng chính `appReducer` (pure function) thay vì đọc `state.spaces` sau
-   * `dispatch()`, vì `dispatch()` chỉ enqueue update — state React chưa cập nhật đồng bộ ngay
-   * trong cùng lượt gọi này. Nhờ vậy không phải chờ effect debounce (vốn chỉ chạy sau khi
-   * React commit re-render) mới biết chính xác dữ liệu cần lưu là gì.
-   */
-  const saveNow = React.useCallback(async (action: AppAction): Promise<{ ok: boolean; error?: string }> => {
-    const nextState = appReducer(state, action);
-    dispatch(action);
-
-    const targetSpace = nextState.spaces.find((s) => s.id === nextState.currentSpaceId);
-
-    if (targetSpace?.isShared && targetSpace.sharedSpaceId) {
-      const sid = targetSpace.sharedSpaceId;
-      const data = sharedSnapshot(targetSpace);
-
-      // Huỷ debounce timer đang chờ của space này — data mới nhất được gửi thẳng ngay bây giờ,
-      // đồng thời cập nhật baseline để effect debounce không tưởng nhầm là "còn thay đổi mới"
-      // rồi bắn thêm 1 lần save trùng lặp ngay sau đó.
-      const existingTimer = sharedSaveTimersRef.current.get(sid);
-      if (existingTimer) {
-        clearTimeout(existingTimer);
-        sharedSaveTimersRef.current.delete(sid);
-      }
-      pendingSharedSavesRef.current.set(sid, data);
-      prevSharedRef.current.set(sid, JSON.stringify(data));
-
-      const ok = await attemptSaveShared(sid);
-      return ok
-        ? { ok: true }
-        : { ok: false, error: 'Không lưu được lên Space chung — kiểm tra kết nối mạng và thử lại.' };
-    }
-
-    // Space cá nhân — modal Thêm/Sửa (Task/Note/Reminder/Habit) chỉ sửa dữ liệu của ĐÚNG Space
-    // đang mở, không sửa settings/Space khác — chỉ lưu ngay 1 hàng `kn_private_spaces` này.
-    if (targetSpace && !targetSpace.isShared) {
-      const sid = targetSpace.id;
-
-      if (targetSpace._privateVersion === undefined) {
-        // Hiếm khi xảy ra (vd bấm "Lưu" ở modal gần như ngay lập tức sau khi vừa tạo Space, trước
-        // khi effect debounce kịp INSERT) — tự INSERT ngay tại đây, KHÔNG debounce, vì saveNow()
-        // cần biết kết quả thật ngay để quyết định đóng modal hay báo lỗi cho user thử lại.
-        if (creatingPrivateRef.current.has(sid)) {
-          // Effect debounce đang tự INSERT song song — tránh bắn thêm 1 lượt INSERT trùng (vi phạm
-          // khoá chính `id`). Coi như dữ liệu vừa dispatch() đã nằm trong action đang chờ xử lý qua
-          // đường effect đó — trả về lạc quan, UI không cần chặn user.
-          return { ok: true };
-        }
-        creatingPrivateRef.current.add(sid);
-        const snapshotAtCreate = JSON.stringify(privateSnapshot(targetSpace));
-        const result = await createPrivateSpace(targetSpace);
-        creatingPrivateRef.current.delete(sid);
-        if (!result.ok) {
-          return { ok: false, error: result.error ?? 'Không lưu được dữ liệu — kiểm tra kết nối mạng và thử lại.' };
-        }
-        prevPrivateRef.current.set(sid, snapshotAtCreate);
-        dispatch({ type: 'SPACE_SET_PRIVATE_VERSION', payload: { id: sid, version: result.version ?? 1 } });
-        return { ok: true };
-      }
-
-      const data = privateSnapshot(targetSpace);
-      const existingTimer = privateSaveTimersRef.current.get(sid);
-      if (existingTimer) {
-        clearTimeout(existingTimer);
-        privateSaveTimersRef.current.delete(sid);
-      }
-      pendingPrivateSavesRef.current.set(sid, data);
-      prevPrivateRef.current.set(sid, JSON.stringify(data));
-
-      const ok = await attemptSavePrivate(sid);
-      return ok
-        ? { ok: true }
-        : { ok: false, error: 'Không lưu được dữ liệu — kiểm tra kết nối mạng và thử lại.' };
-    }
-
-    return { ok: false, error: 'Không tìm thấy Space hiện tại để lưu.' };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state]);
-
   return (
-    <AppStateContext.Provider value={{ state, dispatch: smartDispatch, isLoading, saveNow }}>
+    <AppStateContext.Provider value={{ state, dispatch: smartDispatch, isLoading }}>
       {children}
     </AppStateContext.Provider>
   );
