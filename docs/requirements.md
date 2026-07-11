@@ -31,7 +31,7 @@ Người dùng chấp nhận:
 - **Hosting**: Vercel, domain riêng `kn-space.io.vn`.
 - **Lưu trữ**: Supabase (Postgres), không còn `chrome.storage`.
 - **Đăng nhập**: Google OAuth qua Supabase Auth (không phải magic-link email).
-- **Đồng bộ đa máy**: KHÔNG dùng Supabase Realtime (đã chủ động bỏ ở commit `aa00fae`, 2026-07-01 — gây 5 bug mất dữ liệu, không ổn định, không cần thiết cho tool cá nhân). Cơ chế thật: mỗi lần mở app/tải lại trang, `loadAppState()` đọc bản mới nhất từ Supabase; sửa dữ liệu chỉ lưu lên Supabase (debounce 600ms), không tự đẩy sang máy khác đang mở sẵn — máy B chỉ thấy thay đổi của máy A sau khi tự mở lại/reload.
+- **Đồng bộ đa máy**: KHÔNG dùng Supabase Realtime (đã chủ động bỏ ở commit `aa00fae`, 2026-07-01 — gây 5 bug mất dữ liệu, không ổn định, không cần thiết cho tool cá nhân). Cơ chế thật gồm 2 phần: (1) **load-on-open** — mỗi lần mở app/tải lại trang, `AppStateContext` đọc bản mới nhất từ Supabase (settings qua `loadAppState()`, Space cá nhân/Shared Space qua `loadPrivateSpaces()`/`loadSharedSpaces()`, 5 entity con qua các store riêng — xem mục 10/11); (2) **refresh khi tab quay lại active** (`visibilitychange`, gọi nội bộ "Hướng 2") — tự tải lại Space đang mở khi tab được focus lại, bỏ qua Space đang có thao tác chưa ghi xong để không đè mất dữ liệu vừa sửa cục bộ. Sửa dữ liệu ở máy A không tự đẩy sang máy B đang mở sẵn — máy B chỉ thấy thay đổi sau khi tự mở lại/reload hoặc quay lại tab.
 - **PWA**: có manifest + icon để "Add to Home Screen" trên iOS/Android, mở full-screen như app gốc. **Chưa có service worker/offline-first** — đây là việc cố ý chưa làm ở bước hiện tại, không phải bug.
 - **Responsive desktop/mobile** — *Cập nhật 2026-07-07: mô tả mobile trong mục này đã đối chiếu lại đúng code thật sau đợt UI audit, thay thế mô tả cũ dựa trên breakpoint 639px:*
   - **Ngưỡng chuyển đổi mô hình UI** (toàn bộ Dashboard đổi từ layout cột tự do desktop sang UI mobile "Chat-first") là **~1000px chiều rộng cửa sổ**, không phải `≤639px`: vào mobile khi width `≤999px`, chỉ thoát mobile khi width `≥1010px` (hysteresis 2 mốc khác nhau có chủ đích, chống UI nhảy qua-lại khi resize dao động sát biên giữa 2 mô hình hoàn toàn khác nhau) — xem `src/layout/useMobileLayout.ts`. Đây là ngưỡng chính áp dụng cho mọi mô tả "Responsive desktop/mobile" trong tài liệu này, trừ khi nói rõ là breakpoint Tailwind khác (xem gạch đầu dòng cuối).
@@ -500,17 +500,21 @@ Auth:
 - Không dùng magic-link/email — đã thử trước đó, bỏ vì rate-limit gửi mail của Supabase free tier quá thấp cho UX đăng nhập thực tế.
 
 Lưu trữ (Supabase):
-- 1 bảng `kn_space_state`, **1 hàng/user** (PK = `user_id`), gồm cột `spaces` (jsonb), `current_space_id` (text), `settings` (jsonb), `updated_at`.
-- **Không tách bảng riêng theo task/note/habit/reminder/space** — gộp toàn bộ vào 2 cột jsonb để đơn giản hoá ở quy mô 1-2 người dùng; lý do tách-key 8KB/item của `chrome.storage.sync` (bản extension cũ) không còn áp dụng với Postgres jsonb.
-- RLS bảng `kn_space_state` (Space cá nhân): 4 policy `select/insert/update/delete` đều ràng buộc `auth.uid() = user_id` — mỗi user chỉ đọc/ghi đúng hàng của chính mình. Shared Space (Phase 3, đang code tích cực — xem `docs/features/shared-space.md`) dùng RLS membership-based riêng qua bảng `space_members`, không phải khái niệm này.
-- **Không dùng Supabase Realtime** — đã chủ động bỏ (commit `aa00fae`, 2026-07-01) vì gây bug mất dữ liệu, không cần thiết cho quy mô cá nhân/nhóm nhỏ. Đồng bộ đa máy chỉ qua load-on-open: mở app/reload trang mới đọc bản mới nhất từ Supabase, không có push tức thì khi máy khác đang mở sẵn cùng lúc.
-- Ghi dữ liệu có **debounce 600ms** sau mỗi mutation (note/task/habit/reminder/**log**/space/theme/layout/thứ tự khối) — giữ nguyên cơ chế từ bản extension cũ để tránh ghi network dồn dập theo từng keystroke/tick checkbox.
-- Seed dữ liệu demo (Cá nhân/Công ty) chỉ khi user mới đăng nhập lần đầu, chưa có hàng nào trong `kn_space_state`.
-- Mỗi task có field `order` (số nguyên, dùng cho kéo-thả sắp xếp thủ công) và field `content` (string tuỳ chọn, nội dung chi tiết).
-- **Mới (2026-07-07):** mỗi Space có thêm mảng `logs: LogEntry[]` (Nhật ký nhanh, mục 5.7) — entity mới, immutable, field tối thiểu `id/content/createdBy?/createdAt`, không có `order`/`updatedAt`/`done` (xem schema định hướng đầy đủ tại `docs/features/nhat-ky-nhanh.md` mục Schema). `EnabledBlocks` thêm field `logs`, mất field `today`; `CollapsedBlocks` thêm field `logs`.
-- Lưu thêm `lastScreen` (Home/Dashboard), cấu hình ảnh nền (6 slot — mỗi slot kèm `type`: `url`/`upload` — + chỉ số đang chọn + khoảng tự động đổi ảnh), và cấu hình quote (10 slot nội dung + chỉ số đang chọn + tần suất đổi `quoteRotateMode`: `daily`/`onopen`/`every15m`/`every1h`) trong cột `settings`.
+- **Kiến trúc đã tách bảng theo từng Space + từng entity con** (khác mô tả cũ "1 bảng `kn_space_state` duy nhất, 1 hàng/user, gộp hết Space vào cột `spaces` jsonb" — mô tả đó đã LỖI THỜI, giữ lại chỉ để lịch sử ở `docs/features/storage-architecture-fix.md`/`item-level-entity-tables.md`). Cấu trúc thật hiện tại:
+  - `kn_space_state`: vẫn còn tồn tại nhưng phạm vi đã thu hẹp — **1 hàng/user** (PK = `user_id`), CHỈ còn dùng để lưu `settings` (jsonb). Cột `current_space_id` là cột chết (Space đang mở lưu ở `localStorage`, riêng từng máy, xem `src/storage/localCurrentSpace.ts`); cột `spaces` (jsonb) vẫn còn trên DB nhưng KHÔNG còn được code đọc/ghi (chưa xoá khỏi schema, chờ dọn ở đợt sau).
+  - `kn_private_spaces`: Space CÁ NHÂN, **1 hàng/Space** (không phải 1 hàng/user gộp hết Space như `kn_space_state` cũ) — mỗi hàng có cột `version` + trigger tự tăng riêng, tránh 1 tab giữ bản cũ ghi đè mất toàn bộ Space khác.
+  - `kn_shared_spaces` + `kn_space_members` + `kn_space_invites`: Shared Space (Phase 3) — xem `docs/features/shared-space.md`.
+  - 5 entity con (Việc cần làm/Ghi chú/Thói quen/Nhắc việc/Nhật ký nhanh) đã tách khỏi mảng jsonb trong Space sang bảng riêng theo từng item: `kn_private_<entity>`/`kn_shared_<entity>` (trừ Thói quen chỉ có bản private, KHÔNG có bản Shared) — xem `docs/features/item-level-entity-tables.md`. Cột jsonb tương ứng (`tasks`/`notes`/`habits`/`reminders`/`logs`) trong `kn_private_spaces`/`kn_shared_spaces` VẪN CÒN nhưng chỉ là nhánh ghi dự phòng (dual-write), KHÔNG còn là nguồn đọc thật.
+- RLS: Space cá nhân (`kn_space_state`, `kn_private_spaces`, 5 bảng `kn_private_<entity>`) đều ràng buộc `auth.uid() = user_id` — mỗi user chỉ đọc/ghi đúng hàng của chính mình. Shared Space (`kn_shared_spaces`, `kn_space_members`, 4 bảng `kn_shared_<entity>` — không có Thói quen) dựa trên hàm `is_space_member(space_id)`/`is_space_owner(space_id)` (SECURITY DEFINER, tránh đệ quy RLS) theo membership trong `kn_space_members`, không dùng khái niệm `auth.uid() = user_id`.
+- **Cơ chế ghi: blind last-write-wins, KHÔNG version-check/optimistic-locking** — quyết định đã chốt, xem `docs/features/conflict-handling-simplification.md`. Mọi bảng vẫn có cột `version` + trigger tự tăng vô điều kiện mỗi UPDATE, nhưng tầng application chỉ dùng trigger này để có `updated_at` "miễn phí" — KHÔNG gửi kèm điều kiện `AND version = expected` khi ghi, KHÔNG có logic retry khi phát hiện version lệch.
+- **Không dùng Supabase Realtime** — đã chủ động bỏ (commit `aa00fae`, 2026-07-01) vì gây bug mất dữ liệu, không cần thiết cho quy mô cá nhân/nhóm nhỏ. Đồng bộ đa máy qua 2 cơ chế: load-on-open (mở app/reload trang mới đọc bản mới nhất từ Supabase) và refresh khi tab quay lại active (`visibilitychange`, xem mục 2.1) — không có push tức thì khi máy khác đang mở sẵn cùng lúc.
+- Ghi dữ liệu có **debounce 600ms** sau mỗi mutation (task/note/habit/reminder/log/space/theme/layout/thứ tự khối) — với 5 entity con, debounce theo đơn vị `itemId` (`src/state/itemPersist.ts`, gộp nhiều sửa liên tiếp CÙNG 1 item); với settings/Space/layout, debounce theo kênh riêng (`supabaseStore.ts`/`AppStateContext.tsx`).
+- Seed dữ liệu demo (Cá nhân/Công ty) chỉ khi user mới đăng nhập lần đầu, chưa có hàng settings nào trong `kn_space_state` — Space demo được tạo riêng qua `kn_private_spaces` (không phải cột `spaces` jsonb cũ).
+- Mỗi task/note có field `order` — kéo-thả sắp xếp thủ công dùng **fractional-index** (số thực, không phải số nguyên cũ): 1 lần kéo-thả chỉ tính lại `order` của ĐÚNG 1 item vừa kéo (`src/state/fractionalOrder.ts`), các item khác giữ nguyên giá trị, khác hẳn cách cũ reindex `0..n-1` toàn mảng mỗi lần kéo-thả. Task còn có field `content` (string tuỳ chọn, nội dung chi tiết).
+- **Mới (2026-07-07):** mỗi Space có thêm entity `logs: LogEntry[]` (Nhật ký nhanh, mục 5.7) — entity mới, immutable, field tối thiểu `id/content/createdBy?/createdAt`, không có `order`/`updatedAt`/`done` (xem schema tại `docs/features/item-level-log-schema.sql`, đã gộp vào `supabase/schema.sql`). `EnabledBlocks` thêm field `logs`, mất field `today`; `CollapsedBlocks` thêm field `logs`.
+- Lưu thêm `lastScreen` (Home/Dashboard), cấu hình ảnh nền (6 slot — mỗi slot kèm `type`: `url`/`upload` — + chỉ số đang chọn + khoảng tự động đổi ảnh), và cấu hình quote (10 slot nội dung + chỉ số đang chọn + tần suất đổi `quoteRotateMode`: `daily`/`onopen`/`every15m`/`every1h`) trong cột `settings` của `kn_space_state`.
 - Ảnh upload (base64) lưu trong cùng cột `settings` (jsonb) — **đồng bộ giữa các máy** vì cùng nằm trên Supabase (khác hẳn bản extension cũ, nơi ảnh upload chỉ tồn tại cục bộ trên máy đã upload do giới hạn `chrome.storage.local`).
-- **Mất mạng giữa lúc sửa dữ liệu — quyết định đã chốt:** không cần hàng đợi/retry tự động. Giữ nguyên hành vi hiện tại: `flushSave` lỗi → chỉ hiện banner cảnh báo lưu lỗi, người dùng tự sửa lại (thường chỉ 1 lần) khi có mạng trở lại. Đủ cho quy mô cá nhân hiện tại (1-2 người dùng); không xây thêm cơ chế lưu tạm/queue (xem mục 12).
+- **Mất mạng giữa lúc sửa dữ liệu — quyết định đã chốt:** không cần hàng đợi/retry tự động. Giữ nguyên hành vi hiện tại: lưu lỗi → chỉ hiện banner cảnh báo lưu lỗi, người dùng tự sửa lại (thường chỉ 1 lần) khi có mạng trở lại. Đủ cho quy mô cá nhân hiện tại (1-2 người dùng); không xây thêm cơ chế lưu tạm/queue (xem mục 12).
 
 PWA:
 - `public/manifest.webmanifest`: tên, icon 192/512, `display: standalone`, `theme_color`/`background_color` — đủ để "Add to Home Screen" trên iOS/Android, mở full-screen như app gốc.
@@ -543,11 +547,18 @@ index.html
       AuthContext.tsx
       LoginScreen.tsx
     storage/
-      supabaseStore.ts
+      supabaseStore.ts       # settings (kn_space_state) + điều phối seed
+      privateSpaceStore.ts   # kn_private_spaces (Space cá nhân)
+      sharedSpaceStore.ts    # kn_shared_spaces + kn_space_members/invites
+      taskStore.ts / noteStore.ts / habitStore.ts / reminderStore.ts / logStore.ts
+                              # 5 entity con, mỗi entity 1 bảng private (+ shared, trừ habit)
       normalize.ts
       types.ts
     state/
       AppStateContext.tsx
+      itemPersist.ts          # debounce ghi theo itemId cho 5 entity con
+      reducers/                # tasks/notes/habits/reminders/logs/spaces/settings
+      fractionalOrder.ts       # tính lại `order` khi kéo-thả (không reindex toàn mảng)
       seed.ts
     layout/
       AppLayout.tsx
@@ -571,21 +582,22 @@ index.html
 Vai trò:
 - `index.html` + `src/main.tsx` + `src/App.tsx`: bootstrap web app, gồm cả màn Home.
 - `src/auth/`: Google OAuth qua Supabase, context phiên đăng nhập (`AuthContext`), màn đăng nhập (`LoginScreen`).
-- `src/storage/supabaseStore.ts`: load/seed/save (debounce 600ms), thay hoàn toàn `chromeStorage.ts` cũ. Không có Realtime subscribe (đã bỏ chủ động, xem mục 10).
+- `src/storage/supabaseStore.ts`: chỉ còn load/save `settings` (`kn_space_state`, debounce 600ms) + điều phối seed dữ liệu demo. Space cá nhân/Shared Space/5 entity con đọc/ghi qua các store riêng cùng thư mục (`privateSpaceStore.ts`/`sharedSpaceStore.ts`/`taskStore.ts`/`noteStore.ts`/`habitStore.ts`/`reminderStore.ts`/`logStore.ts`) — thay hoàn toàn `chromeStorage.ts` cũ. Không có Realtime subscribe (đã bỏ chủ động, xem mục 10).
+- `src/state/itemPersist.ts`: điểm gọi duy nhất từ `AppStateContext.tsx` cho mọi mutation của 5 entity con — debounce 600ms theo `itemId` (không phải theo Space), gộp nhiều sửa liên tiếp cùng 1 item trước khi ghi lên bảng item-level tương ứng.
 - `src/layout/`: hệ layout Dashboard tự do (kéo-thả + resize qua splitter), bao gồm logic responsive mobile (ẩn khối, accordion).
 - `src/features/`: UI/logic theo từng khối chức năng (bao gồm Home).
 - `lucide-react`: icon UI line-icon nhất quán trong dashboard.
 - `public/manifest.webmanifest` + `public/icons/`: cấu hình PWA "Add to Home Screen".
-- `supabase/schema.sql`: schema + RLS, chạy 1 lần trên Supabase Dashboard > SQL Editor. File còn 1 dòng `alter publication supabase_realtime add table ...` sót lại từ trước khi bỏ Realtime — vô hại (không ảnh hưởng gì vì không còn code nào subscribe) nhưng có thể dọn sau.
+- `supabase/schema.sql`: schema + RLS đầy đủ (Space cá nhân/chung + 5 entity con item-level), chạy 1 lần trên Supabase Dashboard > SQL Editor để dựng schema từ đầu. Không có dòng `alter publication supabase_realtime add table ...` nào (đã dọn sạch — xem mục 10).
 
 ## 12. Verification
 Dev cần kiểm tra:
 - `npm run build` thành công.
 - Đăng nhập Google OAuth thành công, redirect đúng về app sau khi xác thực.
 - Đăng xuất hoạt động, quay lại màn đăng nhập.
-- User mới (chưa có hàng trong `kn_space_state`) được seed dữ liệu demo đúng, lưu thành công lên Supabase.
+- User mới (chưa có hàng settings trong `kn_space_state`, chưa có Space nào trong `kn_private_spaces`) được seed dữ liệu demo đúng, lưu thành công lên Supabase.
 - User cũ đăng nhập lại trên máy khác thấy đúng dữ liệu đã lưu (đồng bộ qua Supabase).
-- Sửa dữ liệu ở máy A → máy B (cùng tài khoản) thấy đúng thay đổi **sau khi tự reload/mở lại app** — KHÔNG kỳ vọng tự cập nhật khi máy B đang mở sẵn cùng lúc (không có Realtime, xem mục 10).
+- Sửa dữ liệu ở máy A → máy B (cùng tài khoản) thấy đúng thay đổi **sau khi tự reload/mở lại app, hoặc sau khi quay lại tab** (refresh khi tab active lại) — KHÔNG kỳ vọng tự cập nhật ngay lập tức khi máy B đang mở sẵn cùng lúc (không có Realtime, xem mục 10).
 - Mở tab mới hiện đúng màn Home/Dashboard theo `lastScreen` đã lưu.
 - Home: đồng hồ chạy đúng giờ máy, quote/ảnh nền theo đúng tần suất đã chọn, nút "Vào Dashboard" hoạt động kèm phím Enter/Space, Esc từ Dashboard quay lại Home, dòng "X việc cần làm hôm nay" hiện đúng số và ẩn hẳn khi = 0.
 - Ảnh nền lỗi/offline rơi về gradient fallback, không vỡ layout; đổi ảnh có crossfade mượt, không giật.

@@ -1,3 +1,5 @@
+-- ĐÃ GỘP vào supabase/schema.sql (2026-07-11) — chỉ giữ làm lịch sử, KHÔNG chạy lại file này.
+
 -- =============================================================================
 -- KN-Space — Bảng item-level cho Nhật ký nhanh (Log) — Bước 1 (entity đầu tiên)
 -- của kế hoạch tách bảng, xem docs/features/item-level-entity-tables.md và

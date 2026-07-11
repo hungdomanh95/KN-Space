@@ -789,3 +789,720 @@ create index if not exists idx_kn_private_spaces_user_id
 -- tránh phải sort lại toàn bộ ở application layer khi danh sách Space dài.
 create index if not exists idx_kn_private_spaces_user_id_order
   on public.kn_private_spaces (user_id, space_order);
+
+
+-- =============================================================================
+-- ITEM-LEVEL ENTITY TABLES (2026-07-10 → 2026-07-11) — tách 5 entity con
+-- (Log/Habit/Reminder/Task/Note) khỏi mảng jsonb trong kn_private_spaces/
+-- kn_shared_spaces sang bảng riêng theo từng item, mirror CHÍNH XÁC cơ chế
+-- kn_private_spaces/kn_shared_spaces ở trên (version + trigger tự tăng, RLS
+-- theo user_id/is_space_member). Xem docs/features/item-level-entity-tables.md
+-- + -progress.md cho kế hoạch đầy đủ, docs/features/item-level-<entity>-schema.sql
+-- (đã đánh dấu "ĐÃ GỘP") cho lịch sử quyết định thiết kế gốc từng bước.
+--
+-- TRẠNG THÁI TẠI THỜI ĐIỂM VIẾT BLOCK NÀY: cả 5 entity đã tạo bảng thật + đã
+-- migrate dữ liệu cũ + đã bật dual-write (`src/state/itemPersist.ts`, mọi cờ
+-- `<ENTITY>_ITEM_PERSIST_ENABLED = true`) + đã cutover phần ĐỌC (`AppStateContext.tsx`
+-- đọc thẳng từ 10 bảng dưới đây, KHÔNG còn đọc cột jsonb tương ứng). Nhánh ghi
+-- vào cột jsonb cũ (`tasks`/`reminders`/`habits`/`notes`/`logs` trong
+-- kn_private_spaces/kn_shared_spaces) VẪN CHẠY SONG SONG làm lưới an toàn, chưa
+-- tắt hẳn — chưa xoá cột jsonb khỏi 2 bảng Space.
+--
+-- Quyết định thiết kế chung (Phương án B — 2 bảng tách riêng theo loại Space,
+-- KHÔNG polymorphic FK, xem item-level-entity-tables.md mục 3.2/3.4 + mục 10):
+--   - `id` uuid mỗi bảng — CLIENT tự sinh (`crypto.randomUUID()`), KHÔNG default
+--     `gen_random_uuid()` — giữ nguyên định danh item qua migration.
+--   - `space_id` — FK duy nhất trỏ về ĐÚNG 1 bảng cha (kn_private_spaces cho
+--     bảng private, kn_shared_spaces cho bảng shared), `on delete cascade`.
+--   - `user_id` (CHỈ có ở bảng private) — cột RLS trực tiếp, KHÔNG join qua
+--     kn_private_spaces. Bảng shared quyền check qua `is_space_member(space_id)`
+--     (SECURITY DEFINER, tránh đệ quy RLS).
+--   - `version`/trigger `*_before_update` — mọi bảng CÓ cột `version` + trigger
+--     tự tăng vô điều kiện mỗi UPDATE (cho `updated_at` "miễn phí"), nhưng tầng
+--     app ghi thẳng blind write (`WHERE id = itemId`, KHÔNG kèm
+--     `AND version = expected`), KHÔNG version-check/retry — quyết định đã chốt
+--     2026-07-10, xem docs/features/conflict-handling-simplification.md mục 4.3.
+--   - Habit KHÔNG có bản Shared (chỉ `kn_private_habits`) — Habit block ẩn hoàn
+--     toàn ở Shared Space (xem mục Shared Space phía trên). 4 entity còn lại
+--     (Log/Reminder/Task/Note) đều có cặp bảng private + shared.
+-- =============================================================================
+
+
+-- =============================================================================
+-- BẢNG: kn_private_logs / kn_shared_logs — Nhật ký nhanh (Log), item-level Bước 1
+-- =============================================================================
+-- Riêng entity này:
+--   - `created_by` (uuid, NULL được) — "ai viết log này" (chỉ có ý nghĩa hiển
+--     thị avatar ở Shared Space, xem `LogEntry.createdBy` trong `src/types.ts`),
+--     KHÔNG dùng cho RLS. `on delete set null` — xoá 1 user không nên kéo theo
+--     xoá log người khác đang xem trong Shared Space.
+--   - `content`, `expense_date`, `category_override`, `excluded` — khớp
+--     `LogEntry` (`src/types.ts`). 3 field expense là phần MỞ RỘNG sau
+--     (docs/features/quan-ly-chi-tieu.md), optional/NULL = "chưa đặt", tầng app
+--     tự áp default khi đọc (xem `logStore.ts` rowToLog()).
+--   - `created_at` — dùng THẲNG làm nguồn `LogEntry.createdAt` (KHÔNG có cột
+--     `createdAt` riêng ở tầng app). Có `default now()` làm lưới an toàn (phòng
+--     code quên set), NHƯNG mọi lượt CREATE/migration/import THẬT SỰ PHẢI gửi
+--     kèm giá trị tường minh (`logStore.ts` luôn set `created_at = log.createdAt`)
+--     — KHÔNG được để DB tự sinh `now()` khi migrate log cũ, nếu không sẽ mất
+--     mốc thời gian gốc của log đã tạo từ trước.
+--   - Không có cột `order` — Log sort thuần theo `created_at`, không có kéo-thả
+--     thủ công (khác Task/Note — cần fractional-index).
+-- =============================================================================
+
+create table if not exists public.kn_private_logs (
+  id                 uuid primary key,
+  space_id           uuid not null references public.kn_private_spaces (id) on delete cascade,
+  user_id            uuid not null references auth.users (id) on delete cascade,
+  content            text not null,
+  created_by         uuid null references auth.users (id) on delete set null,
+  expense_date       text null,
+  category_override  text null,
+  excluded           boolean null,
+  version            bigint not null default 1,
+  created_at         timestamptz not null default now(),
+  updated_at         timestamptz not null default now()
+);
+
+alter table public.kn_private_logs enable row level security;
+
+create or replace function public.kn_private_logs_before_update()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at := now();
+  new.version    := old.version + 1;
+  return new;
+end;
+$$;
+
+create trigger kn_private_logs_before_update
+  before update on public.kn_private_logs
+  for each row execute function public.kn_private_logs_before_update();
+
+-- RLS: giống hệt kn_private_spaces — không có khái niệm chia sẻ, mỗi user chỉ
+-- đọc/ghi đúng hàng có user_id = chính mình.
+create policy "select own private logs" on public.kn_private_logs
+  for select using (auth.uid() = user_id);
+
+create policy "insert own private logs" on public.kn_private_logs
+  for insert with check (auth.uid() = user_id);
+
+create policy "update own private logs" on public.kn_private_logs
+  for update using (auth.uid() = user_id);
+
+create policy "delete own private logs" on public.kn_private_logs
+  for delete using (auth.uid() = user_id);
+
+-- Truy vấn chính: load toàn bộ log của 1 Space, sort theo created_at.
+create index if not exists idx_kn_private_logs_space_id
+  on public.kn_private_logs (space_id);
+
+create index if not exists idx_kn_private_logs_space_id_created_at
+  on public.kn_private_logs (space_id, created_at);
+
+
+create table if not exists public.kn_shared_logs (
+  id                 uuid primary key,
+  space_id           uuid not null references public.kn_shared_spaces (id) on delete cascade,
+  content            text not null,
+  created_by         uuid null references auth.users (id) on delete set null,
+  expense_date       text null,
+  category_override  text null,
+  excluded           boolean null,
+  version            bigint not null default 1,
+  created_at         timestamptz not null default now(),
+  updated_at         timestamptz not null default now()
+);
+
+alter table public.kn_shared_logs enable row level security;
+
+create or replace function public.kn_shared_logs_before_update()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at := now();
+  new.version    := old.version + 1;
+  return new;
+end;
+$$;
+
+create trigger kn_shared_logs_before_update
+  before update on public.kn_shared_logs
+  for each row execute function public.kn_shared_logs_before_update();
+
+-- RLS: dùng is_space_member()/is_space_owner() (SECURITY DEFINER, đã có sẵn ở
+-- trên) để tránh đệ quy RLS — mirror CHÍNH XÁC "shared_spaces_*_for_member" của
+-- kn_shared_spaces. Mọi member (không chỉ owner) được sửa/xoá log của người
+-- khác trong CÙNG space — đúng hành vi cũ (mảng jsonb dùng chung, ai cũng
+-- sửa/xoá được bất kỳ item nào), KHÔNG có giới hạn quyền theo người tạo (ngoài
+-- phạm vi, xem docs/features/conflict-handling-simplification.md mục 5).
+create policy "shared_logs_select_for_member"
+  on public.kn_shared_logs
+  for select
+  using (is_space_member(space_id));
+
+create policy "shared_logs_insert_for_member"
+  on public.kn_shared_logs
+  for insert
+  with check (auth.uid() is not null and is_space_member(space_id));
+
+create policy "shared_logs_update_for_member"
+  on public.kn_shared_logs
+  for update
+  using (is_space_member(space_id));
+
+create policy "shared_logs_delete_for_member"
+  on public.kn_shared_logs
+  for delete
+  using (is_space_member(space_id));
+
+create index if not exists idx_kn_shared_logs_space_id
+  on public.kn_shared_logs (space_id);
+
+create index if not exists idx_kn_shared_logs_space_id_created_at
+  on public.kn_shared_logs (space_id, created_at);
+
+
+-- =============================================================================
+-- BẢNG: kn_private_habits — Thói quen (Habit), item-level Bước 2 (KHÔNG có bản Shared)
+-- =============================================================================
+-- KHÁC kn_private_logs/kn_shared_logs — Habit KHÔNG có bản Shared: CHỈ 1 bảng
+-- `kn_private_habits`, không có `kn_shared_habits`. Habit block bị ẩn hoàn toàn
+-- ở Shared Space (Shared Space không lưu `habits`, `enabled_blocks` mặc định ép
+-- `habits: false`, `sharedSpaceStore.ts` ép cứng `habits: []` bất kể DB lưu gì).
+--
+-- Riêng entity này:
+--   - `title`, `completed_dates` (jsonb, mảng `yyyy-mm-dd`, giữ nguyên kiểu cũ —
+--     khớp `Habit.completedDates` trong `src/types.ts`).
+--   - Không có cột `order` — Habit giữ nguyên thứ tự mảng khi tạo (push vào
+--     cuối), KHÔNG có kéo-thả thủ công. Load sort theo `created_at` tăng dần để
+--     giữ đúng thứ tự tạo.
+--   - `created_at` — có `default now()`, tầng app (`habitStore.ts`) KHÔNG cần
+--     set tường minh khi tạo mới (khác Log — Habit không có field `createdAt`
+--     hiển thị ở FE, cột này chỉ dùng nội bộ để sort đúng thứ tự tạo).
+-- =============================================================================
+
+create table if not exists public.kn_private_habits (
+  id                 uuid primary key,
+  space_id           uuid not null references public.kn_private_spaces (id) on delete cascade,
+  user_id            uuid not null references auth.users (id) on delete cascade,
+  title              text not null,
+  completed_dates    jsonb not null default '[]'::jsonb,
+  version            bigint not null default 1,
+  created_at         timestamptz not null default now(),
+  updated_at         timestamptz not null default now()
+);
+
+alter table public.kn_private_habits enable row level security;
+
+create or replace function public.kn_private_habits_before_update()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at := now();
+  new.version    := old.version + 1;
+  return new;
+end;
+$$;
+
+create trigger kn_private_habits_before_update
+  before update on public.kn_private_habits
+  for each row execute function public.kn_private_habits_before_update();
+
+-- RLS: giống hệt kn_private_spaces/kn_private_logs — không có khái niệm chia
+-- sẻ, mỗi user chỉ đọc/ghi đúng hàng có user_id = chính mình.
+create policy "select own private habits" on public.kn_private_habits
+  for select using (auth.uid() = user_id);
+
+create policy "insert own private habits" on public.kn_private_habits
+  for insert with check (auth.uid() = user_id);
+
+create policy "update own private habits" on public.kn_private_habits
+  for update using (auth.uid() = user_id);
+
+create policy "delete own private habits" on public.kn_private_habits
+  for delete using (auth.uid() = user_id);
+
+-- Truy vấn chính: load toàn bộ habit của 1 Space, sort theo created_at.
+create index if not exists idx_kn_private_habits_space_id
+  on public.kn_private_habits (space_id);
+
+create index if not exists idx_kn_private_habits_space_id_created_at
+  on public.kn_private_habits (space_id, created_at);
+
+
+-- =============================================================================
+-- BẢNG: kn_private_reminders / kn_shared_reminders — Nhắc việc (Reminder), item-level Bước 3
+-- =============================================================================
+-- Riêng entity này:
+--   - Reminder KHÔNG có field `createdBy` ở tầng app (`ReminderOnce`/
+--     `ReminderRecurring` không có field này, khác Task/Note/Log) — vì vậy 2
+--     bảng dưới đây KHÔNG có cột `created_by`.
+--   - `reminder_type` ('once' | 'recurring'), `title` — khớp
+--     `ReminderDefinition` (`src/types.ts`).
+--   - `date` (text, null được) — CHỈ có ý nghĩa với `type = 'once'`. Luôn NULL
+--     với `type = 'recurring'` (tầng app tự null tường minh khi ghi).
+--   - `time` (text, not null default '') — dùng ở CẢ 2 type, luôn là string
+--     không optional ở tầng app ('' = "không đặt giờ"), không cần nullable.
+--   - `freq_n` (integer, null được), `freq_unit` (text, null được, check trong
+--     ('hour','day','month')), `day_of_month` (integer, null được) — CHỈ có ý
+--     nghĩa với `type = 'recurring'`. Luôn NULL với `type = 'once'`.
+--   - `created_at` — dùng THẲNG làm nguồn `ReminderRecurring.createdAt` (MỐC
+--     TÍNH CHU KỲ lặp lại — giữ nguyên qua mọi lần sửa nếu vẫn 'recurring', làm
+--     mới thành "now" nếu vừa chuyển từ 'once' sang 'recurring'). Với `type =
+--     'once'`, cột này KHÔNG mang ý nghĩa tính toán gì, tầng app KHÔNG set
+--     tường minh khi ghi (giữ nguyên giá trị gốc lúc INSERT lần đầu). Có
+--     `default now()` làm lưới an toàn, NHƯNG mọi lượt CREATE/UPDATE (khi
+--     type='recurring')/migration THẬT SỰ PHẢI gửi kèm giá trị tường minh —
+--     KHÔNG được để DB tự sinh `now()` cho reminder recurring, nếu không sẽ làm
+--     sai lệch mốc tính chu kỳ (đặc biệt chu kỳ theo "Giờ" — neo theo đúng
+--     giờ:phút lúc tạo, xem `supabase/functions/send-due-notifications/index.ts`).
+--   - Không có cột `order` — Reminder KHÔNG có kéo-thả thủ công, luôn unshift
+--     vào ĐẦU mảng khi tạo — load sort theo `created_at` GIẢM DẦN (mới nhất
+--     trước) để khớp đúng hành vi hiển thị cũ — NGƯỢC HƯỚNG với
+--     kn_private_logs/kn_private_habits (2 bảng đó sort TĂNG DẦN vì Log/Habit
+--     lần lượt append/push vào CUỐI mảng).
+-- =============================================================================
+
+create table if not exists public.kn_private_reminders (
+  id                 uuid primary key,
+  space_id           uuid not null references public.kn_private_spaces (id) on delete cascade,
+  user_id            uuid not null references auth.users (id) on delete cascade,
+  reminder_type      text not null check (reminder_type in ('once', 'recurring')),
+  title              text not null,
+  date               text null,
+  time               text not null default '',
+  freq_n             integer null,
+  freq_unit          text null check (freq_unit in ('hour', 'day', 'month')),
+  day_of_month       integer null,
+  version            bigint not null default 1,
+  created_at         timestamptz not null default now(),
+  updated_at         timestamptz not null default now()
+);
+
+alter table public.kn_private_reminders enable row level security;
+
+create or replace function public.kn_private_reminders_before_update()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at := now();
+  new.version    := old.version + 1;
+  return new;
+end;
+$$;
+
+create trigger kn_private_reminders_before_update
+  before update on public.kn_private_reminders
+  for each row execute function public.kn_private_reminders_before_update();
+
+-- RLS: giống hệt kn_private_spaces/kn_private_logs — không có khái niệm chia
+-- sẻ, mỗi user chỉ đọc/ghi đúng hàng có user_id = chính mình.
+create policy "select own private reminders" on public.kn_private_reminders
+  for select using (auth.uid() = user_id);
+
+create policy "insert own private reminders" on public.kn_private_reminders
+  for insert with check (auth.uid() = user_id);
+
+create policy "update own private reminders" on public.kn_private_reminders
+  for update using (auth.uid() = user_id);
+
+create policy "delete own private reminders" on public.kn_private_reminders
+  for delete using (auth.uid() = user_id);
+
+-- Truy vấn chính: load toàn bộ reminder của 1 Space, sort theo created_at.
+create index if not exists idx_kn_private_reminders_space_id
+  on public.kn_private_reminders (space_id);
+
+create index if not exists idx_kn_private_reminders_space_id_created_at
+  on public.kn_private_reminders (space_id, created_at);
+
+
+create table if not exists public.kn_shared_reminders (
+  id                 uuid primary key,
+  space_id           uuid not null references public.kn_shared_spaces (id) on delete cascade,
+  reminder_type      text not null check (reminder_type in ('once', 'recurring')),
+  title              text not null,
+  date               text null,
+  time               text not null default '',
+  freq_n             integer null,
+  freq_unit          text null check (freq_unit in ('hour', 'day', 'month')),
+  day_of_month       integer null,
+  version            bigint not null default 1,
+  created_at         timestamptz not null default now(),
+  updated_at         timestamptz not null default now()
+);
+
+alter table public.kn_shared_reminders enable row level security;
+
+create or replace function public.kn_shared_reminders_before_update()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at := now();
+  new.version    := old.version + 1;
+  return new;
+end;
+$$;
+
+create trigger kn_shared_reminders_before_update
+  before update on public.kn_shared_reminders
+  for each row execute function public.kn_shared_reminders_before_update();
+
+-- RLS: dùng is_space_member()/is_space_owner() — mirror CHÍNH XÁC
+-- "shared_logs_*_for_member" của kn_shared_logs. Mọi member (không chỉ owner)
+-- được sửa/xoá reminder của người khác trong CÙNG space — đúng hành vi cũ,
+-- KHÔNG có giới hạn quyền theo người tạo (Reminder không có field `createdBy`
+-- ở tầng app, không có khái niệm "người tạo" để giới hạn).
+create policy "shared_reminders_select_for_member"
+  on public.kn_shared_reminders
+  for select
+  using (is_space_member(space_id));
+
+create policy "shared_reminders_insert_for_member"
+  on public.kn_shared_reminders
+  for insert
+  with check (auth.uid() is not null and is_space_member(space_id));
+
+create policy "shared_reminders_update_for_member"
+  on public.kn_shared_reminders
+  for update
+  using (is_space_member(space_id));
+
+create policy "shared_reminders_delete_for_member"
+  on public.kn_shared_reminders
+  for delete
+  using (is_space_member(space_id));
+
+create index if not exists idx_kn_shared_reminders_space_id
+  on public.kn_shared_reminders (space_id);
+
+create index if not exists idx_kn_shared_reminders_space_id_created_at
+  on public.kn_shared_reminders (space_id, created_at);
+
+
+-- =============================================================================
+-- BẢNG: kn_private_tasks / kn_shared_tasks — Việc cần làm (Task), item-level Bước 4
+-- =============================================================================
+-- Riêng entity này:
+--   - `id` — quan trọng: Task còn được dùng làm deep-link trong notify Shared
+--     Space (xem docs/features/shared-space-task-assign-notify.md) — id KHÔNG
+--     được đổi qua migration.
+--   - `created_by` (uuid, NULL được) — "ai giao/tạo task này" (chỉ có ý nghĩa
+--     hiển thị avatar ở Shared Space, xem `Task.createdBy`), KHÔNG dùng cho
+--     RLS. `on delete set null`.
+--   - `title`, `content`, `task_date`, `task_time`, `done` — khớp `Task`
+--     (`src/types.ts`). Cả 4 field text đều KHÔNG optional ở tầng app (rỗng ''
+--     = "chưa đặt", CHỨ KHÔNG PHẢI null) — NOT NULL DEFAULT ''.
+--   - `item_order` (double precision, NOT NULL, KHÔNG có default) —
+--     fractional-index (xem item-level-entity-tables.md mục 5): kéo-thả chỉ
+--     tính lại `item_order` của ĐÚNG 1 task vừa kéo (`computeOrderForInsertAt()`,
+--     `src/state/fractionalOrder.ts`), các task khác giữ nguyên — khác hẳn
+--     `order` kiểu integer cũ (reindex `0..n-1` toàn mảng mỗi lần kéo-thả).
+--     Migration giữ NGUYÊN giá trị `order` cũ (số nguyên hiện có) làm giá trị
+--     fractional ban đầu.
+--   - `assignee_ids` (jsonb, NOT NULL DEFAULT '[]') — GIỮ NGUYÊN kiểu jsonb
+--     (KHÔNG đổi sang `uuid[]`, dự án chưa có tiền lệ cột mảng kiểu đó, không
+--     có nhu cầu query server-side theo assignee hiện tại).
+--   - `created_at` (timestamptz, NULL ĐƯỢC, KHÔNG có default) — khác hẳn
+--     kn_private_logs/kn_private_reminders (NOT NULL DEFAULT now()):
+--     `Task.createdAt` là field THẬT SỰ OPTIONAL ở tầng app (`createdAt?: string`)
+--     — Task tạo TRƯỚC khi field này ra đời hoàn toàn có thể THIẾU field này
+--     thật sự, và điều đó có Ý NGHĨA KHÁC với "vừa tạo bây giờ" — dùng để sort
+--     trong `MobileChatScreen.tsx` (item thiếu `createdAt` bị coi là "rất cũ",
+--     xếp lên đầu). Nếu cột này NOT NULL DEFAULT now(), 1 task cũ migrate thiếu
+--     field sẽ vô tình được gán "vừa tạo bây giờ", sai lệch thứ tự hiển thị
+--     trong màn Trò chuyện (mobile). Vì vậy: migration/tạo mới CHỈ set
+--     `created_at` khi `Task.createdAt` có giá trị thật, bỏ hẳn field này khi
+--     task KHÔNG có `createdAt` (xem `taskStore.ts` `toInsertRow`).
+-- =============================================================================
+
+create table if not exists public.kn_private_tasks (
+  id                 uuid primary key,
+  space_id           uuid not null references public.kn_private_spaces (id) on delete cascade,
+  user_id            uuid not null references auth.users (id) on delete cascade,
+  title              text not null,
+  content            text not null default '',
+  task_date          text not null default '',
+  task_time          text not null default '',
+  done               boolean not null default false,
+  item_order         double precision not null,
+  created_by         uuid null references auth.users (id) on delete set null,
+  assignee_ids       jsonb not null default '[]'::jsonb,
+  created_at         timestamptz null,
+  version            bigint not null default 1,
+  updated_at         timestamptz not null default now()
+);
+
+alter table public.kn_private_tasks enable row level security;
+
+create or replace function public.kn_private_tasks_before_update()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at := now();
+  new.version    := old.version + 1;
+  return new;
+end;
+$$;
+
+create trigger kn_private_tasks_before_update
+  before update on public.kn_private_tasks
+  for each row execute function public.kn_private_tasks_before_update();
+
+-- RLS: giống hệt kn_private_spaces/kn_private_logs/kn_private_reminders —
+-- không có khái niệm chia sẻ, mỗi user chỉ đọc/ghi đúng hàng có
+-- user_id = chính mình.
+create policy "select own private tasks" on public.kn_private_tasks
+  for select using (auth.uid() = user_id);
+
+create policy "insert own private tasks" on public.kn_private_tasks
+  for insert with check (auth.uid() = user_id);
+
+create policy "update own private tasks" on public.kn_private_tasks
+  for update using (auth.uid() = user_id);
+
+create policy "delete own private tasks" on public.kn_private_tasks
+  for delete using (auth.uid() = user_id);
+
+-- Truy vấn chính: load toàn bộ task của 1 Space, sort theo item_order.
+create index if not exists idx_kn_private_tasks_space_id
+  on public.kn_private_tasks (space_id);
+
+create index if not exists idx_kn_private_tasks_space_id_item_order
+  on public.kn_private_tasks (space_id, item_order);
+
+
+create table if not exists public.kn_shared_tasks (
+  id                 uuid primary key,
+  space_id           uuid not null references public.kn_shared_spaces (id) on delete cascade,
+  title              text not null,
+  content            text not null default '',
+  task_date          text not null default '',
+  task_time          text not null default '',
+  done               boolean not null default false,
+  item_order         double precision not null,
+  created_by         uuid null references auth.users (id) on delete set null,
+  assignee_ids       jsonb not null default '[]'::jsonb,
+  created_at         timestamptz null,
+  version            bigint not null default 1,
+  updated_at         timestamptz not null default now()
+);
+
+alter table public.kn_shared_tasks enable row level security;
+
+create or replace function public.kn_shared_tasks_before_update()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at := now();
+  new.version    := old.version + 1;
+  return new;
+end;
+$$;
+
+create trigger kn_shared_tasks_before_update
+  before update on public.kn_shared_tasks
+  for each row execute function public.kn_shared_tasks_before_update();
+
+-- RLS: dùng is_space_member()/is_space_owner() — mirror CHÍNH XÁC
+-- "shared_reminders_*_for_member" của kn_shared_reminders. Mọi member (không
+-- chỉ owner) được sửa/xoá task của người khác trong CÙNG space — đúng hành vi
+-- cũ, KHÔNG có giới hạn quyền theo người tạo.
+create policy "shared_tasks_select_for_member"
+  on public.kn_shared_tasks
+  for select
+  using (is_space_member(space_id));
+
+create policy "shared_tasks_insert_for_member"
+  on public.kn_shared_tasks
+  for insert
+  with check (auth.uid() is not null and is_space_member(space_id));
+
+create policy "shared_tasks_update_for_member"
+  on public.kn_shared_tasks
+  for update
+  using (is_space_member(space_id));
+
+create policy "shared_tasks_delete_for_member"
+  on public.kn_shared_tasks
+  for delete
+  using (is_space_member(space_id));
+
+create index if not exists idx_kn_shared_tasks_space_id
+  on public.kn_shared_tasks (space_id);
+
+create index if not exists idx_kn_shared_tasks_space_id_item_order
+  on public.kn_shared_tasks (space_id, item_order);
+
+
+-- =============================================================================
+-- BẢNG: kn_private_notes / kn_shared_notes — Ghi chú (Note), item-level Bước 5 (cuối cùng)
+-- =============================================================================
+-- Riêng entity này:
+--   - `title`, `content`, `color` — khớp `Note` (`src/types.ts`), text NOT
+--     NULL. `title` không có default (reducer luôn trim/fallback 'Note chưa
+--     đặt tên' trước khi lưu, không bao giờ rỗng thật). `content`/`color` NOT
+--     NULL DEFAULT '' (phòng thủ, dù reducer cũng luôn set giá trị thật).
+--   - `hidden` (boolean, NOT NULL DEFAULT false) — "ẩn nội dung" (note bảo mật,
+--     xem `NOTE_TOGGLE_CONTENT_HIDDEN`) — persist để giữ trạng thái ẩn sau
+--     reload, KHÔNG liên quan gì tới mốc sửa nội dung (xem giải thích cột
+--     `content_updated_at` bên dưới).
+--   - `item_order` (double precision, NOT NULL, KHÔNG có default) —
+--     fractional-index, mirror CHÍNH XÁC kn_private_tasks/kn_shared_tasks.
+--     Migration giữ NGUYÊN giá trị `order` cũ làm giá trị fractional ban đầu.
+--   - `created_at` (timestamptz, NULL ĐƯỢC, KHÔNG có default) — mirror
+--     kn_private_tasks/kn_shared_tasks: `Note.createdAt` là field THẬT SỰ
+--     OPTIONAL ở tầng app, note tạo TRƯỚC khi field này ra đời hoàn toàn có thể
+--     THIẾU field này thật sự — dùng để sort trong `MobileChatScreen.tsx` (item
+--     thiếu `createdAt` bị coi là "rất cũ", xếp lên đầu). Migration/tạo mới
+--     CHỈ set `created_at` khi `Note.createdAt` có giá trị thật (xem
+--     `noteStore.ts` `toInsertRow`).
+--   - **`content_updated_at` (double precision, NOT NULL, KHÔNG có default) —
+--     cột RIÊNG, TÁCH KHỎI trigger `updated_at` nội bộ, chỉ tầng APP set tường
+--     minh. LÝ DO (rủi ro thiết kế đã xác định trước khi tạo bảng):**
+--     `Note.updatedAt` (`src/types.ts`, epoch ms) là mốc "sửa nội dung lần
+--     cuối" — hiển thị cho user ("đã sửa lúc...") VÀ dùng để sort "Mới sửa gần
+--     nhất" (`NotesBlock.tsx`). Ở tầng reducer (`state/reducers/notes.ts`),
+--     field này CHỈ đổi ở `NOTE_CREATE`/`NOTE_UPDATE` — KHÔNG đổi khi kéo-thả
+--     (`NOTE_REORDER`) hay ẩn/hiện (`NOTE_TOGGLE_CONTENT_HIDDEN`). Nếu dùng
+--     thẳng cột `updated_at` do trigger `*_before_update` tự bump VÔ ĐIỀU KIỆN
+--     mỗi lần UPDATE (cách Log/Reminder/Task làm cho field tương ứng của họ —
+--     2 khái niệm trùng nhau ở các entity đó), 1 lần kéo-thả hoặc ẩn/hiện 1
+--     note sẽ VÔ TÌNH đổi "đã sửa lúc..." hiển thị cho user và làm SAI thứ tự
+--     sort "Mới sửa gần nhất" — đây là REGRESSION thật so với hành vi cũ
+--     (jsonb), PHẢI TRÁNH. Giải pháp: cột `content_updated_at` này CHỈ được
+--     `noteStore.ts` set tường minh khi ghi `NOTE_CREATE`/`NOTE_UPDATE` (map
+--     thẳng `Note.updatedAt` -> `content_updated_at`, KHÔNG qua `Date`/ISO
+--     string — cả 2 đều epoch ms number), KHÔNG đụng khi ghi `NOTE_REORDER`
+--     (chỉ patch `item_order`)/`NOTE_TOGGLE_CONTENT_HIDDEN` (chỉ patch
+--     `hidden`). Cột `updated_at` (trigger nội bộ, mirror các bảng khác —
+--     "miễn phí") VẪN GIỮ trên DB nhưng KHÔNG được tầng app đọc/dùng để suy ra
+--     `Note.updatedAt` — chỉ có ý nghĩa nội bộ (audit "hàng này được UPDATE lần
+--     cuối lúc nào trên DB", không phải "nội dung note được sửa lúc nào").
+-- =============================================================================
+
+create table if not exists public.kn_private_notes (
+  id                   uuid primary key,
+  space_id             uuid not null references public.kn_private_spaces (id) on delete cascade,
+  user_id              uuid not null references auth.users (id) on delete cascade,
+  title                text not null,
+  content              text not null default '',
+  color                text not null default '',
+  hidden               boolean not null default false,
+  item_order           double precision not null,
+  created_by           uuid null references auth.users (id) on delete set null,
+  created_at           timestamptz null,
+  content_updated_at   double precision not null,
+  version              bigint not null default 1,
+  updated_at           timestamptz not null default now()
+);
+
+alter table public.kn_private_notes enable row level security;
+
+create or replace function public.kn_private_notes_before_update()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at := now();
+  new.version    := old.version + 1;
+  return new;
+end;
+$$;
+
+create trigger kn_private_notes_before_update
+  before update on public.kn_private_notes
+  for each row execute function public.kn_private_notes_before_update();
+
+-- RLS: giống hệt kn_private_spaces/kn_private_tasks — không có khái niệm chia
+-- sẻ, mỗi user chỉ đọc/ghi đúng hàng có user_id = chính mình.
+create policy "select own private notes" on public.kn_private_notes
+  for select using (auth.uid() = user_id);
+
+create policy "insert own private notes" on public.kn_private_notes
+  for insert with check (auth.uid() = user_id);
+
+create policy "update own private notes" on public.kn_private_notes
+  for update using (auth.uid() = user_id);
+
+create policy "delete own private notes" on public.kn_private_notes
+  for delete using (auth.uid() = user_id);
+
+-- Truy vấn chính: load toàn bộ note của 1 Space, sort theo item_order.
+create index if not exists idx_kn_private_notes_space_id
+  on public.kn_private_notes (space_id);
+
+create index if not exists idx_kn_private_notes_space_id_item_order
+  on public.kn_private_notes (space_id, item_order);
+
+
+create table if not exists public.kn_shared_notes (
+  id                   uuid primary key,
+  space_id             uuid not null references public.kn_shared_spaces (id) on delete cascade,
+  title                text not null,
+  content              text not null default '',
+  color                text not null default '',
+  hidden               boolean not null default false,
+  item_order           double precision not null,
+  created_by           uuid null references auth.users (id) on delete set null,
+  created_at           timestamptz null,
+  content_updated_at   double precision not null,
+  version              bigint not null default 1,
+  updated_at           timestamptz not null default now()
+);
+
+alter table public.kn_shared_notes enable row level security;
+
+create or replace function public.kn_shared_notes_before_update()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at := now();
+  new.version    := old.version + 1;
+  return new;
+end;
+$$;
+
+create trigger kn_shared_notes_before_update
+  before update on public.kn_shared_notes
+  for each row execute function public.kn_shared_notes_before_update();
+
+-- RLS: dùng is_space_member() — mirror CHÍNH XÁC "shared_tasks_*_for_member"
+-- của kn_shared_tasks. Mọi member (không chỉ owner) được sửa/xoá note của
+-- người khác trong CÙNG space — đúng hành vi cũ, KHÔNG có giới hạn quyền theo
+-- người tạo.
+create policy "shared_notes_select_for_member"
+  on public.kn_shared_notes
+  for select
+  using (is_space_member(space_id));
+
+create policy "shared_notes_insert_for_member"
+  on public.kn_shared_notes
+  for insert
+  with check (auth.uid() is not null and is_space_member(space_id));
+
+create policy "shared_notes_update_for_member"
+  on public.kn_shared_notes
+  for update
+  using (is_space_member(space_id));
+
+create policy "shared_notes_delete_for_member"
+  on public.kn_shared_notes
+  for delete
+  using (is_space_member(space_id));
+
+create index if not exists idx_kn_shared_notes_space_id
+  on public.kn_shared_notes (space_id);
+
+create index if not exists idx_kn_shared_notes_space_id_item_order
+  on public.kn_shared_notes (space_id, item_order);
