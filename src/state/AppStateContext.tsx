@@ -33,13 +33,19 @@ import {
   computeTaskToggleDoneNotifyEffect,
 } from './sharedTaskNotifyEffects';
 import {
+  flushAllPendingHabitPersist,
   flushAllPendingLogPersist,
+  HABIT_ITEM_PERSIST_ENABLED,
+  handleHabitActionForPersist,
   handleLogActionForPersist,
+  hasPendingHabitsForSpace,
   hasPendingLogsForSpace,
+  isHabitAction,
   isLogAction,
   LOG_ITEM_PERSIST_ENABLED,
 } from './itemPersist';
 import { loadPrivateLogs, loadSharedLogs } from '../storage/logStore';
+import { loadPrivateHabits } from '../storage/habitStore';
 
 interface AppStateContextValue {
   state: AppState;
@@ -126,6 +132,45 @@ async function hydrateItemLevelLogs(
   );
 }
 
+/**
+ * Giai đoạn B (Habit, item-level-entity-tables-progress.md, Bước 2) — mirror CHÍNH XÁC
+ * `hydrateItemLevelLogs()` ở trên: tải Habit của TỪNG Space cá nhân từ bảng item-level mới
+ * (`kn_private_habits`, qua `habitStore.ts`), gán đè `space.habits` (thay cho mảng jsonb cũ) làm
+ * nguồn ĐỌC thật. Chạy song song cho mọi Space qua `Promise.all` — lỗi tải riêng 1 Space KHÔNG
+ * throw/chặn Space khác, fallback dùng đúng `space.habits` jsonb đã có sẵn cho Space đó.
+ *
+ * Khác `hydrateItemLevelLogs()` ở đúng 1 điểm: Habit KHÔNG tồn tại ở Shared Space (không có bảng
+ * `kn_shared_habits`) — mọi Space có `isShared === true` được bỏ qua vô điều kiện (giữ nguyên
+ * `habits`/`enabledBlocks.habits` ép cứng bởi `sharedSpaceStore.ts`, không đụng).
+ *
+ * `shouldSkip(space)` — mirror Log — dùng ở `refreshStaleSpaces()` để bỏ qua Space đang có Habit
+ * "chưa ghi xong" (xem `hasPendingHabitsForSpace()`).
+ *
+ * No-op hoàn toàn (trả về nguyên mảng đầu vào) khi `HABIT_ITEM_PERSIST_ENABLED === false`.
+ */
+async function hydrateItemLevelHabits(
+  spaces: Space[],
+  shouldSkip: (space: Space) => boolean = () => false,
+): Promise<Space[]> {
+  if (!HABIT_ITEM_PERSIST_ENABLED) return spaces;
+  return Promise.all(
+    spaces.map(async (space) => {
+      if (space.isShared) return space; // Habit không tồn tại ở Shared Space — giữ nguyên
+      if (shouldSkip(space)) return space;
+      try {
+        const habits = await loadPrivateHabits(space.id);
+        return { ...space, habits };
+      } catch (err) {
+        console.warn(
+          `[KN-Space] Không tải được Habit item-level cho Space "${space.name}" (${space.id}) — dùng tạm habits jsonb cũ:`,
+          err,
+        );
+        return space;
+      }
+    }),
+  );
+}
+
 export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, emptyState());
   const [isLoading, setIsLoading] = React.useState(true);
@@ -177,13 +222,15 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Giai đoạn B (item-level-entity-tables-progress.md, câu hỏi mở #2) — gán đè `space.logs`
-        // của MỌI Space (private + shared) bằng dữ liệu tải từ bảng item-level mới, TRƯỚC khi
-        // dispatch HYDRATE. Không cần cập nhật `prevPrivateRef`/`prevSharedRef` thủ công ở đây —
-        // 2 baseline này bắt đầu rỗng, effect debounce Space-level tự nhận ra "lần đầu thấy Space
-        // này" (sau khi `state.spaces` đổi do HYDRATE) và chỉ ghi nhận baseline từ `space.logs` ĐÃ
-        // được gán đè ở bước này, không tự bắn save thừa.
+        // của MỌI Space (private + shared) VÀ `space.habits` của Space cá nhân bằng dữ liệu tải từ
+        // bảng item-level mới, TRƯỚC khi dispatch HYDRATE. Không cần cập nhật
+        // `prevPrivateRef`/`prevSharedRef` thủ công ở đây — 2 baseline này bắt đầu rỗng, effect
+        // debounce Space-level tự nhận ra "lần đầu thấy Space này" (sau khi `state.spaces` đổi do
+        // HYDRATE) và chỉ ghi nhận baseline từ `space.logs`/`space.habits` ĐÃ được gán đè ở bước
+        // này, không tự bắn save thừa.
         const rawSpaces = [...privateSpaces, ...sharedSpaces];
-        const allSpaces = await hydrateItemLevelLogs(rawSpaces);
+        const logsHydrated = await hydrateItemLevelLogs(rawSpaces);
+        const allSpaces = await hydrateItemLevelHabits(logsHydrated);
         // Validate sau khi có đủ cả private + shared — localId có thể là shared space
         const validCurrentSpaceId = allSpaces.some((s) => s.id === currentSpaceId)
           ? currentSpaceId
@@ -417,6 +464,11 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
    * `kn_private_spaces`/`kn_shared_spaces`) cho Space nào đang có Log "chưa ghi xong" theo
    * `hasPendingLogsForSpace()` (`itemPersist.ts`) — tránh đè mất log vừa tạo/sửa/xoá cục bộ bằng
    * dữ liệu server (cả 2 nguồn, jsonb lẫn item-level) có thể chưa kịp phản ánh thao tác đó.
+   *
+   * Mirror y hệt cho Habit (Bước 2) — sau khi có `refreshedPrivate` (đã gán đè `.logs`), chạy tiếp
+   * `hydrateItemLevelHabits` để gán đè `.habits` cho Space cá nhân, bỏ qua Space đang có Habit
+   * "chưa ghi xong" theo `hasPendingHabitsForSpace()`. Không áp dụng cho Space chung (Habit không
+   * tồn tại ở đó).
    */
   async function refreshStaleSpaces(): Promise<void> {
     if (!hydratedRef.current) return; // bootstrap chưa xong — để bootstrap tự lo, tránh gọi trùng
@@ -446,12 +498,16 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       return !(pendingSharedSavesRef.current.has(sid) || sharedSaveTimersRef.current.has(sid));
     });
 
-    const [refreshedPrivate, refreshedShared] = await Promise.all([
+    const [refreshedPrivateLogs, refreshedShared] = await Promise.all([
       hydrateItemLevelLogs(privateCandidates, (space) => hasPendingLogsForSpace('private', space.id)),
       hydrateItemLevelLogs(sharedCandidates, (space) =>
         hasPendingLogsForSpace('shared', space.sharedSpaceId ?? space.id),
       ),
     ]);
+
+    const refreshedPrivate = await hydrateItemLevelHabits(refreshedPrivateLogs, (space) =>
+      hasPendingHabitsForSpace(space.id),
+    );
 
     const toRefresh: Space[] = [...refreshedPrivate, ...refreshedShared];
 
@@ -500,9 +556,11 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           sharedSaveTimersRef.current.forEach((t) => clearTimeout(t));
           sharedSaveTimersRef.current.clear();
         }
-        // Flush Log item-level còn pending (mirror 2 nhánh trên, xem itemPersist.ts) — no-op khi
-        // LOG_ITEM_PERSIST_ENABLED === false (hàng đợi luôn rỗng trong trường hợp đó).
+        // Flush Log/Habit item-level còn pending (mirror 2 nhánh trên, xem itemPersist.ts) — no-op
+        // khi LOG_ITEM_PERSIST_ENABLED/HABIT_ITEM_PERSIST_ENABLED === false (hàng đợi luôn rỗng
+        // trong trường hợp đó).
         flushAllPendingLogPersist();
+        flushAllPendingHabitPersist();
       } else if (document.visibilityState === 'visible') {
         void refreshStaleSpaces();
       }
@@ -658,6 +716,14 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     // Nhật ký nhanh tiếp tục lưu qua cột `logs` jsonb như cũ, không đổi hành vi hiện tại.
     if (currentSpace && isLogAction(action)) {
       actionToDispatch = handleLogActionForPersist(currentSpace, action);
+    }
+
+    // Persist item-level cho Habit (Bước 2, docs/features/item-level-entity-tables.md) — mirror
+    // CHÍNH XÁC nhánh Log ở trên (bảng riêng `kn_private_habits`, debounce theo itemId). No-op hoàn
+    // toàn khi `HABIT_ITEM_PERSIST_ENABLED === false` — Thói quen tiếp tục lưu qua cột `habits`
+    // jsonb như cũ, không đổi hành vi hiện tại.
+    if (currentSpace && isHabitAction(action)) {
+      actionToDispatch = handleHabitActionForPersist(currentSpace, action);
     }
 
     dispatch(actionToDispatch);

@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { previewLegacySpacesMigration, runLegacySpacesMigration } from './storage/migrateLegacySpaces';
 import { previewLegacyLogsMigration, runLegacyLogsMigration } from './storage/migrateLegacyLogs';
+import { previewLegacyHabitsMigration, runLegacyHabitsMigration } from './storage/migrateLegacyHabits';
 import './styles.css';
 
 const container = document.getElementById('root');
@@ -56,6 +57,28 @@ declare global {
 window.knMigrateLogs = {
   preview: previewLegacyLogsMigration,
   run: runLegacyLogsMigration,
+};
+
+// Migration Thói quen (habits[] cũ, jsonb) -> kn_private_habits (Bước 2 entity Habit,
+// docs/features/item-level-entity-tables.md). CHỈ chạy được SAU KHI đã chạy
+// docs/features/item-level-habit-schema.sql trên Supabase Dashboard — trước đó mọi lệnh trả lỗi
+// "relation does not exist" (an toàn, không ghi sai gì). Cùng nguyên tắc `knMigrateLogs` ở trên: gọi
+// tay qua Console, không tự chạy khi load app. Habit KHÔNG có bản Shared — không có tham số scope.
+//
+// Cách dùng (mở DevTools Console khi đã đăng nhập):
+//   await window.knMigrateHabits.preview()  // dry-run, chỉ đọc — xem trước sẽ migrate gì
+//   await window.knMigrateHabits.run()      // thực thi migrate thật (idempotent, gọi lại an toàn)
+declare global {
+  interface Window {
+    knMigrateHabits: {
+      preview: typeof previewLegacyHabitsMigration;
+      run: typeof runLegacyHabitsMigration;
+    };
+  }
+}
+window.knMigrateHabits = {
+  preview: previewLegacyHabitsMigration,
+  run: runLegacyHabitsMigration,
 };
 
 // Đăng ký Service Worker (PWA + Push Notification — Phần 1, xem docs/features/push-notification.md).
