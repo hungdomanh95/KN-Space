@@ -17,6 +17,8 @@
 
 **Bước 2 (entity Habit) — sub-bước 1-5 xong, Giai đoạn A đã bật (2026-07-11), Giai đoạn B ĐÃ CODE XONG (2026-07-11, cùng ngày).** Chủ dự án đã tự chạy `item-level-habit-schema.sql` + migrate dữ liệu thật (User B test sạch trước, sau đó User A, đối chiếu 3/3 khớp, không lệch). `HABIT_ITEM_PERSIST_ENABLED = true` — mọi action `HABIT_*` dual-write thật vào `kn_private_habits`. Giai đoạn B (nối phần đọc `loadPrivateHabits` vào bootstrap/`refreshStaleSpaces`, thêm `hasPendingHabitsForSpace()`) **✅ đã code, mirror CHÍNH XÁC Log, CHƯA test tay UI thật** — chờ chủ dự án tự test qua OAuth thật. Xem chi tiết ở mục "Bước 2 — entity Habit" bên dưới.
 
+**Bước 3 (entity Reminder) — sub-bước 1-5 xong, Giai đoạn A ĐÃ BẬT + Giai đoạn B ĐÃ CODE XONG (2026-07-11, gộp chung 1 lượt theo yêu cầu chủ dự án).** Chủ dự án đã tự chạy `item-level-reminder-schema.sql` + migrate dữ liệu thật (2/2 khớp, idempotent — đã sửa xong bug `insertRemindersBulk` trộn khoá once/recurring trước đó). `REMINDER_ITEM_PERSIST_ENABLED = true` — mọi action `REMINDER_*` dual-write thật vào `kn_private_reminders`/`kn_shared_reminders`. Giai đoạn B (nối phần đọc `loadPrivateReminders`/`loadSharedReminders` vào bootstrap/`refreshStaleSpaces`, thêm `hasPendingRemindersForSpace()`) **✅ đã code, mirror CHÍNH XÁC Log (CÓ Shared, khác Habit), CHƯA test tay UI thật** — chờ chủ dự án tự test qua OAuth thật, 1 lượt duy nhất (Giai đoạn A+B gộp, không tách 2 lượt như Log/Habit). Xem chi tiết ở mục "Bước 3 — entity Reminder" bên dưới.
+
 ---
 
 ## Quyết định đã chốt (2026-07-10)
@@ -126,6 +128,197 @@ Theo đúng 5 bước con đã mô tả ở `item-level-entity-tables.md` mục 
 - Đọc code review: `src/storage/habitStore.ts`, `src/state/itemPersist.ts` (phần Habit ở cuối file), đoạn tích hợp trong `src/state/AppStateContext.tsx` (`smartDispatch`, tìm `isHabitAction`/`handleHabitActionForPersist`), `docs/features/item-level-habit-schema.sql`, `src/storage/migrateLegacyHabits.ts`.
 
 **Bước kế tiếp (KHÔNG làm trong lượt này, chờ chủ dự án xác nhận resume):** SQL + migration User B/User A + bật Giai đoạn A + code Giai đoạn B đều **ĐÃ XONG (2026-07-11)**, xem mục "Cách test Giai đoạn A"/"Cách test Giai đoạn B" phía trên. Còn lại: chủ dự án tự test tay UI thật qua OAuth (hướng dẫn ở mục "Cách test Giai đoạn B"); sau khi ổn định, cân nhắc tắt nhánh ghi `habits` jsonb (mirror quyết định tương tự cho Log, câu hỏi mở #2) — chưa làm ở lượt này. Bước tiếp theo trong kế hoạch tổng (Log → Habit → Reminder → Task → Note): entity Reminder, chờ chủ dự án xác nhận resume.
+
+---
+
+## Bước 3 — entity Reminder (`kn_private_reminders`/`kn_shared_reminders`, CÓ bản shared — mirror Log)
+
+Theo đúng 5 bước con đã mô tả ở `item-level-entity-tables.md` mục 7. **Khác Log/Habit ở chỗ Giai
+đoạn A (dual-write) + Giai đoạn B (cutover đọc) được làm GỘP chung 1 lượt (2026-07-11), theo yêu cầu
+tường minh của chủ dự án** — không tách 2 lượt như Log/Habit đã làm trước đó.
+
+1. ✅ **Bảng mới** — `docs/features/item-level-reminder-schema.sql` (file mới, CHƯA chạy lên Supabase
+   Dashboard thật). `kn_private_reminders`/`kn_shared_reminders`, mirror đúng `kn_private_logs`/
+   `kn_shared_logs`: id client-sinh, `version`/trigger giữ nguyên nhưng không dùng version-check,
+   không có cột `order`. Reminder KHÔNG có field `createdBy` ở tầng app (khác Task/Note/Log) nên
+   bảng KHÔNG có cột `created_by`.
+2. ✅ **RLS 2 nhánh tách biệt** — gộp trong cùng file SQL trên. Private: `auth.uid() = user_id`
+   (mirror `kn_private_logs`). Shared: `is_space_member(space_id)` (mirror `kn_shared_logs`).
+3. ✅ **Storage layer** — `src/storage/reminderStore.ts` (CRUD: `loadPrivateReminders`/
+   `loadSharedReminders`/`createReminder`/`insertRemindersBulk`/`updateReminder`/`deleteReminder`/
+   `listExistingReminderIds`, ghi thẳng blind write). `src/state/itemPersist.ts` mở rộng thêm nhánh
+   Reminder (giữ NGUYÊN 2 nhánh Log/Habit có sẵn, chỉ nối thêm phía dưới) — debounce theo `itemId`
+   600ms, `mergeReminderPendingOp()`, hàng đợi `reminderPending`/`reminderInFlight` riêng. Đã áp dụng
+   luôn fix cho bug `inFlight` phát hiện ở Giai đoạn B của Log (tự tham chiếu đúng promise `wrapped`
+   khi dọn map) NGAY TỪ ĐẦU, và đã viết sẵn `hasPendingRemindersForSpace()`/
+   `activeReminderSpaceRefs` dù chưa có Giai đoạn B để dùng tới ở lượt này (mirror bài học đã áp dụng
+   cho Habit — tránh phải quay lại sửa `scheduleReminderFlush()` sau).
+4. ✅ **Tích hợp dispatch** — `AppStateContext.tsx` (`smartDispatch`) gọi
+   `handleReminderActionForPersist()` cho mọi action `REMINDER_*`, thêm NGAY SAU nhánh Habit, độc lập
+   với luồng save Space-level (`kn_private_spaces.reminders`/`kn_shared_spaces.reminders` jsonb —
+   VẪN CHẠY SONG SONG làm lưới an toàn, chưa tắt — xem Giai đoạn A+B bên dưới).
+   `flushAllPendingReminderPersist()` cũng đã nối vào nhánh `hidden` của `visibilitychange` (cùng chỗ
+   Log/Habit).
+5. ✅ **Migration — ĐÃ CHẠY XONG (2026-07-11)** — `src/storage/migrateLegacyReminders.ts` (mirror
+   `migrateLegacyLogs.ts`, CÓ nhánh shared), expose qua `window.knMigrateReminders.preview()/.run()`
+   (`main.tsx`). Chủ dự án đã tự chạy `item-level-reminder-schema.sql` trên Supabase Dashboard, chạy
+   `.run()` — dữ liệu thật 2/2 khớp, idempotent đúng.
+
+   **Bug thật phát hiện + đã fix (2026-07-11):** chủ dự án chạy `window.knMigrateReminders.run()`
+   trên tài khoản chính, gặp `400 Bad Request` từ Supabase khi insert hàng loạt. Root cause:
+   `runLegacyRemindersMigration()` gộp CẢ 2 loại reminder (`once`/`recurring`) vào chung 1 mảng rồi
+   gọi `insertRemindersBulk()` 1 lần — nhưng `toRow()` trả 2 bộ khoá KHÁC NHAU theo type (`once`
+   không có `created_at`, `recurring` có). PostgREST bắt buộc mọi object trong 1 lần `insert()` hàng
+   loạt phải cùng bộ khoá, trộn lẫn bị từ chối thẳng 400. **Đã fix:** `insertRemindersBulk()`
+   (`src/storage/reminderStore.ts`) tự tách `rows` thành 2 lô đồng nhất theo `reminder.type` trước
+   khi insert, gọi `insert()` riêng cho từng lô (bỏ qua lô rỗng, không đổi chữ ký hàm —
+   `migrateLegacyReminders.ts` không cần sửa). Lô `once` insert trước; nếu lỗi thì dừng ngay (không
+   thử lô `recurring`); nếu `once` ok nhưng `recurring` lỗi vẫn trả `ok: false` (idempotent ở
+   `listExistingReminderIds()` tự bỏ qua phần đã ghi khi retry). Thêm test
+   `src/storage/reminderStore.test.ts` (7 test: rows rỗng, chỉ 1 loại x2, trộn 2 loại tách đúng thứ
+   tự, lỗi ở lô đầu dừng ngay, lỗi ở lô sau vẫn báo lỗi, scope shared không gọi `getUser()`/không có
+   `user_id`). Migration đã chạy lại thành công sau khi có bản fix này — kết quả 2/2 khớp.
+
+### Giai đoạn A+B của Reminder — ĐÃ CODE XONG GỘP CHUNG (2026-07-11)
+
+Theo yêu cầu tường minh của chủ dự án (mirror kỹ thuật đã dùng cho Log/Habit, chỉ khác về TIẾN ĐỘ:
+làm cả 2 giai đoạn trong 1 lượt thay vì tách 2 lượt test riêng):
+
+- **Giai đoạn A** — `REMINDER_ITEM_PERSIST_ENABLED = true` (`src/state/itemPersist.ts`). Mọi action
+  `REMINDER_*` dual-write thật vào `kn_private_reminders`/`kn_shared_reminders`, song song với cột
+  `reminders` jsonb cũ (chưa tắt).
+- **Giai đoạn B** — hàm mới `hydrateItemLevelReminders(spaces, shouldSkip?)` trong
+  `AppStateContext.tsx`, mirror CHÍNH XÁC `hydrateItemLevelLogs()` (Reminder CÓ bản Shared, khác
+  Habit — gọi `loadPrivateReminders`/`loadSharedReminders` song song qua `Promise.all` cho CẢ private
+  lẫn shared, gán đè `space.reminders`). Gọi ở bootstrap (sau `hydrateItemLevelHabits`, trước dispatch
+  `HYDRATE`) và trong `refreshStaleSpaces()` (cho cả `privateCandidates` đã qua `hydrateItemLevelHabits`
+  lẫn `sharedCandidates` đã qua `hydrateItemLevelLogs`). Lỗi tải riêng 1 Space không fail cả app —
+  fallback dùng `reminders` jsonb gốc, `console.warn`. Baseline `prevPrivateRef`/`prevSharedRef` cập
+  nhật đúng lúc (mirror Log — bootstrap: gán đè xảy ra TRƯỚC `HYDRATE`, baseline bắt đầu rỗng nên
+  không tự bắn save thừa; `refreshStaleSpaces()`: baseline được set SAU khi `refreshedPrivate`/
+  `refreshedShared` đã qua đủ cả 3 lượt hydrate Log→Habit→Reminder).
+  `refreshStaleSpaces()` bỏ qua Space đang có Reminder pending qua `hasPendingRemindersForSpace(scope,
+  spaceId)` (đã viết sẵn từ sub-bước 3, dựa trên map `activeReminderSpaceRefs` theo dõi cả lúc
+  debounce lẫn lúc network đang bay — mirror `hasPendingLogsForSpace`).
+- **Test mới** — `src/state/itemPersist.test.ts`: thêm `describe('hasPendingRemindersForSpace', ...)`
+  (4 test, mock `../storage/reminderStore` để không gọi Supabase thật — không có test tương đương
+  `LOG_DELETE_MANY` vì Reminder không có action xoá hàng loạt): Space chưa đụng tới → `false`;
+  REMINDER_CREATE → `true` xuyên suốt lúc debounce + lúc network đang bay + `false` sau khi resolve;
+  REMINDER_CREATE rồi REMINDER_DELETE cùng id trong cùng cửa sổ debounce → huỷ hẳn, không gọi network;
+  REMINDER_DELETE (đã tồn tại từ trước) → `true` lúc debounce + lúc network đang bay, `false` sau khi
+  resolve. Tổng **96/96 test pass** (từ 92 sau bản fix `insertRemindersBulk` ở sub-bước 5, +4 test mới).
+- **Xác nhận Edge Function `send-due-notifications` KHÔNG cần sửa** (giữ nguyên kết luận đã ghi ở
+  sub-bước 4/5 phía trên — function đọc trực tiếp cột `reminders` jsonb qua service-role key, dual-
+  write không đụng gì tới đường đọc đó).
+
+**Cách test Giai đoạn A+B (chủ dự án tự làm, có OAuth thật, 1 lượt duy nhất):**
+- `npx tsc --noEmit`, `npm run build`, `npm test` — cả 3 đã PASS phía `dev` (96/96 test).
+- Gọi REST API `kn_private_reminders`/`kn_shared_reminders` bằng anon key qua `curl` — trả `200 []`
+  (không phải lỗi "relation does not exist") — xác nhận 2 bảng tồn tại thật trên Supabase.
+- Tạo 1 Nhắc việc loại "một lần" (once) ở Space cá nhân → phải hiện ngay trên UI (đọc từ
+  `kn_private_reminders`). Mở DevTools > Network lọc `kn_private_reminders`, xác nhận có `POST`.
+- Tạo 1 Nhắc việc loại "lặp lại" (recurring) → xác nhận `POST` tương tự, kiểm tra Supabase Table
+  Editor thấy `created_at` = mốc tạo (không phải `now()` của DB).
+- Sửa 1 reminder đổi từ "một lần" → "lặp lại": xác nhận UI cập nhật đúng, kiểm tra Table Editor —
+  `created_at` phải là mốc MỚI (vừa chuyển sang recurring, reducer tính "now" cho trường hợp này).
+- Sửa 1 reminder đang "lặp lại" (đổi tần suất/giờ, KHÔNG đổi type) → kiểm tra Table Editor —
+  `created_at` phải GIỮ NGUYÊN mốc cũ (không bị reset).
+- Sửa 1 reminder đổi từ "lặp lại" → "một lần": xác nhận UI đúng, không cần quan tâm `created_at` (DB
+  giữ giá trị cũ nhưng `ReminderOnce` không hiển thị field này).
+- Xoá 1 reminder ở Space cá nhân lẫn Shared Space, kiểm tra Table Editor — dòng biến mất thật.
+- F5 (reload full trang) hoặc mở tab mới cùng tài khoản → reminder cũ (đã migrate) + reminder vừa
+  tạo/sửa đều hiển thị đúng, đúng thứ tự (mới nhất trước — `REMINDER_CREATE` unshift).
+- Mở 2 tab cùng lúc (cùng Space cá nhân hoặc cùng Shared Space): ở tab A tạo/sửa/xoá 1 reminder,
+  chuyển sang tab B (trigger `visibilitychange` → `visible`) → tab B phải thấy thay đổi từ tab A.
+  Ngay sau khi tab B refresh xong, mở DevTools > Network ở tab B, xác nhận **KHÔNG** có request
+  `PATCH kn_private_spaces`/`kn_shared_spaces` tự bắn ra (dấu hiệu bug baseline nếu có).
+- Test thêm race hiếm: ở 1 tab, tạo 1 reminder rồi LẬP TỨC chuyển tab đi (trong vòng < 600ms) rồi
+  quay lại ngay — reminder vừa tạo phải KHÔNG biến mất khỏi UI khi tab quay lại `visible`.
+- Test ở Shared Space: tạo/sửa/xoá 1 reminder, xác nhận request đi đúng bảng `kn_shared_reminders`
+  (không lẫn `kn_private_reminders`), thành viên khác (nếu test được) mở tab/F5 thấy đúng thay đổi.
+
+**Điểm khác Reminder so với Log (tóm tắt):**
+- CÓ bản Shared (giống Log, khác Habit) — mọi hàm trong `reminderStore.ts`/nhánh Reminder của
+  `itemPersist.ts` có tham số `scope`.
+- `REMINDER_UPDATE` thay NGUYÊN item (không phải patch hẹp như `LOG_PATCH_EXPENSE`) —
+  `ReminderFormModal.tsx` cho phép đổi cả `type` (once <-> recurring) khi sửa 1 reminder đã có. Vì
+  vậy `reminderStore.ts` (`toRow()`) LUÔN trả FULL bộ cột theo type MỚI, null tường minh cột không
+  dùng của type kia (vd `freq_n`/`freq_unit`/`day_of_month` = null khi type = 'once', `date` = null
+  khi type = 'recurring') — tránh để lại giá trị "mồ côi" từ type cũ. `mergeReminderPendingOp()` vì
+  vậy đơn giản hơn `mergeLogPendingOp`/`mergeHabitPendingOp` — không cần áp patch từng field, chỉ cần
+  lấy bản `ReminderDefinition` đầy đủ mới nhất.
+- **`ReminderRecurring.createdAt` (mốc tính chu kỳ lặp lại) — quyết định #5 đã chốt áp dụng ĐÚNG
+  NHƯNG có điều kiện quan trọng phát hiện khi đọc kỹ `state/reducers/reminders.ts`:** cột DB
+  `created_at` CHỈ được set tường minh khi reminder đang là `type === 'recurring'` (cả lúc INSERT lẫn
+  UPDATE), dùng ĐÚNG giá trị đã được `remindersReducer` tính sẵn (giữ nguyên nếu vẫn recurring trước
+  khi sửa; LÀM MỚI = "now" nếu vừa chuyển từ 'once' sang 'recurring' — xem `buildReminder`/
+  `REMINDER_UPDATE` trong reducer: `createdAt = r.type === 'recurring' ? r.createdAt : new
+  Date().toISOString()`, tính theo TYPE CŨ của reminder trước lúc sửa, không phải type mới). Khi
+  type là `'once'`, cột `created_at` KHÔNG được set (giữ nguyên giá trị DB gốc lúc INSERT, DB
+  `default now()` lo — không có ý nghĩa gì để giữ vì `ReminderOnce` không có field `createdAt`).
+  Test riêng 2 case này trong `reminders.test.ts` (`describe('remindersReducer — REMINDER_UPDATE giữ
+  đúng mốc createdAt...')`) để xác nhận reducer tính đúng TRƯỚC khi tin tưởng storage layer set đúng
+  theo giá trị đó.
+- Load sort theo `created_at` **GIẢM DẦN** (mới nhất trước) — NGƯỢC HƯỚNG với Log/Habit (sort tăng
+  dần). Lý do: `REMINDER_CREATE` **unshift** vào ĐẦU mảng (không phải push vào cuối như Log/Habit),
+  `RemindersBlock.tsx` hiển thị thẳng theo thứ tự mảng không tự sort — phải sort DESC ở tầng storage
+  để khớp đúng thứ tự hiển thị cũ.
+- Không có action "xoá hàng loạt" (không có `REMINDER_DELETE_MANY`, khác Log).
+- `REMINDER_CREATE.payload.id` được thêm optional (mirror `LOG_CREATE`/`HABIT_CREATE`/`TASK_CREATE`)
+  vào `state/reducers/reminders.ts`.
+
+**Xác nhận lại (2026-07-11, sau khi gộp code Giai đoạn A+B) — Edge Function
+`supabase/functions/send-due-notifications/index.ts` KHÔNG cần sửa gì trong lượt này:** đã đọc kỹ
+toàn bộ file. Function này đọc TRỰC TIẾP `kn_space_state.select('user_id, spaces')` (Space cá nhân)
+và `kn_shared_spaces.select('id, tasks, reminders')` (Shared Space) bằng service-role key — KHÔNG
+đụng gì tới `kn_private_reminders`/`kn_shared_reminders` (2 bảng item-level mới). Dual-write (Giai
+đoạn A) chỉ CỘNG THÊM 1 đường ghi song song, KHÔNG tắt/thay đổi đường ghi `reminders` jsonb cũ mà
+Function này đang đọc. Cutover phần ĐỌC (Giai đoạn B) chỉ đổi nguồn đọc ở tầng app (FE,
+`AppStateContext.tsx`) — cột `reminders` jsonb trên `kn_private_spaces`/`kn_shared_spaces` VẪN được
+ghi đầy đủ, đồng bộ đúng với bảng item-level (chưa tắt nhánh ghi cũ). Vì vậy Edge Function tiếp tục
+hoạt động y hệt hiện tại, không cần sửa gì cho tới khi nhánh ghi jsonb thật sự bị tắt (quyết định
+riêng, ngoài phạm vi lượt này — xem câu hỏi mở #2 đã áp dụng cho Log).
+
+**Phát hiện phụ, KHÔNG thuộc phạm vi Reminder — ghi nhận để chủ dự án biết, chưa xử lý:** trong lúc
+đọc Edge Function, phát hiện comment tại đó (dòng ~176-178) ghi "ở Shared Space, UI hiện ẩn hoàn toàn
+khối 'Nhắc việc' (`enabledBlocks.reminder` cố định `false`)" — nhưng đọc code thật
+(`src/storage/sharedSpaceStore.ts`, `defaultSharedEnabledBlocks()`/`normalizeSharedEnabledBlocks()`)
+thì `reminder` **KHÔNG** bị ép `false` như `habits` (chỉ `habits` mới bị ép cứng `false`, `reminder`
+đọc bình thường từ DB, mặc định `true`). Comment trong Edge Function có vẻ ĐÃ LỖI THỜI (có thể do dữ
+kiện cũ trước khi `enabled_blocks` được đọc thật từ DB — xem
+`docs/features/fix-shared-space-enabled-blocks.sql`). Không sửa gì (không thuộc phạm vi việc này,
+Edge Function vẫn hoạt động đúng vì code KHÔNG dựa vào giả định đó để bỏ qua sớm — tự comment ghi rõ
+"Vẫn xử lý ở đây cho đúng/đủ... không dựa vào enabledBlocks.reminder để bỏ qua sớm") — nêu ra để
+tránh hiểu nhầm nếu ai đọc lại comment đó sau này.
+
+**Cách test sub-bước 1-4 (lịch sử — ghi lại đúng lúc cờ CÒN tắt, TRƯỚC khi bật Giai đoạn A+B ở trên;
+giữ nguyên làm hồ sơ, xem mục "Cách test Giai đoạn A+B" phía trên cho tình trạng hiện tại):**
+- `npx tsc --noEmit` — PASS.
+- `npm run build` — PASS.
+- `npm test` — 85/85 test pass (từ 68, +6 test reducer `reminders.test.ts` mới (id optional cho
+  `REMINDER_CREATE`, unshift vào đầu mảng, 2 test riêng xác nhận `createdAt`/mốc chu kỳ giữ
+  đúng/làm mới qua `REMINDER_UPDATE`) + 11 test mới trong `itemPersist.test.ts`
+  (`computeReminderPersistDescriptors` 5 test, `mergeReminderPendingOp` 6 test) — toàn bộ phần thuần
+  logic, KHÔNG gọi Supabase thật, mirror cách test Log/Habit lúc mới viết (trước khi có
+  `hasPendingLogsForSpace`/`hasPendingHabitsForSpace`).
+- **Chủ dự án tự test tay 1 lượt qua `npm run dev` (có OAuth thật):** tạo/sửa (kể cả đổi loại 1
+  lần <-> lặp lại)/xoá 1 Nhắc việc ở Space cá nhân bất kỳ — UI phải hoạt động **giống hệt trước** (vì
+  cờ `REMINDER_ITEM_PERSIST_ENABLED` còn `false`, mọi thứ vẫn đọc/ghi qua cột `reminders` jsonb như
+  cũ). Mở DevTools > Network trong lúc thao tác, xác nhận **KHÔNG** có request nào tới
+  `kn_private_reminders`/`kn_shared_reminders` (2 bảng chưa tồn tại thật — nếu thấy request lỗi
+  "relation does not exist" là dấu hiệu cờ bị bật nhầm, cần báo ngay).
+- Đọc code review: `src/storage/reminderStore.ts`, `src/state/itemPersist.ts` (phần Reminder ở cuối
+  file), đoạn tích hợp trong `src/state/AppStateContext.tsx` (`smartDispatch`, tìm
+  `isReminderAction`/`handleReminderActionForPersist`), `docs/features/item-level-reminder-schema.sql`,
+  `src/storage/migrateLegacyReminders.ts`.
+
+**Bước kế tiếp (KHÔNG làm trong lượt này, chờ chủ dự án xác nhận resume):** SQL + migration dữ liệu
+thật + bật Giai đoạn A + code Giai đoạn B đều **ĐÃ XONG (2026-07-11)**, xem mục "Giai đoạn A+B của
+Reminder" và "Cách test Giai đoạn A+B" phía trên. Còn lại: chủ dự án tự test tay UI thật qua OAuth
+(1 lượt duy nhất, theo hướng dẫn ở mục đó); sau khi ổn định, cân nhắc tắt nhánh ghi `reminders` jsonb
+(mirror câu hỏi mở #2 chưa quyết định chính thức cho cả Log/Habit) — chưa làm ở lượt này. Bước tiếp
+theo trong kế hoạch tổng (Log → Habit → Reminder → Task → Note): entity Task, chờ chủ dự án xác nhận
+resume.
 
 ---
 

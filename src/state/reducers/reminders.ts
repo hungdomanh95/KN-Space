@@ -13,8 +13,17 @@ export interface ReminderFormPayload {
   time?: string;
 }
 
+/**
+ * `REMINDER_CREATE.payload.id` (optional) — mirror TASK_CREATE/LOG_CREATE/HABIT_CREATE
+ * (`reducers/tasks.ts`/`reducers/logs.ts`/`reducers/habits.ts`): cho phép caller
+ * (`state/itemPersist.ts` qua `smartDispatch`) tự sinh id TRƯỚC khi gọi reducer, dùng chung đúng id
+ * đó cho cả lượt tính descriptor persist item-level lẫn lượt dispatch thật — tránh 2 lần
+ * `crypto.randomUUID()` ra 2 id khác nhau cho cùng 1 reminder vừa tạo (xem docs/features/
+ * item-level-entity-tables.md mục 4.2). Absent = reducer tự sinh như cũ (mọi caller khác, vd test,
+ * ReminderFormModal).
+ */
 export type ReminderAction =
-  | { type: 'REMINDER_CREATE'; payload: ReminderFormPayload }
+  | { type: 'REMINDER_CREATE'; payload: ReminderFormPayload & { id?: string } }
   | { type: 'REMINDER_UPDATE'; payload: ReminderFormPayload & { id: string } }
   | { type: 'REMINDER_DELETE'; payload: { id: string } };
 
@@ -47,7 +56,7 @@ export function remindersReducer(space: Space, action: ReminderAction): Space {
   switch (action.type) {
     case 'REMINDER_CREATE': {
       const nowIso = new Date().toISOString();
-      const newReminder = buildReminder(action.payload, crypto.randomUUID(), nowIso);
+      const newReminder = buildReminder(action.payload, action.payload.id ?? crypto.randomUUID(), nowIso);
       // RemindersBlock hiện thị thẳng theo thứ tự mảng (không sort) — thêm vào ĐẦU để nhắc việc
       // mới luôn nổi lên trên cùng, thấy ngay không cần cuộn xuống cuối danh sách.
       return { ...space, reminders: [newReminder, ...space.reminders] };

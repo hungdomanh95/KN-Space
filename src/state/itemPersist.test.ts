@@ -2,16 +2,21 @@ import { beforeEach, describe, it, expect, vi } from 'vitest';
 import {
   computeHabitPersistDescriptors,
   computeLogPersistDescriptors,
+  computeReminderPersistDescriptors,
   handleHabitActionForPersist,
   handleLogActionForPersist,
+  handleReminderActionForPersist,
   hasPendingHabitsForSpace,
   hasPendingLogsForSpace,
+  hasPendingRemindersForSpace,
   mergeHabitPendingOp,
   mergeLogPendingOp,
+  mergeReminderPendingOp,
   type HabitPendingOp,
   type LogPendingOp,
+  type ReminderPendingOp,
 } from './itemPersist';
-import type { Habit, LogEntry, Space } from '../types';
+import type { Habit, LogEntry, ReminderDefinition, Space } from '../types';
 
 // Mock logStore.ts (thay vì để `hasPendingLogsForSpace` test dưới đây gọi network Supabase THẬT) —
 // chỉ cần biết CÓ gọi hàm ghi nào không và điều khiển được thời điểm resolve, không cần hành vi
@@ -32,6 +37,15 @@ vi.mock('../storage/habitStore', () => ({
   deleteHabit: vi.fn(),
 }));
 import { createHabit, deleteHabit } from '../storage/habitStore';
+
+// Mock reminderStore.ts — mirror logStore.ts ở trên, dùng cho `hasPendingRemindersForSpace` (Giai
+// đoạn B).
+vi.mock('../storage/reminderStore', () => ({
+  createReminder: vi.fn(),
+  updateReminder: vi.fn(),
+  deleteReminder: vi.fn(),
+}));
+import { createReminder, deleteReminder } from '../storage/reminderStore';
 
 function emptySpace(logs: LogEntry[] = []): Space {
   return {
@@ -402,5 +416,190 @@ describe('hasPendingHabitsForSpace', () => {
     resolveDelete();
     await wait(0);
     expect(hasPendingHabitsForSpace('space-habit-delete')).toBe(false);
+  }, 2000);
+});
+
+// =============================================================================
+// Reminder (Bước 3, docs/features/item-level-entity-tables.md) — Giai đoạn A+B
+// đã bật (2026-07-11). Gồm phần thuần logic (descriptor + merge, không gọi
+// Supabase thật) + `describe('hasPendingRemindersForSpace', ...)` ở cuối file
+// (mirror CHÍNH XÁC `hasPendingLogsForSpace`, network-mock qua `reminderStore.ts`).
+// =============================================================================
+
+function makeOnceReminder(overrides: Partial<Extract<ReminderDefinition, { type: 'once' }>> = {}): ReminderDefinition {
+  return { id: 'reminder-1', type: 'once', title: 'Uống nước', date: '2026-07-11', time: '', ...overrides };
+}
+
+function makeRecurringReminder(
+  overrides: Partial<Extract<ReminderDefinition, { type: 'recurring' }>> = {},
+): ReminderDefinition {
+  return {
+    id: 'reminder-1',
+    type: 'recurring',
+    title: 'Uống thuốc',
+    freqN: 1,
+    freqUnit: 'day',
+    dayOfMonth: null,
+    time: '',
+    createdAt: '2026-07-10T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function reminderSpace(reminders: ReminderDefinition[] = []): Space {
+  return { ...emptySpace(), reminders };
+}
+
+describe('computeReminderPersistDescriptors', () => {
+  it('REMINDER_CREATE — trả đúng 1 descriptor insert khi id đã gắn và reminder xuất hiện trong nextSpace', () => {
+    const reminder = makeOnceReminder();
+    const nextSpace = reminderSpace([reminder]);
+    const result = computeReminderPersistDescriptors(
+      { type: 'REMINDER_CREATE', payload: { type: 'once', title: 'Uống nước', date: '2026-07-11', id: 'reminder-1' } },
+      nextSpace,
+    );
+    expect(result).toEqual([{ itemId: 'reminder-1', op: { kind: 'insert', reminder } }]);
+  });
+
+  it('REMINDER_CREATE — trả mảng rỗng nếu thiếu id (phòng thủ, không nên xảy ra thực tế)', () => {
+    const result = computeReminderPersistDescriptors(
+      { type: 'REMINDER_CREATE', payload: { type: 'once', title: 'X', date: '2026-07-11' } },
+      reminderSpace(),
+    );
+    expect(result).toEqual([]);
+  });
+
+  it('REMINDER_UPDATE — trả đúng 1 descriptor update với TOÀN BỘ reminder mới (không phải patch hẹp)', () => {
+    const updatedReminder = makeRecurringReminder({ title: 'Uống thuốc 2 lần/ngày', freqN: 2 });
+    const nextSpace = reminderSpace([updatedReminder]);
+    const result = computeReminderPersistDescriptors(
+      { type: 'REMINDER_UPDATE', payload: { id: 'reminder-1', type: 'recurring', title: 'Uống thuốc 2 lần/ngày', freqN: 2, freqUnit: 'day' } },
+      nextSpace,
+    );
+    expect(result).toEqual([{ itemId: 'reminder-1', op: { kind: 'update', reminder: updatedReminder } }]);
+  });
+
+  it('REMINDER_UPDATE — trả mảng rỗng nếu reminder không còn trong nextSpace (đã bị xoá, race hiếm)', () => {
+    const result = computeReminderPersistDescriptors(
+      { type: 'REMINDER_UPDATE', payload: { id: 'reminder-1', type: 'once', title: 'X', date: '2026-07-11' } },
+      reminderSpace([]),
+    );
+    expect(result).toEqual([]);
+  });
+
+  it('REMINDER_DELETE — trả đúng 1 descriptor delete', () => {
+    const result = computeReminderPersistDescriptors(
+      { type: 'REMINDER_DELETE', payload: { id: 'reminder-1' } },
+      reminderSpace(),
+    );
+    expect(result).toEqual([{ itemId: 'reminder-1', op: { kind: 'delete' } }]);
+  });
+});
+
+describe('mergeReminderPendingOp', () => {
+  it('không có pending trước -> trả thẳng op mới', () => {
+    const incoming: ReminderPendingOp = { kind: 'delete' };
+    expect(mergeReminderPendingOp(undefined, incoming)).toBe(incoming);
+  });
+
+  it('insert + update (cùng cửa sổ debounce) -> vẫn là insert, nhưng đổi sang bản reminder mới nhất', () => {
+    const existing: ReminderPendingOp = { kind: 'insert', reminder: makeOnceReminder() };
+    const newReminder = makeOnceReminder({ title: 'Uống nước ấm' });
+    const merged = mergeReminderPendingOp(existing, { kind: 'update', reminder: newReminder });
+    expect(merged).toEqual({ kind: 'insert', reminder: newReminder });
+  });
+
+  it('insert + delete (cùng cửa sổ debounce) -> huỷ hẳn, trả null (không gửi gì lên server)', () => {
+    const existing: ReminderPendingOp = { kind: 'insert', reminder: makeOnceReminder() };
+    const merged = mergeReminderPendingOp(existing, { kind: 'delete' });
+    expect(merged).toBeNull();
+  });
+
+  it('update + update -> đổi thẳng sang bản reminder mới nhất (không cần merge field)', () => {
+    const existing: ReminderPendingOp = { kind: 'update', reminder: makeRecurringReminder({ freqN: 1 }) };
+    const incoming: ReminderPendingOp = { kind: 'update', reminder: makeRecurringReminder({ freqN: 5 }) };
+    const merged = mergeReminderPendingOp(existing, incoming);
+    expect(merged).toEqual(incoming);
+  });
+
+  it('update + delete -> đè thành delete (bỏ update đang chờ)', () => {
+    const existing: ReminderPendingOp = { kind: 'update', reminder: makeOnceReminder() };
+    const merged = mergeReminderPendingOp(existing, { kind: 'delete' });
+    expect(merged).toEqual({ kind: 'delete' });
+  });
+
+  it('delete + bất kỳ -> giữ nguyên delete (không hồi sinh item đã yêu cầu xoá)', () => {
+    const existing: ReminderPendingOp = { kind: 'delete' };
+    const merged = mergeReminderPendingOp(existing, { kind: 'update', reminder: makeOnceReminder() });
+    expect(merged).toEqual({ kind: 'delete' });
+  });
+});
+
+// Giai đoạn B (item-level-entity-tables-progress.md, Bước 3) — `hasPendingRemindersForSpace()`
+// mirror CHÍNH XÁC `hasPendingLogsForSpace()` (Reminder CÓ `scope`, giống Log — khác Habit). Không
+// có test tương đương LOG_DELETE_MANY vì Reminder không có action "xoá hàng loạt". Tái dùng
+// `sharedSpace()`/`wait()` đã định nghĩa ở phần Log phía trên (helper chung, không riêng entity nào).
+describe('hasPendingRemindersForSpace', () => {
+  beforeEach(() => {
+    vi.mocked(createReminder).mockReset();
+    vi.mocked(deleteReminder).mockReset();
+  });
+
+  it('Space chưa từng có action Reminder nào -> luôn false', () => {
+    expect(hasPendingRemindersForSpace('shared', 'space-never-touched-reminder')).toBe(false);
+  });
+
+  it('REMINDER_CREATE: true ngay khi queue (đang debounce), true suốt lúc network đang bay, false khi resolve xong', async () => {
+    let resolveCreate!: (v: { ok: boolean }) => void;
+    vi.mocked(createReminder).mockImplementation(
+      () => new Promise((resolve) => { resolveCreate = resolve; }),
+    );
+
+    const space = sharedSpace({ sharedSpaceId: 'space-reminder-create' });
+    handleReminderActionForPersist(space, {
+      type: 'REMINDER_CREATE',
+      payload: { type: 'once', title: 'Test', date: '2026-07-11', id: 'reminder-create-1' },
+    });
+
+    expect(hasPendingRemindersForSpace('shared', 'space-reminder-create')).toBe(true); // còn trong 600ms debounce
+
+    await wait(650); // hết debounce -> flushReminderItem() gọi createReminder() (đang treo, chưa resolve)
+    expect(hasPendingRemindersForSpace('shared', 'space-reminder-create')).toBe(true); // network chưa resolve
+
+    resolveCreate({ ok: true });
+    await wait(0); // setTimeout(0) chạy SAU khi mọi microtask (.then/.finally) đã xử lý xong
+    expect(hasPendingRemindersForSpace('shared', 'space-reminder-create')).toBe(false);
+  }, 2000);
+
+  it('REMINDER_CREATE rồi REMINDER_DELETE cùng id TRONG cửa sổ debounce -> huỷ hẳn, không còn pending, KHÔNG gọi network', async () => {
+    const space = sharedSpace({ sharedSpaceId: 'space-reminder-create-delete' });
+    handleReminderActionForPersist(space, {
+      type: 'REMINDER_CREATE',
+      payload: { type: 'once', title: 'Test', date: '2026-07-11', id: 'reminder-create-2' },
+    });
+    expect(hasPendingRemindersForSpace('shared', 'space-reminder-create-delete')).toBe(true);
+
+    handleReminderActionForPersist(space, { type: 'REMINDER_DELETE', payload: { id: 'reminder-create-2' } });
+    expect(hasPendingRemindersForSpace('shared', 'space-reminder-create-delete')).toBe(false); // insert+delete = huỷ
+
+    await wait(650);
+    expect(createReminder).not.toHaveBeenCalled();
+  }, 2000);
+
+  it('REMINDER_DELETE (reminder đã tồn tại từ trước): true lúc debounce, true lúc network đang bay, false sau khi resolve', async () => {
+    let resolveDelete!: () => void;
+    vi.mocked(deleteReminder).mockImplementation(() => new Promise((resolve) => { resolveDelete = resolve; }));
+
+    const space = sharedSpace({ sharedSpaceId: 'space-reminder-delete' });
+    handleReminderActionForPersist(space, { type: 'REMINDER_DELETE', payload: { id: 'reminder-existing-1' } });
+
+    expect(hasPendingRemindersForSpace('shared', 'space-reminder-delete')).toBe(true);
+
+    await wait(650);
+    expect(hasPendingRemindersForSpace('shared', 'space-reminder-delete')).toBe(true); // network chưa resolve
+
+    resolveDelete();
+    await wait(0);
+    expect(hasPendingRemindersForSpace('shared', 'space-reminder-delete')).toBe(false);
   }, 2000);
 });

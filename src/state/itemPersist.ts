@@ -9,12 +9,18 @@
 // vẫn có (600ms, gộp nhiều sửa liên tiếp CÙNG 1 item), nhưng đơn vị theo dõi là
 // `itemId` (Map), không phải `spaceId`.
 //
-// File này gộp CẢ 2 entity đã làm tới nay theo đúng kế hoạch cuốn chiếu (mục 7
+// File này gộp CẢ 3 entity đã làm tới nay theo đúng kế hoạch cuốn chiếu (mục 7
 // tài liệu trên, Log → Habit → Reminder → Task → Note):
 //   - Log (Bước 1, xong, Giai đoạn A+B đã bật) — phần đầu file.
-//   - Habit (Bước 2, Giai đoạn A+B đã bật 2026-07-11) — phần cuối file, xem
+//   - Habit (Bước 2, Giai đoạn A+B đã bật 2026-07-11) — phần giữa file, xem
 //     `HABIT_ITEM_PERSIST_ENABLED` bên dưới. Habit KHÔNG có bản Shared (chỉ có
 //     `kn_private_habits`), khác Log — mọi hàm Habit không có tham số `scope`.
+//   - Reminder (Bước 3, Giai đoạn A+B đã bật 2026-07-11) — phần cuối file. Xem
+//     `REMINDER_ITEM_PERSIST_ENABLED` bên dưới. Reminder CÓ bản Shared (mirror
+//     Log, không phải Habit) — mọi hàm có tham số `scope`. Khác Log ở chỗ
+//     `REMINDER_UPDATE` luôn thay NGUYÊN item (không phải patch hẹp từng
+//     field) vì `ReminderFormModal.tsx` cho phép đổi cả `type` (once <->
+//     recurring) khi sửa — xem `reminderStore.ts`.
 //
 // CỜ BẬT/TẮT — `LOG_ITEM_PERSIST_ENABLED`:
 // Bảng `kn_private_logs`/`kn_shared_logs` (docs/features/item-level-log-schema.sql)
@@ -31,11 +37,13 @@
 // refresh hiện tại (tránh đè mất log vừa tạo/sửa/xoá cục bộ).
 // =============================================================================
 
-import type { Habit, Space } from '../types';
+import type { Habit, ReminderDefinition, Space } from '../types';
 import type { LogAction } from './reducers/logs';
 import { logsReducer } from './reducers/logs';
 import type { HabitAction } from './reducers/habits';
 import { habitsReducer } from './reducers/habits';
+import type { ReminderAction } from './reducers/reminders';
+import { remindersReducer } from './reducers/reminders';
 import type { LogEntry } from '../types';
 import { setPrivateFallbackActive, setSharedFallbackActive } from '../storage/supabaseStore';
 import {
@@ -46,6 +54,12 @@ import {
   type LogScope,
 } from '../storage/logStore';
 import { createHabit, deleteHabit, updateHabit } from '../storage/habitStore';
+import {
+  createReminder,
+  deleteReminder,
+  updateReminder,
+  type ReminderScope,
+} from '../storage/reminderStore';
 
 export const LOG_ITEM_PERSIST_ENABLED = true;
 
@@ -614,5 +628,256 @@ export function flushAllPendingHabitPersist(): void {
     const entry = habitPending.get(id);
     if (entry) clearTimeout(entry.timer);
     scheduleHabitFlush(id);
+  });
+}
+
+// =============================================================================
+// Reminder (Bước 3, docs/features/item-level-entity-tables.md) — mirror CHÍNH
+// XÁC cấu trúc Log ở đầu file (descriptor/merge/debounce theo itemId, CÓ
+// `scope` — khác Habit), chỉ khác:
+//   - `REMINDER_UPDATE` thay NGUYÊN item (không phải patch hẹp từng field như
+//     `LOG_PATCH_EXPENSE`/`HABIT_UPDATE`) — `ReminderFormModal.tsx` cho phép
+//     đổi cả `type` (once <-> recurring) khi sửa, nên op 'update' mang theo cả
+//     `ReminderDefinition` mới, không phải object patch hẹp.
+//   - KHÔNG có action "xoá hàng loạt" (không có REMINDER_DELETE_MANY).
+//   - Bảng `kn_private_reminders`/`kn_shared_reminders` (docs/features/
+//     item-level-reminder-schema.sql) đã tạo thật trên Supabase, dữ liệu cũ đã
+//     migrate xong (`window.knMigrateReminders.run()`, 2/2 khớp, idempotent).
+//     Cờ đang BẬT (`true`) — mọi action `REMINDER_*` GHI SONG SONG (dual-write)
+//     vào bảng mới. "Giai đoạn B" (2026-07-11) đã nối phần ĐỌC:
+//     `AppStateContext.tsx` (bootstrap + `refreshStaleSpaces()`) gọi
+//     `loadPrivateReminders`/`loadSharedReminders` (`reminderStore.ts`) cho
+//     từng Space rồi GÁN ĐÈ `space.reminders` — nguồn đọc THẬT của Nhắc việc
+//     giờ là bảng item-level, KHÔNG còn là cột `reminders` jsonb nữa (dù nhánh
+//     ghi jsonb VẪN CHẠY SONG SONG làm lưới an toàn, chưa tắt).
+//   - `hasPendingRemindersForSpace()` (viết sẵn từ Bước 3, mirror bài học rút
+//     ra từ Habit) giờ là điểm nối quan trọng nhất: cho `refreshStaleSpaces()`
+//     biết Space nào đang có Reminder "chưa ghi xong" để KHÔNG gán đè
+//     `space.reminders` cho Space đó trong lượt refresh hiện tại.
+// =============================================================================
+
+export const REMINDER_ITEM_PERSIST_ENABLED = true;
+
+const REMINDER_ACTION_TYPES = new Set(['REMINDER_CREATE', 'REMINDER_UPDATE', 'REMINDER_DELETE']);
+
+/** Type guard — action có phải 1 trong 3 action CRUD của Reminder không (dùng ở `smartDispatch`). */
+export function isReminderAction(action: { type: string }): action is ReminderAction {
+  return REMINDER_ACTION_TYPES.has(action.type);
+}
+
+/** 1 thao tác đang chờ ghi cho 1 reminder — tương đương "descriptor" mục 4.2 tài liệu trên. Khác
+ * `LogPendingOp`/`HabitPendingOp`: `update` mang theo TOÀN BỘ `ReminderDefinition` mới (không phải
+ * patch hẹp) vì `REMINDER_UPDATE` luôn thay nguyên item — xem giải thích ở đầu block này. */
+export type ReminderPendingOp =
+  | { kind: 'insert'; reminder: ReminderDefinition }
+  | { kind: 'update'; reminder: ReminderDefinition }
+  | { kind: 'delete' };
+
+/**
+ * Gộp 1 thao tác MỚI vào thao tác ĐANG CHỜ (nếu có) của CÙNG 1 item, trong CÙNG cửa sổ debounce —
+ * tránh gửi 2 request khi user sửa liên tiếp rất nhanh. Đơn giản hơn `mergeLogPendingOp`/
+ * `mergeHabitPendingOp` vì `update`/`insert` ở đây LUÔN mang theo bản `ReminderDefinition` ĐẦY ĐỦ đã
+ * được `remindersReducer` tính đúng (giữ nguyên/làm mới `createdAt` theo đúng logic chu kỳ) — không
+ * cần áp patch từng field, chỉ cần lấy bản mới nhất.
+ *
+ * Export để test độc lập (`itemPersist.test.ts`).
+ */
+export function mergeReminderPendingOp(
+  existing: ReminderPendingOp | undefined,
+  incoming: ReminderPendingOp,
+): ReminderPendingOp | null {
+  if (!existing) return incoming;
+
+  if (incoming.kind === 'delete') {
+    // Item CHƯA từng lên server (còn đang chờ insert) rồi bị xoá ngay trong lúc còn chờ -> không
+    // cần làm gì cả (không insert rồi lại delete, tốn 1 lượt network vô ích).
+    if (existing.kind === 'insert') return null;
+    return incoming;
+  }
+
+  // incoming.kind === 'insert' | 'update' — cả 2 đều mang theo TOÀN BỘ ReminderDefinition mới nhất.
+  if (existing.kind === 'delete') {
+    // Đã yêu cầu xoá — 1 insert/update tới sau (race UI hiếm) không hồi sinh item.
+    return existing;
+  }
+  if (existing.kind === 'insert') {
+    // Item chưa lên server -> vẫn là 1 lượt insert, chỉ đổi nội dung sang bản mới nhất.
+    return { kind: 'insert', reminder: incoming.reminder };
+  }
+  // existing.kind === 'update' -> đổi nội dung sang bản mới nhất, vẫn là update.
+  return { kind: 'update', reminder: incoming.reminder };
+}
+
+/**
+ * Tính descriptor (item nào, thao tác gì) từ 1 action Reminder — LUÔN gọi SAU khi đã chắc chắn
+ * `action.payload.id` (với REMINDER_CREATE) đã được gắn cố định, và `nextSpace` là kết quả CHẠY THẬT
+ * `remindersReducer(currentSpace, action)` (không phải suy đoán).
+ *
+ * Export để test độc lập.
+ */
+export function computeReminderPersistDescriptors(
+  action: ReminderAction,
+  nextSpace: Space,
+): { itemId: string; op: ReminderPendingOp }[] {
+  switch (action.type) {
+    case 'REMINDER_CREATE': {
+      const id = action.payload.id;
+      if (!id) return []; // phòng thủ — caller (handleReminderActionForPersist) luôn phải gắn id trước
+      const created = nextSpace.reminders.find((r) => r.id === id);
+      if (!created) return []; // phòng thủ — buildReminder hiện không có nhánh từ chối tạo
+      return [{ itemId: id, op: { kind: 'insert', reminder: created } }];
+    }
+    case 'REMINDER_UPDATE': {
+      const updated = nextSpace.reminders.find((r) => r.id === action.payload.id);
+      if (!updated) return []; // reminder đã bị xoá trước đó (race hiếm) — không còn gì để update
+      return [{ itemId: action.payload.id, op: { kind: 'update', reminder: updated } }];
+    }
+    case 'REMINDER_DELETE':
+      return [{ itemId: action.payload.id, op: { kind: 'delete' } }];
+    default:
+      return [];
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Hàng đợi debounce theo itemId + thực thi — mirror CHÍNH XÁC cơ chế Log ở
+// đầu file (`pending`/`inFlight`, CÓ `scope`), đặt tên riêng để không đụng
+// tên module-level của Log/Habit.
+// ---------------------------------------------------------------------------
+
+interface ReminderPendingEntry {
+  scope: ReminderScope;
+  spaceId: string;
+  op: ReminderPendingOp;
+  timer: ReturnType<typeof setTimeout>;
+}
+
+const reminderPending = new Map<string, ReminderPendingEntry>();
+// Promise đang bay của lượt flush GẦN NHẤT cho 1 itemId — mirror `inFlight` ở phần Log (xem giải
+// thích đầy đủ ở đó). Tự tham chiếu đúng promise đã lưu (`wrapped`) khi dọn map — KHÔNG lặp lại bug
+// đã phát hiện + sửa ở `scheduleFlush()` (Log, Giai đoạn B).
+const reminderInFlight = new Map<string, Promise<void>>();
+// itemId -> {scope, spaceId} cho MỌI Reminder hiện "chưa ghi xong" — mirror CHÍNH XÁC
+// `activeSpaceRefs` ở phần Log. Dùng ở `hasPendingRemindersForSpace()` (Giai đoạn B, chưa nối ở lượt
+// này, viết sẵn để không phải sửa lại `scheduleReminderFlush()` sau).
+const activeReminderSpaceRefs = new Map<string, { scope: ReminderScope; spaceId: string }>();
+
+function setReminderFallback(scope: ReminderScope, active: boolean): void {
+  if (scope === 'private') setPrivateFallbackActive(active);
+  else setSharedFallbackActive(active);
+}
+
+async function flushReminderItem(itemId: string): Promise<void> {
+  const entry = reminderPending.get(itemId);
+  if (!entry) return; // đã bị mergeReminderPendingOp huỷ (vd insert+delete) hoặc đã flush bởi lượt khác
+  reminderPending.delete(itemId);
+  const { scope, spaceId, op } = entry;
+  try {
+    if (op.kind === 'insert') {
+      const result = await createReminder({ scope, spaceId }, op.reminder);
+      if (!result.ok) throw new Error(result.error ?? 'Không rõ lỗi');
+    } else if (op.kind === 'update') {
+      await updateReminder(scope, itemId, op.reminder);
+    } else {
+      await deleteReminder(scope, itemId);
+    }
+    setReminderFallback(scope, false);
+  } catch (err) {
+    console.warn(`[KN-Space] itemPersist: lưu Reminder ${itemId} thất bại:`, err);
+    setReminderFallback(scope, true);
+  }
+}
+
+/** Xếp lượt flush của `itemId` nối tiếp sau lượt đang bay (nếu có) — mirror CHÍNH XÁC
+ * `scheduleFlush()` ở phần Log (đã áp dụng fix bug `inFlight` ngay từ đầu, không lặp lại lỗi so
+ * sánh nhầm biến `next`). */
+function scheduleReminderFlush(itemId: string): void {
+  const prior = reminderInFlight.get(itemId) ?? Promise.resolve();
+  const chained = prior.then(() => flushReminderItem(itemId));
+  const wrapped: Promise<void> = chained.finally(() => {
+    if (reminderInFlight.get(itemId) === wrapped) {
+      reminderInFlight.delete(itemId);
+      if (!reminderPending.has(itemId)) activeReminderSpaceRefs.delete(itemId);
+    }
+  });
+  reminderInFlight.set(itemId, wrapped);
+}
+
+/** Đưa 1 thao tác vào hàng đợi debounce (600ms) của `itemId`, gộp với thao tác đang chờ (nếu có). */
+function queueReminderPersist(scope: ReminderScope, spaceId: string, itemId: string, op: ReminderPendingOp, debounceMs = 600): void {
+  const existing = reminderPending.get(itemId);
+  if (existing) clearTimeout(existing.timer);
+
+  const merged = mergeReminderPendingOp(existing?.op, op);
+  if (merged === null) {
+    reminderPending.delete(itemId);
+    if (!reminderInFlight.has(itemId)) activeReminderSpaceRefs.delete(itemId);
+    return;
+  }
+
+  const timer = setTimeout(() => scheduleReminderFlush(itemId), debounceMs);
+  reminderPending.set(itemId, { scope, spaceId, op: merged, timer });
+  activeReminderSpaceRefs.set(itemId, { scope, spaceId });
+}
+
+/**
+ * `true` nếu Space (`scope`+`spaceId`) hiện có ÍT NHẤT 1 Reminder "chưa ghi xong" (còn chờ debounce
+ * HOẶC network call đang bay) — dùng ở `refreshStaleSpaces()` (Giai đoạn B, AppStateContext.tsx) để
+ * KHÔNG gán đè `space.reminders` bằng dữ liệu vừa tải lại từ bảng item-level cho Space này trong lượt
+ * refresh hiện tại. Mirror CHÍNH XÁC `hasPendingLogsForSpace()`.
+ */
+export function hasPendingRemindersForSpace(scope: ReminderScope, spaceId: string): boolean {
+  for (const ref of activeReminderSpaceRefs.values()) {
+    if (ref.scope === scope && ref.spaceId === spaceId) return true;
+  }
+  return false;
+}
+
+/**
+ * Điểm gọi DUY NHẤT từ `AppStateContext.tsx` (`smartDispatch`) cho mọi action Reminder. Làm 3 việc
+ * (mirror CHÍNH XÁC `handleLogActionForPersist()`):
+ *   1. Nếu `REMINDER_CREATE` chưa có `payload.id` -> tự sinh, trả action đã gắn id để caller dùng
+ *      làm `actionToDispatch`.
+ *   2. Chạy `remindersReducer(currentSpace, action)` để biết CHÍNH XÁC kết quả.
+ *   3. Tính descriptor + đẩy vào hàng đợi debounce theo itemId (no-op nếu
+ *      `REMINDER_ITEM_PERSIST_ENABLED` còn `false`).
+ *
+ * Trả về action ĐÃ gắn id (dùng làm `actionToDispatch`) — KHÔNG dispatch thật ở đây.
+ */
+export function handleReminderActionForPersist(currentSpace: Space, action: ReminderAction): ReminderAction {
+  let resolvedAction = action;
+  if (resolvedAction.type === 'REMINDER_CREATE' && resolvedAction.payload.id === undefined) {
+    resolvedAction = { ...resolvedAction, payload: { ...resolvedAction.payload, id: crypto.randomUUID() } };
+  }
+
+  if (!REMINDER_ITEM_PERSIST_ENABLED) return resolvedAction;
+
+  const scope: ReminderScope = currentSpace.isShared && currentSpace.sharedSpaceId ? 'shared' : 'private';
+  const spaceId = scope === 'shared' ? currentSpace.sharedSpaceId! : currentSpace.id;
+
+  // Space cá nhân CHƯA từng lưu lên `kn_private_spaces` (vừa tạo cục bộ, `_privateVersion`
+  // undefined) -> KHÔNG persist item-level ngay (FK `kn_private_reminders.space_id` sẽ vi phạm vì
+  // hàng cha chưa tồn tại trên DB). Bỏ qua an toàn — cột `reminders` jsonb (đường cũ) vẫn lưu bình
+  // thường, không mất dữ liệu; item-level sẽ persist đúng ở lần sửa KẾ TIẾP.
+  if (scope === 'private' && currentSpace._privateVersion === undefined) return resolvedAction;
+
+  const nextSpace = remindersReducer(currentSpace, resolvedAction);
+  const descriptors = computeReminderPersistDescriptors(resolvedAction, nextSpace);
+  descriptors.forEach(({ itemId, op }) => queueReminderPersist(scope, spaceId, itemId, op));
+
+  return resolvedAction;
+}
+
+/**
+ * Flush ngay mọi thao tác Reminder đang chờ debounce (mirror `flushAllPendingLogPersist()` ở trên) —
+ * gọi khi tab chuyển `hidden`. No-op nếu không có gì đang chờ (luôn đúng khi
+ * `REMINDER_ITEM_PERSIST_ENABLED === false`).
+ */
+export function flushAllPendingReminderPersist(): void {
+  const ids = Array.from(reminderPending.keys());
+  ids.forEach((id) => {
+    const entry = reminderPending.get(id);
+    if (entry) clearTimeout(entry.timer);
+    scheduleReminderFlush(id);
   });
 }
