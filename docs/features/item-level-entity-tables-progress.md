@@ -21,6 +21,8 @@
 
 **Bước 4 (entity Task, `kn_private_tasks`/`kn_shared_tasks`) — 4a (fractional-index thuần logic) VÀ 4b (bảng/RLS/storage layer/dispatch/migration script) đều ĐÃ CODE XONG (2026-07-11).** `TASK_REORDER` (`state/reducers/tasks.ts`) đã tích hợp `computeOrderForInsertAt()` thật — không còn reindex toàn mảng. 132/132 test pass, `npx tsc --noEmit`/`npm run build` pass. Cờ `TASK_ITEM_PERSIST_ENABLED` vẫn `false` — CHƯA chạy SQL lên Supabase Dashboard, CHƯA migrate dữ liệu thật, CHƯA bật dual-write. Xem chi tiết ở mục "Bước 4 — entity Task" bên dưới.
 
+**Bước 5 (entity Note, `kn_private_notes`/`kn_shared_notes`, CÓ bản shared — entity CUỐI CÙNG của kế hoạch) — ĐÃ CODE XONG (2026-07-11), mirror CHÍNH XÁC Task (Bước 4b).** `NOTE_REORDER` (`state/reducers/notes.ts`) đã tích hợp `computeOrderForInsertAt()` thật — không còn reindex toàn mảng (CÓ thêm tham số `insertAfter`, khác Task). Thêm cột RIÊNG `content_updated_at` (tách khỏi trigger `updated_at`) để tránh regression: kéo-thả/ẩn-hiện KHÔNG được vô tình đổi mốc "sửa nội dung lần cuối" hiển thị cho user. 161/161 test pass, `npx tsc --noEmit`/`npm run build` pass. Cờ `NOTE_ITEM_PERSIST_ENABLED` vẫn `false` — CHƯA chạy SQL lên Supabase Dashboard, CHƯA migrate dữ liệu thật, CHƯA bật dual-write. Xem chi tiết ở mục "Bước 5 — entity Note" bên dưới.
+
 ---
 
 ## Quyết định đã chốt (2026-07-10)
@@ -439,6 +441,115 @@ bằng tài khoản Google phụ (User B) trước → migrate tài khoản chí
 `TASK_ITEM_PERSIST_ENABLED = true` → chủ dự án tự verify tay qua UI thật (OAuth) → cân nhắc code Giai
 đoạn B (cutover phần đọc, mirror Log/Habit/Reminder) → sau khi Task ổn định, chuyển sang entity Note
 (Bước 5, kế hoạch tổng Log → Habit → Reminder → Task → **Note**).
+
+---
+
+## Bước 5 — entity Note (`kn_private_notes`/`kn_shared_notes`, CÓ bản shared, ENTITY CUỐI CÙNG)
+
+Theo đúng 5 bước con đã mô tả ở `item-level-entity-tables.md` mục 7, mirror CHÍNH XÁC cách làm Task
+(Bước 4b) ở giai đoạn TRƯỚC KHI bật Giai đoạn A/B (chỉ chuẩn bị, chưa đụng dữ liệu thật). KHÔNG cần
+bước con "4a" riêng (fractional-index thuần logic đã viết + test xong ở Bước 4a, tái dùng nguyên
+`computeOrderForInsertAt()`, không sửa module đó).
+
+**Rủi ro thiết kế đã xác định TRƯỚC khi code (khác mọi entity trước) — cột `content_updated_at`
+tách khỏi trigger `updated_at`:** `Note.updatedAt` (`src/types.ts`, epoch ms) là mốc "sửa nội dung lần
+cuối" — hiển thị "đã sửa lúc..." cho user VÀ dùng để sort "Mới sửa gần nhất". Ở tầng reducer
+(`state/reducers/notes.ts`), field này CHỈ đổi ở `NOTE_CREATE`/`NOTE_UPDATE` — KHÔNG đổi khi kéo-thả
+(`NOTE_REORDER`) hay ẩn/hiện (`NOTE_TOGGLE_CONTENT_HIDDEN`). Log/Reminder/Task đều dùng THẲNG cột
+`updated_at` do trigger `*_before_update` tự bump VÔ ĐIỀU KIỆN mỗi lần UPDATE để suy ra field hiển thị
+tương ứng của họ — nếu Note copy y nguyên cách đó, 1 lần kéo-thả hoặc ẩn/hiện 1 note sẽ VÔ TÌNH đổi
+"đã sửa lúc..." và làm SAI thứ tự sort "Mới sửa gần nhất" — REGRESSION thật so với hành vi hiện tại
+(jsonb), PHẢI TRÁNH. **Quyết định:** thêm cột RIÊNG `content_updated_at` (double precision, epoch ms)
+— CHỈ tầng app (`noteStore.ts`) set tường minh khi ghi `NOTE_CREATE`/`NOTE_UPDATE` (map thẳng
+`Note.updatedAt`, KHÔNG qua `Date`/ISO string), KHÔNG đụng khi ghi `NOTE_REORDER` (chỉ patch
+`item_order`)/`NOTE_TOGGLE_CONTENT_HIDDEN` (chỉ patch `hidden`). Cột `updated_at` (trigger nội bộ,
+mirror các bảng khác — "miễn phí") vẫn giữ trên DB nhưng KHÔNG được tầng app đọc/dùng để suy ra
+`Note.updatedAt`. Xem giải thích đầy đủ ở header `docs/features/item-level-note-schema.sql`.
+
+1. ✅ **Bảng mới** — `docs/features/item-level-note-schema.sql` (file mới, CHƯA chạy lên Supabase
+   Dashboard thật). `kn_private_notes`/`kn_shared_notes`, mirror đúng `kn_private_tasks`/
+   `kn_shared_tasks`: `id` uuid client-sinh, `item_order` double precision NOT NULL
+   (fractional-index), `created_by` uuid null (chỉ ý nghĩa hiển thị avatar Shared Space, không dùng
+   cho RLS), `created_at` timestamptz NULL ĐƯỢC (mirror Task — `Note.createdAt` optional ở tầng app),
+   `hidden` boolean NOT NULL DEFAULT false, **`content_updated_at` double precision NOT NULL** (cột
+   RIÊNG, xem giải thích rủi ro thiết kế ở trên), `version`/trigger giữ nguyên nhưng không dùng
+   version-check.
+2. ✅ **RLS 2 nhánh tách biệt** — gộp trong cùng file SQL trên. Private: `auth.uid() = user_id`
+   (mirror `kn_private_tasks`). Shared: `is_space_member(space_id)` (mirror `kn_shared_tasks`, mọi
+   member được sửa/xoá note của người khác trong cùng Space — đúng hành vi cũ, không giới hạn theo
+   người tạo).
+3. ✅ **Storage layer** — `src/storage/noteStore.ts` (CRUD: `loadPrivateNotes`/`loadSharedNotes`
+   (sort theo `item_order`)/`createNote`/`insertNotesBulk`/`updateNote` (patch hẹp theo từng nhóm
+   field)/`deleteNote`/`listExistingNoteIds`, ghi thẳng blind write; `toInsertRow()` chỉ set
+   `created_at` khi `Note.createdAt` có giá trị thật; `rowToNote()` map `content_updated_at` ->
+   `Note.updatedAt` TRỰC TIẾP, không qua `Date`). `src/state/itemPersist.ts` mở rộng thêm nhánh Note
+   (giữ NGUYÊN 4 nhánh Log/Habit/Reminder/Task có sẵn, chỉ nối thêm phía dưới) — debounce theo
+   `itemId` 600ms, `mergeNotePendingOp()`, hàng đợi `notePending`/`noteInFlight` riêng. 3 action UPDATE
+   tách biệt (`NOTE_UPDATE`/`NOTE_REORDER`/`NOTE_TOGGLE_CONTENT_HIDDEN`), mỗi action patch 1 nhóm
+   field hẹp — mirror cách Task dùng patch hẹp. Đã áp dụng luôn fix bug `inFlight` (tự tham chiếu
+   đúng promise `wrapped` khi dọn map) và viết sẵn `hasPendingNotesForSpace()`/`activeNoteSpaceRefs`
+   NGAY TỪ ĐẦU dù chưa có Giai đoạn B để dùng tới ở lượt này (mirror bài học đã áp dụng cho
+   Habit/Reminder/Task). **KHÁC Task:** đã xác nhận qua grep toàn repo — Note KHÔNG có notify Shared
+   Space/Edge Function nào chạy trước gắn sẵn `payload.id` (khác Task, nơi khối notify assign/hoàn
+   thành task có thể đã gắn id trước khi tới `handleTaskActionForPersist()`), nên
+   `handleNoteActionForPersist()` không cần logic `actionToDispatch` đặc biệt như Task.
+4. ✅ **Tích hợp dispatch** — `AppStateContext.tsx` (`smartDispatch`) gọi
+   `handleNoteActionForPersist()` cho mọi action `NOTE_*`, thêm NGAY SAU nhánh Task, độc lập với luồng
+   save Space-level (`kn_private_spaces.notes`/`kn_shared_spaces.notes` jsonb — VẪN LÀ NGUỒN THẬT,
+   không đổi gì). Cờ `NOTE_ITEM_PERSIST_ENABLED = false` (đầu phần Note trong `itemPersist.ts`) — khi
+   `false`, `handleNoteActionForPersist()` chỉ tự sinh `id` cho `NOTE_CREATE` nếu thiếu (mirror
+   Log/Habit/Reminder/Task), KHÔNG gọi bất kỳ hàm nào trong `noteStore.ts` (bảng `kn_private_notes`/
+   `kn_shared_notes` CHƯA tồn tại thật). `flushAllPendingNotePersist()` cũng đã nối vào nhánh `hidden`
+   của `visibilitychange` (cùng chỗ Log/Habit/Reminder/Task).
+5. ✅ **Migration** — `src/storage/migrateLegacyNotes.ts` (mirror `migrateLegacyTasks.ts`, CÓ nhánh
+   shared), giữ nguyên `order`/`updatedAt` cũ (`updatedAt` GIỮ NGUYÊN giá trị epoch ms cũ, KHÔNG tính
+   lại "now" — mốc lịch sử phải giữ đúng; `created_at` chỉ set khi có giá trị thật), expose qua
+   `window.knMigrateNotes.preview()/.run()` (`main.tsx`). **CHƯA chạy** — chờ chủ dự án tự chạy
+   `item-level-note-schema.sql` trên Supabase Dashboard trước.
+
+**Test mới:**
+- `src/state/reducers/notes.test.ts` (Note trước đây CHƯA có unit test nào) — 13 test: `NOTE_CREATE`
+  dùng đúng `id` truyền sẵn / tự sinh UUID khi không truyền; bộ test `NOTE_REORDER
+  (fractional-index)` phủ CẢ 2 biến thể `insertAfter=false` (chèn trước targetId) và `insertAfter=true`
+  (chèn ngay sau targetId) — kéo giữa/đầu/cuối danh sách, no-op khi `draggedId`/`targetId` không hợp
+  lệ hoặc trùng nhau, kéo lặp lại nhiều lần liên tiếp không NaN/crash, kéo đi rồi kéo NGAY VỀ đúng vị
+  trí cũ (idempotent, mirror edge-case đã thêm cho Task ở Việc 1); 2 test riêng xác nhận
+  `NOTE_REORDER`/`NOTE_TOGGLE_CONTENT_HIDDEN` KHÔNG đổi `updatedAt` (verify trực tiếp bất biến thiết
+  kế quan trọng nhất của Bước 5 — nếu ai vô tình sửa reducer làm 2 action này đụng `updatedAt`, test
+  này sẽ đỏ ngay).
+- `src/state/itemPersist.test.ts` — `computeNotePersistDescriptors` (9 test)/`mergeNotePendingOp` (5
+  test), thuần logic, mirror Log/Habit/Reminder/Task lúc mới viết, KHÔNG gọi Supabase thật. Riêng
+  `NOTE_REORDER`/`NOTE_TOGGLE_CONTENT_HIDDEN` có test xác nhận descriptor patch CHỈ gồm đúng 1 field
+  (`order`/`hidden`), KHÔNG kèm `updatedAt` — mirror bất biến thiết kế đã kiểm ở reducer.
+- Tổng **161/161 test pass** (từ 132 sau Bước 4, +29 test: 13 reducer Note + 16 itemPersist Note).
+
+**Cách test (cờ còn tắt, `npm run dev` với OAuth thật):**
+- `npx tsc --noEmit`, `npm run build`, `npm test` (161/161) — cả 3 PASS (đã tự chạy, xem kết quả ở
+  trên).
+- **Môi trường agent hiện tại không tự đăng nhập Google OAuth được** — không thao tác UI thật qua
+  `npm run dev` để xác nhận runtime bằng tay (mirror đúng tình trạng đã ghi nhận ở Bước 4a/4b — Task
+  cũng không được test tay UI ở giai đoạn chuẩn bị này, chỉ dựa vào unit test + code review). Chủ dự
+  án cần tự test tay 1 lượt qua `npm run dev` (OAuth thật): tạo/sửa/kéo-thả (thử cả kéo lên/xuống, thử
+  thả vào nửa trên lẫn nửa dưới của 1 note khác để phủ cả 2 nhánh `insertAfter`)/ẩn-hiện/xoá 1 Ghi chú
+  ở Space cá nhân bất kỳ — UI phải hoạt động **giống hệt trước** (cờ `NOTE_ITEM_PERSIST_ENABLED` còn
+  `false`, mọi thứ vẫn đọc/ghi qua cột `notes` jsonb như cũ). Mở DevTools > Network trong lúc thao
+  tác, xác nhận **KHÔNG** có request nào tới `kn_private_notes`/`kn_shared_notes` (2 bảng chưa tồn tại
+  thật — nếu thấy request lỗi "relation does not exist" là dấu hiệu cờ bị bật nhầm, cần báo ngay).
+  Quan trọng nhất cần để ý: sau khi kéo-thả hoặc ẩn/hiện 1 note, dòng chữ "đã sửa lúc..." hiển thị
+  trên UI (nếu có) KHÔNG được đổi — chỉ sửa nội dung/tiêu đề/màu mới đổi dòng đó.
+- Đọc code review: `src/storage/noteStore.ts`, `src/state/itemPersist.ts` (phần Note ở cuối file),
+  đoạn tích hợp trong `src/state/AppStateContext.tsx` (`smartDispatch`, tìm
+  `isNoteAction`/`handleNoteActionForPersist`), `docs/features/item-level-note-schema.sql`,
+  `src/storage/migrateLegacyNotes.ts`, `src/state/reducers/notes.ts` (`NOTE_REORDER`).
+
+**Bước kế tiếp (chờ chủ dự án tự tay làm, đúng quy trình đã áp dụng cho Log/Habit/Reminder/Task):**
+chạy `item-level-note-schema.sql` trên Supabase Dashboard → test
+`window.knMigrateNotes.preview()/.run()` bằng tài khoản Google phụ (User B) trước → migrate tài khoản
+chính (User A) → xác nhận để bật `NOTE_ITEM_PERSIST_ENABLED = true` → chủ dự án tự verify tay qua UI
+thật (OAuth) → cân nhắc code Giai đoạn B (cutover phần đọc, mirror Log/Habit/Reminder/Task). Đây là
+**entity CUỐI CÙNG** trong kế hoạch tổng (Log → Habit → Reminder → Task → Note) — sau khi Note ổn
+định, cân nhắc bước tổng kết: rà soát tắt các nhánh ghi jsonb cũ đã "chết" (câu hỏi mở #2, hiện vẫn
+[MỞ] cho cả 5 entity) một khi mọi Giai đoạn B đã chạy ổn định đủ lâu.
 
 ---
 

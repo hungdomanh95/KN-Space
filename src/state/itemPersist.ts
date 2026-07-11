@@ -9,8 +9,8 @@
 // vẫn có (600ms, gộp nhiều sửa liên tiếp CÙNG 1 item), nhưng đơn vị theo dõi là
 // `itemId` (Map), không phải `spaceId`.
 //
-// File này gộp CẢ 4 entity đã làm tới nay theo đúng kế hoạch cuốn chiếu (mục 7
-// tài liệu trên, Log → Habit → Reminder → Task → Note):
+// File này gộp CẢ 5 entity theo đúng kế hoạch cuốn chiếu (mục 7 tài liệu trên,
+// Log → Habit → Reminder → Task → Note):
 //   - Log (Bước 1, xong, Giai đoạn A+B đã bật) — phần đầu file.
 //   - Habit (Bước 2, Giai đoạn A+B đã bật 2026-07-11) — phần giữa file, xem
 //     `HABIT_ITEM_PERSIST_ENABLED` bên dưới. Habit KHÔNG có bản Shared (chỉ có
@@ -22,19 +22,37 @@
 //     field) vì `ReminderFormModal.tsx` cho phép đổi cả `type` (once <->
 //     recurring) khi sửa — xem `reminderStore.ts`.
 //   - Task (Bước 4, CHỈ mới chuẩn bị — `TASK_ITEM_PERSIST_ENABLED = false`) —
-//     phần cuối file. Task CÓ bản Shared (mirror Log/Reminder). Khác Reminder:
-//     có 3 action UPDATE tách biệt (`TASK_UPDATE`/`TASK_TOGGLE_DONE`/
-//     `TASK_REORDER`), mỗi action patch 1 nhóm field hẹp — mirror cách Habit
-//     dùng patch hẹp (`HABIT_UPDATE`/`HABIT_TOGGLE_TODAY`), KHÔNG mirror cách
-//     Reminder thay nguyên item. `TASK_REORDER` dùng fractional-index
-//     (`src/state/fractionalOrder.ts`, đã tích hợp vào `state/reducers/tasks.ts`)
-//     — chỉ patch `order` của ĐÚNG 1 task, không đụng task khác. **Điểm khác
-//     biệt quan trọng khi gọi `handleTaskActionForPersist()` từ
-//     `AppStateContext.tsx`:** PHẢI truyền `actionToDispatch` (không phải
-//     `action` gốc) — khối notify Shared Space (assign/hoàn thành task, chạy
-//     TRƯỚC trong `smartDispatch`) có thể đã gắn sẵn `payload.id` cho
-//     `TASK_CREATE` (đảm bảo id gửi trong notify khớp đúng id task thật) —
-//     dùng lại `action` gốc sẽ khiến hàm này tự sinh 1 id THỨ HAI khác hẳn.
+//     phần giữa file (sau Reminder). Task CÓ bản Shared (mirror Log/Reminder).
+//     Khác Reminder: có 3 action UPDATE tách biệt (`TASK_UPDATE`/
+//     `TASK_TOGGLE_DONE`/`TASK_REORDER`), mỗi action patch 1 nhóm field hẹp —
+//     mirror cách Habit dùng patch hẹp (`HABIT_UPDATE`/`HABIT_TOGGLE_TODAY`),
+//     KHÔNG mirror cách Reminder thay nguyên item. `TASK_REORDER` dùng
+//     fractional-index (`src/state/fractionalOrder.ts`, đã tích hợp vào
+//     `state/reducers/tasks.ts`) — chỉ patch `order` của ĐÚNG 1 task, không
+//     đụng task khác. **Điểm khác biệt quan trọng khi gọi
+//     `handleTaskActionForPersist()` từ `AppStateContext.tsx`:** PHẢI truyền
+//     `actionToDispatch` (không phải `action` gốc) — khối notify Shared Space
+//     (assign/hoàn thành task, chạy TRƯỚC trong `smartDispatch`) có thể đã
+//     gắn sẵn `payload.id` cho `TASK_CREATE` (đảm bảo id gửi trong notify
+//     khớp đúng id task thật) — dùng lại `action` gốc sẽ khiến hàm này tự
+//     sinh 1 id THỨ HAI khác hẳn.
+//   - Note (Bước 5, entity CUỐI CÙNG, CHỈ mới chuẩn bị —
+//     `NOTE_ITEM_PERSIST_ENABLED = false`) — phần cuối file. Note CÓ bản
+//     Shared (mirror Task/Log/Reminder). Giống Task ở chỗ có nhiều action
+//     UPDATE tách biệt patch field hẹp (`NOTE_UPDATE`/`NOTE_REORDER`/
+//     `NOTE_TOGGLE_CONTENT_HIDDEN`), dùng fractional-index cho `NOTE_REORDER`
+//     (mirror `TASK_REORDER`, có thêm `insertAfter` — xem
+//     `state/reducers/notes.ts`). KHÁC Task: KHÔNG có notify nào chạy trước
+//     gắn sẵn id (không có Edge Function/notify Shared Space nào cho Note) —
+//     `handleNoteActionForPersist()` nhận `action` bình thường, không cần
+//     logic `actionToDispatch` đặc biệt như Task. **Điểm khác biệt quan
+//     trọng riêng của Note:** `NOTE_UPDATE`/`NOTE_CREATE` patch field
+//     `updatedAt` (map thẳng vào cột DB `content_updated_at`, KHÔNG phải cột
+//     `updated_at` trigger) — `NOTE_REORDER`/`NOTE_TOGGLE_CONTENT_HIDDEN`
+//     TUYỆT ĐỐI KHÔNG được patch field này (xem giải thích đầy đủ ở header
+//     `docs/features/item-level-note-schema.sql`/`noteStore.ts` — rủi ro thiết
+//     kế đã xác định: kéo-thả/ẩn-hiện không được vô tình đổi "đã sửa lúc..."
+//     hiển thị cho user hay làm sai thứ tự sort "Mới sửa gần nhất").
 //
 // CỜ BẬT/TẮT — `LOG_ITEM_PERSIST_ENABLED`:
 // Bảng `kn_private_logs`/`kn_shared_logs` (docs/features/item-level-log-schema.sql)
@@ -51,7 +69,7 @@
 // refresh hiện tại (tránh đè mất log vừa tạo/sửa/xoá cục bộ).
 // =============================================================================
 
-import type { Habit, ReminderDefinition, Space, Task } from '../types';
+import type { Habit, Note, ReminderDefinition, Space, Task } from '../types';
 import type { LogAction } from './reducers/logs';
 import { logsReducer } from './reducers/logs';
 import type { HabitAction } from './reducers/habits';
@@ -60,6 +78,8 @@ import type { ReminderAction } from './reducers/reminders';
 import { remindersReducer } from './reducers/reminders';
 import type { TaskAction } from './reducers/tasks';
 import { tasksReducer } from './reducers/tasks';
+import type { NoteAction } from './reducers/notes';
+import { notesReducer } from './reducers/notes';
 import type { LogEntry } from '../types';
 import { setPrivateFallbackActive, setSharedFallbackActive } from '../storage/supabaseStore';
 import {
@@ -82,6 +102,12 @@ import {
   updateTask,
   type TaskScope,
 } from '../storage/taskStore';
+import {
+  createNote,
+  deleteNote,
+  updateNote,
+  type NoteScope,
+} from '../storage/noteStore';
 
 export const LOG_ITEM_PERSIST_ENABLED = true;
 
@@ -1209,5 +1235,317 @@ export function flushAllPendingTaskPersist(): void {
     const entry = taskPending.get(id);
     if (entry) clearTimeout(entry.timer);
     scheduleTaskFlush(id);
+  });
+}
+
+// =============================================================================
+// Note (Bước 5, entity CUỐI CÙNG, docs/features/item-level-entity-tables.md)
+// — mirror CHÍNH XÁC cấu trúc Task ở trên (descriptor/merge/debounce theo
+// itemId, CÓ `scope` — Note CÓ bản Shared), chỉ khác:
+//   - 3 action UPDATE TÁCH BIỆT (`NOTE_UPDATE`/`NOTE_REORDER`/
+//     `NOTE_TOGGLE_CONTENT_HIDDEN`), mỗi action patch 1 nhóm field HẸP —
+//     mirror cách Task dùng patch hẹp (`TASK_UPDATE`/`TASK_TOGGLE_DONE`/
+//     `TASK_REORDER`).
+//   - `NOTE_REORDER` dùng fractional-index (`src/state/fractionalOrder.ts`,
+//     đã tích hợp vào `state/reducers/notes.ts` — xem `computeOrderForInsertAt`,
+//     CÓ thêm tham số `insertAfter` khác Task) — chỉ patch field `order` của
+//     ĐÚNG 1 note vừa kéo, note khác giữ nguyên.
+//   - `NOTE_UPDATE`/`NOTE_CREATE` patch/insert kèm field `updatedAt` — map
+//     THẲNG vào cột DB `content_updated_at` (KHÔNG phải cột `updated_at`
+//     trigger, xem `noteStore.ts`). `NOTE_REORDER`/`NOTE_TOGGLE_CONTENT_HIDDEN`
+//     TUYỆT ĐỐI KHÔNG được patch field `updatedAt` — xem giải thích đầy đủ ở
+//     đầu file + header `docs/features/item-level-note-schema.sql` (rủi ro
+//     thiết kế đã xác định trước khi code: kéo-thả/ẩn-hiện không được vô
+//     tình đổi "đã sửa lúc..." hiển thị cho user hay làm sai thứ tự sort
+//     "Mới sửa gần nhất").
+//   - `NOTE_ITEM_PERSIST_ENABLED = false` — bảng `kn_private_notes`/
+//     `kn_shared_notes` (docs/features/item-level-note-schema.sql) CHỈ MỚI
+//     CHUẨN BỊ SQL trong repo, CHƯA chạy lên Supabase Dashboard thật, CHƯA có
+//     dữ liệu migrate. `handleNoteActionForPersist()` khi cờ tắt CHỈ tự sinh
+//     `id` cho `NOTE_CREATE` nếu thiếu (mirror `LOG_CREATE`/`HABIT_CREATE`/
+//     `REMINDER_CREATE`/`TASK_CREATE`), KHÔNG gọi bất kỳ hàm nào trong
+//     `noteStore.ts`.
+//   - Đã viết sẵn `hasPendingNotesForSpace()`/`activeNoteSpaceRefs` NGAY TỪ
+//     ĐẦU dù chưa có Giai đoạn B để dùng tới ở lượt này (mirror bài học đã áp
+//     dụng cho Habit/Reminder/Task — tránh phải quay lại sửa
+//     `scheduleNoteFlush()` sau). Đã áp dụng luôn fix bug `inFlight` phát
+//     hiện ở Giai đoạn B của Log (tự tham chiếu đúng promise `wrapped` khi
+//     dọn map, không so sánh nhầm biến `next`).
+//   - **KHÁC Task:** Note KHÔNG có notify Shared Space nào chạy trước gắn sẵn
+//     `payload.id` (không có Edge Function/notify nào cho Note, xác nhận qua
+//     grep toàn repo trước khi viết block này) — `handleNoteActionForPersist()`
+//     nhận `action` bình thường ở `AppStateContext.tsx`, không cần logic
+//     `actionToDispatch` đặc biệt như Task (dù caller vẫn được khuyến nghị
+//     truyền `actionToDispatch` — tại thời điểm gọi (SAU khối Task) giá trị
+//     đó luôn TRÙNG với `action` gốc cho mọi action `NOTE_*`, vì khối Task chỉ
+//     biến đổi action có type `TASK_*`).
+// =============================================================================
+
+export const NOTE_ITEM_PERSIST_ENABLED = false;
+
+const NOTE_ACTION_TYPES = new Set([
+  'NOTE_CREATE',
+  'NOTE_UPDATE',
+  'NOTE_DELETE',
+  'NOTE_REORDER',
+  'NOTE_TOGGLE_CONTENT_HIDDEN',
+]);
+
+/** Type guard — action có phải 1 trong 5 action CRUD của Note không (dùng ở `smartDispatch`). */
+export function isNoteAction(action: { type: string }): action is NoteAction {
+  return NOTE_ACTION_TYPES.has(action.type);
+}
+
+/** Patch hẹp — mỗi action UPDATE của Note chỉ set 1 nhóm field con (xem giải thích ở đầu block). */
+type NotePatch = {
+  title?: string;
+  content?: string;
+  color?: string;
+  updatedAt?: number;
+  order?: number;
+  hidden?: boolean;
+};
+
+/** 1 thao tác đang chờ ghi cho 1 note — tương đương "descriptor" mục 4.2 tài liệu trên. */
+export type NotePendingOp =
+  | { kind: 'insert'; note: Note }
+  | { kind: 'update'; patch: NotePatch }
+  | { kind: 'delete' };
+
+/** Áp patch vào 1 `Note` cục bộ (KHÔNG gọi DB) — dùng khi gộp 1 UPDATE tới trong lúc 1 INSERT của
+ * CÙNG item còn đang chờ (item chưa từng lên server để có gì mà UPDATE). */
+function applyNotePatch(note: Note, patch: NotePatch): Note {
+  const next: Note = { ...note };
+  if (patch.title !== undefined) next.title = patch.title;
+  if (patch.content !== undefined) next.content = patch.content;
+  if (patch.color !== undefined) next.color = patch.color;
+  if (patch.updatedAt !== undefined) next.updatedAt = patch.updatedAt;
+  if (patch.order !== undefined) next.order = patch.order;
+  if (patch.hidden !== undefined) next.hidden = patch.hidden;
+  return next;
+}
+
+/**
+ * Gộp 1 thao tác MỚI vào thao tác ĐANG CHỜ (nếu có) của CÙNG 1 item, trong CÙNG cửa sổ debounce —
+ * mirror CHÍNH XÁC `mergeTaskPendingOp()` ở trên (cùng bộ quy tắc insert/update/delete).
+ *
+ * Export để test độc lập (`itemPersist.test.ts`).
+ */
+export function mergeNotePendingOp(existing: NotePendingOp | undefined, incoming: NotePendingOp): NotePendingOp | null {
+  if (!existing) return incoming;
+
+  if (incoming.kind === 'delete') {
+    // Item CHƯA từng lên server (còn đang chờ insert) rồi bị xoá ngay trong lúc còn chờ -> không
+    // cần làm gì cả (không insert rồi lại delete, tốn 1 lượt network vô ích).
+    if (existing.kind === 'insert') return null;
+    return incoming;
+  }
+
+  if (incoming.kind === 'update') {
+    if (existing.kind === 'insert') {
+      // Item chưa lên server -> merge patch THẲNG vào note đang chờ insert, không tạo 1 UPDATE
+      // riêng (không có gì trên DB để UPDATE).
+      return { kind: 'insert', note: applyNotePatch(existing.note, incoming.patch) };
+    }
+    if (existing.kind === 'update') {
+      // Gộp nhiều patch liên tiếp — field nào có mặt ở patch SAU thì đè, field vắng giữ patch cũ.
+      return { kind: 'update', patch: { ...existing.patch, ...incoming.patch } };
+    }
+    // existing.kind === 'delete' — đã yêu cầu xoá, 1 update tới sau (race UI hiếm) không hồi sinh
+    // item, giữ nguyên delete.
+    return existing;
+  }
+
+  // incoming.kind === 'insert' — không nên xảy ra thực tế (id là UUID, NOTE_CREATE không tái dùng
+  // id đã có) — phòng thủ: ưu tiên bản mới nhất.
+  return incoming;
+}
+
+/**
+ * Tính descriptor (item nào, thao tác gì) từ 1 action Note — LUÔN gọi SAU khi đã chắc chắn
+ * `action.payload.id` (với NOTE_CREATE) đã được gắn cố định, và `nextSpace` là kết quả CHẠY THẬT
+ * `notesReducer(currentSpace, action)` (không phải suy đoán). LUÔN lấy giá trị field từ `nextSpace`
+ * (không phải trực tiếp từ `action.payload`) — vd `NOTE_UPDATE` có thể bị `notesReducer` trim/fallback
+ * `title` rỗng thành 'Note chưa đặt tên', dùng thẳng payload sẽ lệch với dữ liệu thật trong state.
+ *
+ * Export để test độc lập.
+ */
+export function computeNotePersistDescriptors(
+  action: NoteAction,
+  nextSpace: Space,
+): { itemId: string; op: NotePendingOp }[] {
+  switch (action.type) {
+    case 'NOTE_CREATE': {
+      const id = action.payload.id;
+      if (!id) return []; // phòng thủ — caller (handleNoteActionForPersist) luôn phải gắn id trước
+      const created = nextSpace.notes.find((n) => n.id === id);
+      if (!created) return []; // phòng thủ — reducer không có nhánh từ chối tạo hiện tại
+      return [{ itemId: id, op: { kind: 'insert', note: created } }];
+    }
+    case 'NOTE_UPDATE': {
+      const updated = nextSpace.notes.find((n) => n.id === action.payload.id);
+      if (!updated) return []; // note đã bị xoá trước đó (race hiếm) — không còn gì để update
+      const { title, content, color, updatedAt } = updated;
+      return [{ itemId: action.payload.id, op: { kind: 'update', patch: { title, content, color, updatedAt } } }];
+    }
+    case 'NOTE_DELETE':
+      return [{ itemId: action.payload.id, op: { kind: 'delete' } }];
+    case 'NOTE_REORDER': {
+      const updated = nextSpace.notes.find((n) => n.id === action.payload.draggedId);
+      if (!updated) return []; // draggedId/targetId không hợp lệ -> reducer trả nguyên space, không đổi gì
+      return [{ itemId: action.payload.draggedId, op: { kind: 'update', patch: { order: updated.order } } }];
+    }
+    case 'NOTE_TOGGLE_CONTENT_HIDDEN': {
+      const updated = nextSpace.notes.find((n) => n.id === action.payload.id);
+      if (!updated) return []; // note đã bị xoá trước đó (race hiếm)
+      return [{ itemId: action.payload.id, op: { kind: 'update', patch: { hidden: updated.hidden } } }];
+    }
+    default:
+      return [];
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Hàng đợi debounce theo itemId + thực thi — mirror CHÍNH XÁC cơ chế Task ở trên (`pending`/
+// `inFlight`, CÓ `scope`), đặt tên riêng để không đụng tên module-level của Log/Habit/Reminder/Task.
+// ---------------------------------------------------------------------------
+
+interface NotePendingEntry {
+  scope: NoteScope;
+  spaceId: string;
+  op: NotePendingOp;
+  timer: ReturnType<typeof setTimeout>;
+}
+
+const notePending = new Map<string, NotePendingEntry>();
+// Promise đang bay của lượt flush GẦN NHẤT cho 1 itemId — mirror `inFlight` ở phần Log (xem giải
+// thích đầy đủ ở đó). Tự tham chiếu đúng promise đã lưu (`wrapped`) khi dọn map — KHÔNG lặp lại bug
+// đã phát hiện + sửa ở `scheduleFlush()` (Log, Giai đoạn B).
+const noteInFlight = new Map<string, Promise<void>>();
+// itemId -> {scope, spaceId} cho MỌI Note hiện "chưa ghi xong" — mirror CHÍNH XÁC `activeTaskSpaceRefs`
+// ở phần Task. Dùng ở `hasPendingNotesForSpace()` (Giai đoạn B, chưa nối ở lượt này, viết sẵn để
+// không phải sửa lại `scheduleNoteFlush()` sau — mirror bài học đã áp dụng cho Habit/Reminder/Task).
+const activeNoteSpaceRefs = new Map<string, { scope: NoteScope; spaceId: string }>();
+
+function setNoteFallback(scope: NoteScope, active: boolean): void {
+  if (scope === 'private') setPrivateFallbackActive(active);
+  else setSharedFallbackActive(active);
+}
+
+async function flushNoteItem(itemId: string): Promise<void> {
+  const entry = notePending.get(itemId);
+  if (!entry) return; // đã bị mergeNotePendingOp huỷ (vd insert+delete) hoặc đã flush bởi lượt khác
+  notePending.delete(itemId);
+  const { scope, spaceId, op } = entry;
+  try {
+    if (op.kind === 'insert') {
+      const result = await createNote({ scope, spaceId }, op.note);
+      if (!result.ok) throw new Error(result.error ?? 'Không rõ lỗi');
+    } else if (op.kind === 'update') {
+      await updateNote(scope, itemId, op.patch);
+    } else {
+      await deleteNote(scope, itemId);
+    }
+    setNoteFallback(scope, false);
+  } catch (err) {
+    console.warn(`[KN-Space] itemPersist: lưu Note ${itemId} thất bại:`, err);
+    setNoteFallback(scope, true);
+  }
+}
+
+/** Xếp lượt flush của `itemId` nối tiếp sau lượt đang bay (nếu có) — mirror CHÍNH XÁC
+ * `scheduleTaskFlush()` ở phần Task (đã áp dụng fix bug `inFlight` ngay từ đầu, không lặp lại lỗi so
+ * sánh nhầm biến `next`). */
+function scheduleNoteFlush(itemId: string): void {
+  const prior = noteInFlight.get(itemId) ?? Promise.resolve();
+  const chained = prior.then(() => flushNoteItem(itemId));
+  const wrapped: Promise<void> = chained.finally(() => {
+    if (noteInFlight.get(itemId) === wrapped) {
+      noteInFlight.delete(itemId);
+      if (!notePending.has(itemId)) activeNoteSpaceRefs.delete(itemId);
+    }
+  });
+  noteInFlight.set(itemId, wrapped);
+}
+
+/** Đưa 1 thao tác vào hàng đợi debounce (600ms) của `itemId`, gộp với thao tác đang chờ (nếu có). */
+function queueNotePersist(scope: NoteScope, spaceId: string, itemId: string, op: NotePendingOp, debounceMs = 600): void {
+  const existing = notePending.get(itemId);
+  if (existing) clearTimeout(existing.timer);
+
+  const merged = mergeNotePendingOp(existing?.op, op);
+  if (merged === null) {
+    notePending.delete(itemId);
+    if (!noteInFlight.has(itemId)) activeNoteSpaceRefs.delete(itemId);
+    return;
+  }
+
+  const timer = setTimeout(() => scheduleNoteFlush(itemId), debounceMs);
+  notePending.set(itemId, { scope, spaceId, op: merged, timer });
+  activeNoteSpaceRefs.set(itemId, { scope, spaceId });
+}
+
+/**
+ * `true` nếu Space (`scope`+`spaceId`) hiện có ÍT NHẤT 1 Note "chưa ghi xong" (còn chờ debounce
+ * HOẶC network call đang bay) — dùng ở `refreshStaleSpaces()` (Giai đoạn B, chưa nối ở lượt này) để
+ * KHÔNG gán đè `space.notes` bằng dữ liệu vừa tải lại từ bảng item-level cho Space này trong lượt
+ * refresh hiện tại. Mirror CHÍNH XÁC `hasPendingTasksForSpace()`.
+ * Luôn trả `false` khi `NOTE_ITEM_PERSIST_ENABLED === false` (không có gì được queue vào
+ * `activeNoteSpaceRefs` khi đó).
+ */
+export function hasPendingNotesForSpace(scope: NoteScope, spaceId: string): boolean {
+  for (const ref of activeNoteSpaceRefs.values()) {
+    if (ref.scope === scope && ref.spaceId === spaceId) return true;
+  }
+  return false;
+}
+
+/**
+ * Điểm gọi DUY NHẤT từ `AppStateContext.tsx` (`smartDispatch`) cho mọi action Note. Làm 3 việc
+ * (mirror CHÍNH XÁC `handleTaskActionForPersist()`, ĐƠN GIẢN HƠN vì không có notify nào chạy trước
+ * cần xử lý `actionToDispatch` đặc biệt):
+ *   1. Nếu `NOTE_CREATE` chưa có `payload.id` -> tự sinh, trả action đã gắn id để caller dùng làm
+ *      `actionToDispatch` (đảm bảo id dùng để persist == id thật sự được tạo trong state).
+ *   2. Chạy `notesReducer(currentSpace, action)` để biết CHÍNH XÁC kết quả.
+ *   3. Tính descriptor + đẩy vào hàng đợi debounce theo itemId (no-op nếu
+ *      `NOTE_ITEM_PERSIST_ENABLED` còn `false`).
+ *
+ * Trả về action ĐÃ gắn id (dùng làm `actionToDispatch`) — KHÔNG dispatch thật ở đây.
+ */
+export function handleNoteActionForPersist(currentSpace: Space, action: NoteAction): NoteAction {
+  let resolvedAction = action;
+  if (resolvedAction.type === 'NOTE_CREATE' && resolvedAction.payload.id === undefined) {
+    resolvedAction = { ...resolvedAction, payload: { ...resolvedAction.payload, id: crypto.randomUUID() } };
+  }
+
+  if (!NOTE_ITEM_PERSIST_ENABLED) return resolvedAction;
+
+  const scope: NoteScope = currentSpace.isShared && currentSpace.sharedSpaceId ? 'shared' : 'private';
+  const spaceId = scope === 'shared' ? currentSpace.sharedSpaceId! : currentSpace.id;
+
+  // Space cá nhân CHƯA từng lưu lên `kn_private_spaces` (vừa tạo cục bộ, `_privateVersion`
+  // undefined) -> KHÔNG persist item-level ngay (FK `kn_private_notes.space_id` sẽ vi phạm vì hàng
+  // cha chưa tồn tại trên DB). Bỏ qua an toàn — cột `notes` jsonb (đường cũ) vẫn lưu bình thường,
+  // không mất dữ liệu; item-level sẽ persist đúng ở lần sửa KẾ TIẾP.
+  if (scope === 'private' && currentSpace._privateVersion === undefined) return resolvedAction;
+
+  const nextSpace = notesReducer(currentSpace, resolvedAction);
+  const descriptors = computeNotePersistDescriptors(resolvedAction, nextSpace);
+  descriptors.forEach(({ itemId, op }) => queueNotePersist(scope, spaceId, itemId, op));
+
+  return resolvedAction;
+}
+
+/**
+ * Flush ngay mọi thao tác Note đang chờ debounce (mirror `flushAllPendingTaskPersist()` ở trên) —
+ * gọi khi tab chuyển `hidden`. No-op nếu không có gì đang chờ (luôn đúng khi
+ * `NOTE_ITEM_PERSIST_ENABLED === false`).
+ */
+export function flushAllPendingNotePersist(): void {
+  const ids = Array.from(notePending.keys());
+  ids.forEach((id) => {
+    const entry = notePending.get(id);
+    if (entry) clearTimeout(entry.timer);
+    scheduleNoteFlush(id);
   });
 }

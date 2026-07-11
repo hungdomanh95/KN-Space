@@ -35,11 +35,13 @@ import {
 import {
   flushAllPendingHabitPersist,
   flushAllPendingLogPersist,
+  flushAllPendingNotePersist,
   flushAllPendingReminderPersist,
   flushAllPendingTaskPersist,
   HABIT_ITEM_PERSIST_ENABLED,
   handleHabitActionForPersist,
   handleLogActionForPersist,
+  handleNoteActionForPersist,
   handleReminderActionForPersist,
   handleTaskActionForPersist,
   hasPendingHabitsForSpace,
@@ -47,6 +49,7 @@ import {
   hasPendingRemindersForSpace,
   isHabitAction,
   isLogAction,
+  isNoteAction,
   isReminderAction,
   isTaskAction,
   LOG_ITEM_PERSIST_ENABLED,
@@ -620,14 +623,15 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           sharedSaveTimersRef.current.forEach((t) => clearTimeout(t));
           sharedSaveTimersRef.current.clear();
         }
-        // Flush Log/Habit/Reminder/Task item-level còn pending (mirror các nhánh trên, xem
+        // Flush Log/Habit/Reminder/Task/Note item-level còn pending (mirror các nhánh trên, xem
         // itemPersist.ts) — no-op khi LOG_ITEM_PERSIST_ENABLED/HABIT_ITEM_PERSIST_ENABLED/
-        // REMINDER_ITEM_PERSIST_ENABLED/TASK_ITEM_PERSIST_ENABLED === false (hàng đợi luôn rỗng
-        // trong trường hợp đó — Task hiện đang `false`, chỉ mới chuẩn bị).
+        // REMINDER_ITEM_PERSIST_ENABLED/TASK_ITEM_PERSIST_ENABLED/NOTE_ITEM_PERSIST_ENABLED === false
+        // (hàng đợi luôn rỗng trong trường hợp đó — Task/Note hiện đang `false`, chỉ mới chuẩn bị).
         flushAllPendingLogPersist();
         flushAllPendingHabitPersist();
         flushAllPendingReminderPersist();
         flushAllPendingTaskPersist();
+        flushAllPendingNotePersist();
       } else if (document.visibilityState === 'visible') {
         void refreshStaleSpaces();
       }
@@ -815,6 +819,20 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     // khác nhau cho cùng 1 lượt tạo (xem giải thích đầy đủ ở đầu block Task trong `itemPersist.ts`).
     if (currentSpace && isTaskAction(actionToDispatch)) {
       actionToDispatch = handleTaskActionForPersist(currentSpace, actionToDispatch);
+    }
+
+    // Persist item-level cho Note (Bước 5, entity CUỐI CÙNG, docs/features/item-level-entity-tables.md)
+    // — mirror CHÍNH XÁC nhánh Task ở trên (bảng riêng `kn_private_notes`/`kn_shared_notes`, debounce
+    // theo itemId, CÓ scope). No-op hoàn toàn khi `NOTE_ITEM_PERSIST_ENABLED === false` (hiện đang
+    // `false` — chỉ mới chuẩn bị, chưa chạy SQL/migrate) — Note tiếp tục lưu qua cột `notes` jsonb
+    // như cũ, không đổi hành vi hiện tại.
+    //
+    // Dùng `actionToDispatch` (không phải `action` gốc) để nhất quán với nhánh Task ngay phía trên —
+    // Note KHÔNG có notify Shared Space nào chạy trước gắn sẵn id (khác Task), nên tại điểm gọi này
+    // `actionToDispatch` luôn TRÙNG với `action` gốc cho mọi action `NOTE_*` (khối Task chỉ biến đổi
+    // action có type `TASK_*`) — xem giải thích đầy đủ ở đầu block Note trong `itemPersist.ts`.
+    if (currentSpace && isNoteAction(actionToDispatch)) {
+      actionToDispatch = handleNoteActionForPersist(currentSpace, actionToDispatch);
     }
 
     dispatch(actionToDispatch);

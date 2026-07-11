@@ -1,4 +1,5 @@
 import type { Note, Space } from '../../types';
+import { computeOrderForInsertAt } from '../fractionalOrder';
 
 export const NOTE_PALETTE = ['#8b5cf6', '#0ea5e9', '#22c55e', '#f97316', '#ec4899', '#64748b'];
 
@@ -7,7 +8,7 @@ export function defaultNoteColor(noteCount: number): string {
 }
 
 export type NoteAction =
-  | { type: 'NOTE_CREATE'; payload: { title: string; content: string; color: string; createdBy?: string } }
+  | { type: 'NOTE_CREATE'; payload: { title: string; content: string; color: string; createdBy?: string; id?: string } }
   | { type: 'NOTE_UPDATE'; payload: { id: string; title: string; content: string; color: string } }
   | { type: 'NOTE_DELETE'; payload: { id: string } }
   | { type: 'NOTE_REORDER'; payload: { draggedId: string; targetId: string; insertAfter: boolean } }
@@ -18,7 +19,7 @@ export function notesReducer(space: Space, action: NoteAction): Space {
     case 'NOTE_CREATE': {
       const maxOrder = space.notes.reduce((max, n) => Math.max(max, n.order), -1);
       const newNote: Note = {
-        id: crypto.randomUUID(),
+        id: action.payload.id ?? crypto.randomUUID(),
         title: action.payload.title.trim() || 'Note chưa đặt tên',
         content: action.payload.content,
         color: action.payload.color || NOTE_PALETTE[0],
@@ -50,17 +51,27 @@ export function notesReducer(space: Space, action: NoteAction): Space {
     case 'NOTE_REORDER': {
       const { draggedId, targetId, insertAfter } = action.payload;
       if (draggedId === targetId) return space;
-      // Sắp xếp theo order hiện tại để có 1 mảng tuyến tính nhất quán, rồi re-assign order 0..n-1.
+      // Fractional-index (docs/features/item-level-entity-tables.md mục 5): CHỈ tính lại `order`
+      // của ĐÚNG note vừa kéo (draggedId) — KHÔNG reindex toàn mảng `0..n-1` như trước. Mọi note
+      // khác giữ nguyên `order` -> khi tách bảng item-level (kn_private_notes/kn_shared_notes), 1
+      // lần kéo-thả chỉ cần UPDATE đúng 1 dòng thay vì N dòng. Mirror CHÍNH XÁC `TASK_REORDER`
+      // (`state/reducers/tasks.ts`), chỉ khác Note CÓ phân biệt nửa trên/dưới (`insertAfter`).
       const ordered = [...space.notes].sort((a, b) => a.order - b.order);
       const fromIdx = ordered.findIndex((n) => n.id === draggedId);
       if (fromIdx === -1) return space;
-      const [moved] = ordered.splice(fromIdx, 1);
+      ordered.splice(fromIdx, 1); // loại note đang kéo khỏi mảng tham chiếu láng giềng
       let toIdx = ordered.findIndex((n) => n.id === targetId);
       if (toIdx === -1) return space;
+      // Giữ NGUYÊN ý nghĩa `insertAfter` cũ: chèn TRƯỚC targetId (mặc định) hoặc NGAY SAU targetId
+      // (kéo thả vào nửa dưới của item) — chỉ khác cách tính: lấy 2 láng giềng kề tại đúng vị trí
+      // chèn thay vì gán lại toàn bộ chỉ số mảng.
       if (insertAfter) toIdx += 1;
-      ordered.splice(toIdx, 0, moved);
-      const reindexed = ordered.map((n, idx) => ({ ...n, order: idx }));
-      return { ...space, notes: reindexed };
+      const existingOrders = ordered.map((n) => n.order);
+      const newOrder = computeOrderForInsertAt(existingOrders, toIdx);
+      return {
+        ...space,
+        notes: space.notes.map((n) => (n.id === draggedId ? { ...n, order: newOrder } : n)),
+      };
     }
     case 'NOTE_TOGGLE_CONTENT_HIDDEN':
       return {

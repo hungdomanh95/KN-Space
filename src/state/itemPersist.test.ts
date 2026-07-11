@@ -2,6 +2,7 @@ import { beforeEach, describe, it, expect, vi } from 'vitest';
 import {
   computeHabitPersistDescriptors,
   computeLogPersistDescriptors,
+  computeNotePersistDescriptors,
   computeReminderPersistDescriptors,
   computeTaskPersistDescriptors,
   handleHabitActionForPersist,
@@ -12,14 +13,16 @@ import {
   hasPendingRemindersForSpace,
   mergeHabitPendingOp,
   mergeLogPendingOp,
+  mergeNotePendingOp,
   mergeReminderPendingOp,
   mergeTaskPendingOp,
   type HabitPendingOp,
   type LogPendingOp,
+  type NotePendingOp,
   type ReminderPendingOp,
   type TaskPendingOp,
 } from './itemPersist';
-import type { Habit, LogEntry, ReminderDefinition, Space, Task } from '../types';
+import type { Habit, LogEntry, Note, ReminderDefinition, Space, Task } from '../types';
 
 // Mock logStore.ts (thay vì để `hasPendingLogsForSpace` test dưới đây gọi network Supabase THẬT) —
 // chỉ cần biết CÓ gọi hàm ghi nào không và điều khiển được thời điểm resolve, không cần hành vi
@@ -57,6 +60,15 @@ vi.mock('../storage/taskStore', () => ({
   createTask: vi.fn(),
   updateTask: vi.fn(),
   deleteTask: vi.fn(),
+}));
+
+// Mock noteStore.ts — mirror taskStore.ts ở trên. `NOTE_ITEM_PERSIST_ENABLED` đang `false` ở lượt
+// này (chỉ mới chuẩn bị) nên các hàm này chưa thực sự được `handleNoteActionForPersist()` gọi, mock
+// chỉ để tránh phụ thuộc `createClient()` thật khi import module (mirror các entity khác).
+vi.mock('../storage/noteStore', () => ({
+  createNote: vi.fn(),
+  updateNote: vi.fn(),
+  deleteNote: vi.fn(),
 }));
 
 function emptySpace(logs: LogEntry[] = []): Space {
@@ -756,6 +768,147 @@ describe('mergeTaskPendingOp', () => {
   it('delete + bất kỳ -> giữ nguyên delete (không hồi sinh item đã yêu cầu xoá)', () => {
     const existing: TaskPendingOp = { kind: 'delete' };
     const merged = mergeTaskPendingOp(existing, { kind: 'update', patch: { done: true } });
+    expect(merged).toEqual({ kind: 'delete' });
+  });
+});
+
+// =============================================================================
+// Note (Bước 5, entity CUỐI CÙNG, docs/features/item-level-entity-tables.md) — CHỈ MỚI CHUẨN BỊ
+// (`NOTE_ITEM_PERSIST_ENABLED = false`, xem itemPersist.ts). Gồm phần thuần logic (descriptor +
+// merge, không gọi Supabase thật) — mirror đúng mức độ test đã làm cho Task ở giai đoạn TRƯỚC Giai
+// đoạn B (chưa viết test `hasPendingNotesForSpace` ở lượt này, dù hàm/hàng đợi `activeNoteSpaceRefs`
+// đã viết sẵn trong itemPersist.ts — mirror bài học áp dụng cho Habit/Reminder/Task, Giai đoạn B sẽ
+// thêm test riêng khi tới lượt).
+// =============================================================================
+
+function makeNote(overrides: Partial<Note> = {}): Note {
+  return { id: 'note-1', title: 'Note A', content: '', color: '#8b5cf6', updatedAt: 1000, order: 0, hidden: false, ...overrides };
+}
+
+function noteSpace(notes: Note[] = []): Space {
+  return { ...emptySpace(), notes };
+}
+
+describe('computeNotePersistDescriptors', () => {
+  it('NOTE_CREATE — trả đúng 1 descriptor insert khi id đã gắn và note xuất hiện trong nextSpace', () => {
+    const note = makeNote();
+    const nextSpace = noteSpace([note]);
+    const result = computeNotePersistDescriptors(
+      { type: 'NOTE_CREATE', payload: { title: 'Note A', content: '', color: '#8b5cf6', id: 'note-1' } },
+      nextSpace,
+    );
+    expect(result).toEqual([{ itemId: 'note-1', op: { kind: 'insert', note } }]);
+  });
+
+  it('NOTE_CREATE — trả mảng rỗng nếu thiếu id (phòng thủ, không nên xảy ra thực tế)', () => {
+    const result = computeNotePersistDescriptors(
+      { type: 'NOTE_CREATE', payload: { title: 'X', content: '', color: '#8b5cf6' } },
+      noteSpace(),
+    );
+    expect(result).toEqual([]);
+  });
+
+  it('NOTE_CREATE — trả mảng rỗng nếu reducer từ chối tạo (note không có trong nextSpace)', () => {
+    const result = computeNotePersistDescriptors(
+      { type: 'NOTE_CREATE', payload: { title: 'X', content: '', color: '#8b5cf6', id: 'note-ghost' } },
+      noteSpace([]),
+    );
+    expect(result).toEqual([]);
+  });
+
+  it('NOTE_UPDATE — trả đúng 1 descriptor update với 4 field (title/content/color/updatedAt), lấy từ nextSpace (đã qua trim/fallback của reducer)', () => {
+    const updated = makeNote({ title: 'Note A sửa', content: 'nội dung mới', color: '#0ea5e9', updatedAt: 2000 });
+    const nextSpace = noteSpace([updated]);
+    const result = computeNotePersistDescriptors(
+      { type: 'NOTE_UPDATE', payload: { id: 'note-1', title: 'Note A sửa', content: 'nội dung mới', color: '#0ea5e9' } },
+      nextSpace,
+    );
+    expect(result).toEqual([
+      {
+        itemId: 'note-1',
+        op: { kind: 'update', patch: { title: 'Note A sửa', content: 'nội dung mới', color: '#0ea5e9', updatedAt: 2000 } },
+      },
+    ]);
+  });
+
+  it('NOTE_UPDATE — trả mảng rỗng nếu note không còn trong nextSpace (đã bị xoá, race hiếm)', () => {
+    const result = computeNotePersistDescriptors(
+      { type: 'NOTE_UPDATE', payload: { id: 'note-1', title: 'X', content: '', color: '#8b5cf6' } },
+      noteSpace([]),
+    );
+    expect(result).toEqual([]);
+  });
+
+  it('NOTE_DELETE — trả đúng 1 descriptor delete', () => {
+    const result = computeNotePersistDescriptors({ type: 'NOTE_DELETE', payload: { id: 'note-1' } }, noteSpace());
+    expect(result).toEqual([{ itemId: 'note-1', op: { kind: 'delete' } }]);
+  });
+
+  it('NOTE_REORDER — trả đúng 1 descriptor update CHỈ patch field order (KHÔNG kèm updatedAt), itemId = draggedId (không phải targetId)', () => {
+    const nextSpace = noteSpace([makeNote({ id: 'note-1', order: 1.5 }), makeNote({ id: 'note-2', order: 2 })]);
+    const result = computeNotePersistDescriptors(
+      { type: 'NOTE_REORDER', payload: { draggedId: 'note-1', targetId: 'note-2', insertAfter: false } },
+      nextSpace,
+    );
+    expect(result).toEqual([{ itemId: 'note-1', op: { kind: 'update', patch: { order: 1.5 } } }]);
+  });
+
+  it('NOTE_REORDER — trả mảng rỗng nếu draggedId không còn trong nextSpace (race hiếm)', () => {
+    const result = computeNotePersistDescriptors(
+      { type: 'NOTE_REORDER', payload: { draggedId: 'ghost', targetId: 'note-2', insertAfter: false } },
+      noteSpace([makeNote({ id: 'note-2' })]),
+    );
+    expect(result).toEqual([]);
+  });
+
+  it('NOTE_TOGGLE_CONTENT_HIDDEN — trả đúng 1 descriptor update CHỈ patch field hidden (KHÔNG kèm updatedAt, không kèm field khác)', () => {
+    const nextSpace = noteSpace([makeNote({ hidden: true })]);
+    const result = computeNotePersistDescriptors({ type: 'NOTE_TOGGLE_CONTENT_HIDDEN', payload: { id: 'note-1' } }, nextSpace);
+    expect(result).toEqual([{ itemId: 'note-1', op: { kind: 'update', patch: { hidden: true } } }]);
+  });
+
+  it('NOTE_TOGGLE_CONTENT_HIDDEN — trả mảng rỗng nếu note không còn trong nextSpace (race hiếm)', () => {
+    const result = computeNotePersistDescriptors({ type: 'NOTE_TOGGLE_CONTENT_HIDDEN', payload: { id: 'note-1' } }, noteSpace([]));
+    expect(result).toEqual([]);
+  });
+});
+
+describe('mergeNotePendingOp', () => {
+  it('không có pending trước -> trả thẳng op mới', () => {
+    const incoming: NotePendingOp = { kind: 'delete' };
+    expect(mergeNotePendingOp(undefined, incoming)).toBe(incoming);
+  });
+
+  it('insert + update (cùng cửa sổ debounce) -> merge patch THẲNG vào note đang chờ insert, vẫn là insert', () => {
+    const note = makeNote();
+    const existing: NotePendingOp = { kind: 'insert', note };
+    const incoming: NotePendingOp = { kind: 'update', patch: { hidden: true } };
+    const merged = mergeNotePendingOp(existing, incoming);
+    expect(merged).toEqual({ kind: 'insert', note: { ...note, hidden: true } });
+  });
+
+  it('insert + delete (cùng cửa sổ debounce) -> huỷ hẳn, trả null (không gửi gì lên server)', () => {
+    const existing: NotePendingOp = { kind: 'insert', note: makeNote() };
+    const merged = mergeNotePendingOp(existing, { kind: 'delete' });
+    expect(merged).toBeNull();
+  });
+
+  it('update + update -> gộp patch, field patch SAU đè field patch TRƯỚC (vd TOGGLE_CONTENT_HIDDEN rồi REORDER liên tiếp)', () => {
+    const existing: NotePendingOp = { kind: 'update', patch: { hidden: true } };
+    const incoming: NotePendingOp = { kind: 'update', patch: { order: 3.5 } };
+    const merged = mergeNotePendingOp(existing, incoming);
+    expect(merged).toEqual({ kind: 'update', patch: { hidden: true, order: 3.5 } });
+  });
+
+  it('update + delete -> đè thành delete (bỏ patch đang chờ)', () => {
+    const existing: NotePendingOp = { kind: 'update', patch: { hidden: true } };
+    const merged = mergeNotePendingOp(existing, { kind: 'delete' });
+    expect(merged).toEqual({ kind: 'delete' });
+  });
+
+  it('delete + bất kỳ -> giữ nguyên delete (không hồi sinh item đã yêu cầu xoá)', () => {
+    const existing: NotePendingOp = { kind: 'delete' };
+    const merged = mergeNotePendingOp(existing, { kind: 'update', patch: { hidden: true } });
     expect(merged).toEqual({ kind: 'delete' });
   });
 });
