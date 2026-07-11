@@ -255,6 +255,19 @@ export async function deleteReminder(scope: ReminderScope, reminderId: string): 
   }
 }
 
+/**
+ * Xoá TOÀN BỘ Reminder của 1 Space (theo `space_id`) — dùng cho luồng Import JSON (`IMPORT_DATA`,
+ * `syncImportedSpaceItems()` ở `AppStateContext.tsx`), mirror `deleteAllTasksForSpace()`. KHÔNG
+ * dùng cho CRUD thường (xoá 1 reminder luôn qua `deleteReminder()`).
+ */
+export async function deleteAllRemindersForSpace(scope: ReminderScope, spaceId: string): Promise<void> {
+  const { error } = await supabase.from(tableFor(scope)).delete().eq('space_id', spaceId);
+  if (error) {
+    console.warn(`[KN-Space] deleteAllRemindersForSpace (${scope}) lỗi:`, error.message);
+    throw error;
+  }
+}
+
 /** id của mọi Reminder hiện có trên bảng mới (theo scope) — dùng để phát hiện Reminder NÀO trong
  * `reminders[]` jsonb cũ CHƯA được migrate (xem `migrateLegacyReminders.ts`). RLS tự giới hạn đúng
  * phạm vi user/space hiện tại, không cần filter thêm (private thêm `.eq('user_id', ...)` để nhất

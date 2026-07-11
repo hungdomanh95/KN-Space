@@ -198,14 +198,20 @@ create table if not exists public.kn_shared_spaces (
   -- version: tăng 1 mỗi lần UPDATE (dùng cho optimistic locking ở client).
   -- Client gửi kèm version hiện tại; nếu version trên DB đã lớn hơn → báo conflict.
   version     bigint not null default 1,
-  -- tasks: mảng JSON, mỗi phần tử PHẢI có { id, updatedAt, ... }
+  -- tasks/notes/reminders/logs: LỊCH SỬ — KHÔNG còn được app đọc/ghi từ 2026-07-11 (dọn dẹp
+  -- "Việc 1", xem docs/features/item-level-entity-tables-progress.md câu hỏi mở #2). Cả 4 entity
+  -- đã cutover hoàn toàn sang bảng item-level riêng (kn_shared_tasks/kn_shared_notes/
+  -- kn_shared_reminders/kn_shared_logs, qua src/state/itemPersist.ts). 4 cột dưới đây giữ NGUYÊN
+  -- (KHÔNG xoá/ALTER/DROP) làm lưới an toàn lịch sử — dữ liệu trong đó có thể LỖI THỜI (đứng yên
+  -- từ mốc cutover, không phản ánh thay đổi sau đó), tuyệt đối KHÔNG dùng làm nguồn đọc/ghi mới.
+  -- tasks: mảng JSON, mỗi phần tử PHẢI có { id, updatedAt, ... } — LỊCH SỬ, xem trên
   tasks       jsonb not null default '[]'::jsonb,
-  -- notes: mảng JSON, mỗi phần tử PHẢI có { id, updatedAt, ... }
+  -- notes: mảng JSON, mỗi phần tử PHẢI có { id, updatedAt, ... } — LỊCH SỬ, xem trên
   notes       jsonb not null default '[]'::jsonb,
-  -- reminders: mảng JSON, mỗi phần tử PHẢI có { id, updatedAt, ... }
+  -- reminders: mảng JSON, mỗi phần tử PHẢI có { id, updatedAt, ... } — LỊCH SỬ, xem trên
   reminders   jsonb not null default '[]'::jsonb,
   -- logs: mảng JSON "Nhật ký nhanh", mỗi phần tử PHẢI có { id, content, createdAt, ... }
-  -- (xem docs/features/nhat-ky-nhanh.md mục 9 — thêm sau, 2026-07-08)
+  -- (xem docs/features/nhat-ky-nhanh.md mục 9 — thêm sau, 2026-07-08) — LỊCH SỬ, xem trên
   logs        jsonb not null default '[]'::jsonb,
   -- enabled_blocks: cấu hình "khối nào bật/tắt" MẶC ĐỊNH của CHÍNH space này
   -- (tasks/notes/reminders/logs — không phải per-member). habits luôn ép
@@ -732,12 +738,19 @@ create table if not exists public.kn_private_spaces (
   space_order    integer not null default 0,
   enabled_blocks jsonb not null default
     '{"tasks":true,"reminder":true,"habits":true,"notes":true,"reminders":true,"logs":true}'::jsonb,
+  -- tasks/reminders/habits/notes/logs: LỊCH SỬ — KHÔNG còn được app đọc/ghi từ 2026-07-11 (dọn dẹp
+  -- "Việc 1", xem docs/features/item-level-entity-tables-progress.md câu hỏi mở #2). Cả 5 entity đã
+  -- cutover hoàn toàn sang bảng item-level riêng (kn_private_tasks/kn_private_reminders/
+  -- kn_private_habits/kn_private_notes/kn_private_logs, qua src/state/itemPersist.ts). 5 cột dưới
+  -- đây giữ NGUYÊN (KHÔNG xoá/ALTER/DROP) làm lưới an toàn lịch sử — dữ liệu trong đó có thể LỖI
+  -- THỜI (đứng yên từ mốc cutover, không phản ánh thay đổi sau đó), tuyệt đối KHÔNG dùng làm nguồn
+  -- đọc/ghi mới.
   tasks          jsonb not null default '[]'::jsonb,
   reminders      jsonb not null default '[]'::jsonb,
   habits         jsonb not null default '[]'::jsonb,
   notes          jsonb not null default '[]'::jsonb,
   -- logs: mảng "Nhật ký nhanh" — giống cột cùng tên ở kn_shared_spaces, mỗi
-  -- phần tử PHẢI có { id, content, createdAt, ... } (xem LogEntry trong types.ts).
+  -- phần tử PHẢI có { id, content, createdAt, ... } (xem LogEntry trong types.ts). LỊCH SỬ, xem trên.
   logs           jsonb not null default '[]'::jsonb,
   -- version: tăng 1 mỗi lần UPDATE (optimistic locking) — copy CHÍNH XÁC cơ chế
   -- đã dùng ở kn_shared_spaces, xem trigger bên dưới.

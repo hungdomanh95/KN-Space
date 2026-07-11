@@ -64,6 +64,7 @@ import { loadPrivateHabits } from '../storage/habitStore';
 import { loadPrivateReminders, loadSharedReminders } from '../storage/reminderStore';
 import { loadPrivateTasks, loadSharedTasks } from '../storage/taskStore';
 import { loadPrivateNotes, loadSharedNotes } from '../storage/noteStore';
+import { syncImportedSpaceItems } from '../storage/importSync';
 
 interface AppStateContextValue {
   state: AppState;
@@ -77,6 +78,21 @@ interface AppStateContextValue {
    *
    * KHÔNG dùng cho các thao tác nhỏ (tick checkbox, kéo-thả, đổi theme...) — những chỗ đó
    * vẫn dùng `dispatch` thường + debounce nền như cũ để giữ cảm giác mượt.
+   *
+   * **CẢNH BÁO (phát hiện 2026-07-11 khi dọn dẹp jsonb, xem "Việc 1" trong
+   * item-level-entity-tables-progress.md):** HIỆN TẠI không có nơi nào trong codebase gọi
+   * `saveNow` (đã `grep` toàn repo, mọi modal Thêm/Sửa đều chỉ dùng `dispatch` thường/
+   * `smartDispatch`) — hàm này ĐANG LÀ DEAD CODE. Cài đặt bên dưới gọi THẲNG `dispatch` (raw,
+   * từ `useReducer`), KHÔNG đi qua `smartDispatch` — nghĩa là nếu sau này có chỗ nào gọi
+   * `saveNow()` cho action `TASK_CREATE`/`NOTE_UPDATE`/... thì action đó sẽ KHÔNG được
+   * `handleTaskActionForPersist()`/`handleNoteActionForPersist()`/... xử lý — dữ liệu KHÔNG
+   * được ghi vào bảng item-level (nguồn đọc thật hiện nay), CHỈ cập nhật RAM cục bộ. Từ khi
+   * Space-level (`savePrivateSpace`/`saveSharedSpace`) ngừng ghi `tasks`/`notes`/... (Việc 1),
+   * gọi `attemptSavePrivate`/`attemptSaveShared` ở đây cũng không còn "vô tình" cứu được dữ
+   * liệu entity nữa (trước đây còn có tác dụng phụ ghi kèm vào jsonb). TRƯỚC KHI dùng lại hàm
+   * này ở bất kỳ đâu, PHẢI đổi `dispatch(action)` bên dưới thành gọi qua cùng logic
+   * `smartDispatch` (hoặc refactor `smartDispatch` thành hàm thuần tái dùng được ở cả 2 nơi) —
+   * nếu không sẽ mất dữ liệu Task/Note/Habit/Reminder/Log tạo qua đường này.
    */
   saveNow: (action: AppAction) => Promise<{ ok: boolean; error?: string }>;
 }
@@ -94,19 +110,37 @@ function emptyState(): AppState {
   };
 }
 
-/** Các field thực sự cần lưu lên `kn_private_spaces` cho 1 Space cá nhân — dùng chung cho cả
- * snapshot baseline (so sánh phát hiện thay đổi) lẫn payload gửi lên `createPrivateSpace`/
- * `savePrivateSpace`. Không gồm `id`/`isShared`/`_privateVersion` (metadata, không phải dữ liệu). */
+/**
+ * Các field THẬT SỰ thuộc về `kn_private_spaces` cho 1 Space cá nhân — dùng chung cho cả snapshot
+ * baseline (so sánh phát hiện thay đổi) lẫn payload gửi lên `createPrivateSpace`/`savePrivateSpace`.
+ * Không gồm `id`/`isShared`/`_privateVersion` (metadata, không phải dữ liệu).
+ *
+ * **KHÔNG còn gồm `tasks`/`reminders`/`habits`/`notes`/`logs`** (dọn dẹp 2026-07-11, xem
+ * docs/features/item-level-entity-tables-progress.md câu hỏi mở #2, "Việc 1") — cả 5 entity đã
+ * cutover đọc/ghi sang bảng item-level riêng (`itemPersist.ts`, `handleTaskActionForPersist()` v.v.,
+ * gọi ĐỘC LẬP ở `smartDispatch` bên dưới). Diff-effect Space-level giờ CHỈ còn phản ứng khi
+ * `name`/`order`/`enabledBlocks` đổi — sửa Task/Note/Habit/Reminder/Log không còn kích hoạt ghi lại
+ * `kn_private_spaces` (trước đây ghi CẢ 2 nơi mỗi lần sửa, lãng phí network + phình dữ liệu trùng
+ * lặp trên cột jsonb vốn không còn ai đọc).
+ */
 function privateSnapshot(space: Space) {
   return {
     name: space.name,
     order: space.order,
     enabledBlocks: space.enabledBlocks,
-    tasks: space.tasks,
-    reminders: space.reminders,
-    habits: space.habits,
-    notes: space.notes,
-    logs: space.logs,
+  };
+}
+
+/**
+ * Mirror `privateSnapshot()` cho Shared Space (`kn_shared_spaces`) — field THẬT SỰ thuộc về
+ * Space-level ở đây chỉ còn `name`/`enabledBlocks` (Shared Space không có cột `space_order` riêng,
+ * thứ tự hiển thị suy từ `joined_at`, xem `sharedSpaceStore.ts`). Dùng chung cho snapshot baseline
+ * (`prevSharedRef`) lẫn payload gửi `saveSharedSpace()`/`attemptSaveShared()`/`saveNow()`.
+ */
+function sharedSnapshot(space: Space) {
+  return {
+    name: space.name,
+    enabledBlocks: space.enabledBlocks,
   };
 }
 
@@ -509,10 +543,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const prevSharedRef = useRef<Map<string, string>>(new Map()); // spaceId → JSON snapshot
   // Track data pending flush — cập nhật NGAY khi có thay đổi, trước debounce timer
   // Dùng để flush ngay khi tab ẩn (F5/đóng tab) tránh mất data trong cửa sổ debounce 800ms
-  const pendingSharedSavesRef = useRef<Map<string, {
-    tasks: Space['tasks']; notes: Space['notes']; reminders: Space['reminders']; logs: Space['logs']; name: string;
-    enabledBlocks: Space['enabledBlocks'];
-  }>>(new Map());
+  const pendingSharedSavesRef = useRef<Map<string, ReturnType<typeof sharedSnapshot>>>(new Map());
 
   /**
    * Thử lưu 1 shared space — ghi thẳng, KHÔNG version-check/retry (bỏ theo
@@ -544,7 +575,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     const sharedSpaces = state.spaces.filter((s) => s.isShared && s.sharedSpaceId);
     sharedSpaces.forEach((space) => {
       const sid = space.sharedSpaceId!;
-      const snapshot = JSON.stringify({ tasks: space.tasks, notes: space.notes, reminders: space.reminders, logs: space.logs, name: space.name, enabledBlocks: space.enabledBlocks });
+      const snapshot = JSON.stringify(sharedSnapshot(space));
       // Lần đầu thấy space này (vừa hydrate/load) → chỉ ghi nhận baseline, KHÔNG save.
       // Trước đây thiếu bước này khiến lần render đầu tiên luôn bị coi là "có thay đổi"
       // (Map rỗng nên snapshot cũ luôn undefined !== snapshot hiện tại) → tự bắn 1 save
@@ -557,7 +588,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       if (prevSharedRef.current.get(sid) === snapshot) return;
       prevSharedRef.current.set(sid, snapshot);
       // Cập nhật pending data ngay — dùng để flush khi visibilitychange
-      pendingSharedSavesRef.current.set(sid, { tasks: space.tasks, notes: space.notes, reminders: space.reminders, logs: space.logs, name: space.name, enabledBlocks: space.enabledBlocks });
+      pendingSharedSavesRef.current.set(sid, sharedSnapshot(space));
       // Debounce 800ms
       const existing = sharedSaveTimersRef.current.get(sid);
       if (existing) clearTimeout(existing);
@@ -697,17 +728,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
     refreshedShared.forEach((space) => {
       const sid = space.sharedSpaceId ?? space.id;
-      prevSharedRef.current.set(
-        sid,
-        JSON.stringify({
-          tasks: space.tasks,
-          notes: space.notes,
-          reminders: space.reminders,
-          logs: space.logs,
-          name: space.name,
-          enabledBlocks: space.enabledBlocks,
-        }),
-      );
+      prevSharedRef.current.set(sid, JSON.stringify(sharedSnapshot(space)));
     });
 
     if (toRefresh.length > 0) {
@@ -845,6 +866,15 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
             prevPrivateRef.current.set(s.id, JSON.stringify(privateSnapshot(s)));
             dispatch({ type: 'SPACE_SET_PRIVATE_VERSION', payload: { id: s.id, version } });
           });
+
+          // Space-level (kn_private_spaces) không còn ghi tasks/notes/habits/reminders/logs (Việc
+          // 1) — tự bulk-insert entity vào bảng item-level cho TỪNG Space vừa import, nếu không dữ
+          // liệu import sẽ "biến mất" ở lần reload kế tiếp (xem `syncImportedSpaceItems()`,
+          // `storage/importSync.ts`). `result.spaces` giữ nguyên đầy đủ tasks/notes/... từ
+          // `newPrivateSpaces` (spread trong `upsertPrivateSpaces()`, chỉ thêm `_privateVersion`),
+          // dùng trực tiếp được.
+          const syncResults = await Promise.all(result.spaces.map((s) => syncImportedSpaceItems(s)));
+          if (syncResults.some((r) => !r.ok)) setPrivateFallbackActive(true);
         })();
       }
     }
@@ -965,14 +995,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
     if (targetSpace?.isShared && targetSpace.sharedSpaceId) {
       const sid = targetSpace.sharedSpaceId;
-      const data = {
-        tasks: targetSpace.tasks,
-        notes: targetSpace.notes,
-        reminders: targetSpace.reminders,
-        logs: targetSpace.logs,
-        name: targetSpace.name,
-        enabledBlocks: targetSpace.enabledBlocks,
-      };
+      const data = sharedSnapshot(targetSpace);
 
       // Huỷ debounce timer đang chờ của space này — data mới nhất được gửi thẳng ngay bây giờ,
       // đồng thời cập nhật baseline để effect debounce không tưởng nhầm là "còn thay đổi mới"

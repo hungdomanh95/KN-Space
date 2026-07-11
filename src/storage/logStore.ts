@@ -209,6 +209,20 @@ export async function deleteLogs(scope: LogScope, logIds: string[]): Promise<voi
   }
 }
 
+/**
+ * Xoá TOÀN BỘ Log của 1 Space (theo `space_id`) — dùng cho luồng Import JSON (`IMPORT_DATA`,
+ * `syncImportedSpaceItems()` ở `AppStateContext.tsx`), mirror `deleteAllTasksForSpace()`. Khác
+ * `deleteLogs()` (xoá theo danh sách id cụ thể, dùng cho `LOG_DELETE_MANY`) — hàm này xoá theo
+ * `space_id`, không cần biết trước danh sách id.
+ */
+export async function deleteAllLogsForSpace(scope: LogScope, spaceId: string): Promise<void> {
+  const { error } = await supabase.from(tableFor(scope)).delete().eq('space_id', spaceId);
+  if (error) {
+    console.warn(`[KN-Space] deleteAllLogsForSpace (${scope}) lỗi:`, error.message);
+    throw error;
+  }
+}
+
 /** id của mọi Log hiện có trên bảng mới (theo scope) — dùng để phát hiện Log NÀO trong `logs[]`
  * jsonb cũ CHƯA được migrate (xem `migrateLegacyLogs.ts`). RLS tự giới hạn đúng phạm vi user/space
  * hiện tại, không cần filter thêm (private thêm `.eq('user_id', ...)` để nhất quán với

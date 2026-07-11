@@ -2,11 +2,6 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { previewLegacySpacesMigration, runLegacySpacesMigration } from './storage/migrateLegacySpaces';
-import { previewLegacyLogsMigration, runLegacyLogsMigration } from './storage/migrateLegacyLogs';
-import { previewLegacyHabitsMigration, runLegacyHabitsMigration } from './storage/migrateLegacyHabits';
-import { previewLegacyRemindersMigration, runLegacyRemindersMigration } from './storage/migrateLegacyReminders';
-import { previewLegacyTasksMigration, runLegacyTasksMigration } from './storage/migrateLegacyTasks';
-import { previewLegacyNotesMigration, runLegacyNotesMigration } from './storage/migrateLegacyNotes';
 import './styles.css';
 
 const container = document.getElementById('root');
@@ -38,119 +33,6 @@ declare global {
 window.knMigrateLegacySpaces = {
   preview: previewLegacySpacesMigration,
   run: runLegacySpacesMigration,
-};
-
-// Migration Nhật ký nhanh (logs[] cũ, jsonb) -> kn_private_logs/kn_shared_logs (Bước 1 entity Log,
-// docs/features/item-level-entity-tables.md). CHỈ chạy được SAU KHI đã chạy
-// docs/features/item-level-log-schema.sql trên Supabase Dashboard — trước đó mọi lệnh trả lỗi
-// "relation does not exist" (an toàn, không ghi sai gì). Cùng nguyên tắc `knMigrateLegacySpaces` ở
-// trên: gọi tay qua Console, không tự chạy khi load app.
-//
-// Cách dùng (mở DevTools Console khi đã đăng nhập):
-//   await window.knMigrateLogs.preview()  // dry-run, chỉ đọc — xem trước sẽ migrate gì
-//   await window.knMigrateLogs.run()      // thực thi migrate thật (idempotent, gọi lại an toàn)
-declare global {
-  interface Window {
-    knMigrateLogs: {
-      preview: typeof previewLegacyLogsMigration;
-      run: typeof runLegacyLogsMigration;
-    };
-  }
-}
-window.knMigrateLogs = {
-  preview: previewLegacyLogsMigration,
-  run: runLegacyLogsMigration,
-};
-
-// Migration Thói quen (habits[] cũ, jsonb) -> kn_private_habits (Bước 2 entity Habit,
-// docs/features/item-level-entity-tables.md). CHỈ chạy được SAU KHI đã chạy
-// docs/features/item-level-habit-schema.sql trên Supabase Dashboard — trước đó mọi lệnh trả lỗi
-// "relation does not exist" (an toàn, không ghi sai gì). Cùng nguyên tắc `knMigrateLogs` ở trên: gọi
-// tay qua Console, không tự chạy khi load app. Habit KHÔNG có bản Shared — không có tham số scope.
-//
-// Cách dùng (mở DevTools Console khi đã đăng nhập):
-//   await window.knMigrateHabits.preview()  // dry-run, chỉ đọc — xem trước sẽ migrate gì
-//   await window.knMigrateHabits.run()      // thực thi migrate thật (idempotent, gọi lại an toàn)
-declare global {
-  interface Window {
-    knMigrateHabits: {
-      preview: typeof previewLegacyHabitsMigration;
-      run: typeof runLegacyHabitsMigration;
-    };
-  }
-}
-window.knMigrateHabits = {
-  preview: previewLegacyHabitsMigration,
-  run: runLegacyHabitsMigration,
-};
-
-// Migration Nhắc việc (reminders[] cũ, jsonb) -> kn_private_reminders/kn_shared_reminders (Bước 3
-// entity Reminder, docs/features/item-level-entity-tables.md). CHỈ chạy được SAU KHI đã chạy
-// docs/features/item-level-reminder-schema.sql trên Supabase Dashboard — trước đó mọi lệnh trả lỗi
-// "relation does not exist" (an toàn, không ghi sai gì). Cùng nguyên tắc `knMigrateLogs`/
-// `knMigrateHabits` ở trên: gọi tay qua Console, không tự chạy khi load app. Reminder CÓ bản Shared
-// (mirror knMigrateLogs, khác knMigrateHabits).
-//
-// Cách dùng (mở DevTools Console khi đã đăng nhập):
-//   await window.knMigrateReminders.preview()  // dry-run, chỉ đọc — xem trước sẽ migrate gì
-//   await window.knMigrateReminders.run()      // thực thi migrate thật (idempotent, gọi lại an toàn)
-declare global {
-  interface Window {
-    knMigrateReminders: {
-      preview: typeof previewLegacyRemindersMigration;
-      run: typeof runLegacyRemindersMigration;
-    };
-  }
-}
-window.knMigrateReminders = {
-  preview: previewLegacyRemindersMigration,
-  run: runLegacyRemindersMigration,
-};
-
-// Migration Việc cần làm (tasks[] cũ, jsonb) -> kn_private_tasks/kn_shared_tasks (Bước 4 entity
-// Task, docs/features/item-level-entity-tables.md). CHỈ chạy được SAU KHI đã chạy
-// docs/features/item-level-task-schema.sql trên Supabase Dashboard — trước đó mọi lệnh trả lỗi
-// "relation does not exist" (an toàn, không ghi sai gì). Cùng nguyên tắc `knMigrateLogs`/
-// `knMigrateReminders` ở trên: gọi tay qua Console, không tự chạy khi load app. Task CÓ bản Shared
-// (mirror knMigrateLogs/knMigrateReminders, khác knMigrateHabits).
-//
-// Cách dùng (mở DevTools Console khi đã đăng nhập):
-//   await window.knMigrateTasks.preview()  // dry-run, chỉ đọc — xem trước sẽ migrate gì
-//   await window.knMigrateTasks.run()      // thực thi migrate thật (idempotent, gọi lại an toàn)
-declare global {
-  interface Window {
-    knMigrateTasks: {
-      preview: typeof previewLegacyTasksMigration;
-      run: typeof runLegacyTasksMigration;
-    };
-  }
-}
-window.knMigrateTasks = {
-  preview: previewLegacyTasksMigration,
-  run: runLegacyTasksMigration,
-};
-
-// Migration Ghi chú (notes[] cũ, jsonb) -> kn_private_notes/kn_shared_notes (Bước 5, entity CUỐI
-// CÙNG, docs/features/item-level-entity-tables.md). CHỈ chạy được SAU KHI đã chạy
-// docs/features/item-level-note-schema.sql trên Supabase Dashboard — trước đó mọi lệnh trả lỗi
-// "relation does not exist" (an toàn, không ghi sai gì). Cùng nguyên tắc `knMigrateLogs`/
-// `knMigrateTasks` ở trên: gọi tay qua Console, không tự chạy khi load app. Note CÓ bản Shared
-// (mirror knMigrateLogs/knMigrateReminders/knMigrateTasks, khác knMigrateHabits).
-//
-// Cách dùng (mở DevTools Console khi đã đăng nhập):
-//   await window.knMigrateNotes.preview()  // dry-run, chỉ đọc — xem trước sẽ migrate gì
-//   await window.knMigrateNotes.run()      // thực thi migrate thật (idempotent, gọi lại an toàn)
-declare global {
-  interface Window {
-    knMigrateNotes: {
-      preview: typeof previewLegacyNotesMigration;
-      run: typeof runLegacyNotesMigration;
-    };
-  }
-}
-window.knMigrateNotes = {
-  preview: previewLegacyNotesMigration,
-  run: runLegacyNotesMigration,
 };
 
 // Đăng ký Service Worker (PWA + Push Notification — Phần 1, xem docs/features/push-notification.md).

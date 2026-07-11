@@ -86,17 +86,29 @@ function rowToSpace(row: PrivateSpaceRow): Space {
   return normalizeSpace(raw);
 }
 
-/** Map `Space` (FE) -> object cột DB (không gồm `id`/`user_id` — caller tự thêm tuỳ ngữ cảnh insert/update). */
+/**
+ * Map `Space` (FE) -> object cột DB (không gồm `id`/`user_id` — caller tự thêm tuỳ ngữ cảnh
+ * insert/update). Dùng cho CẢ `createPrivateSpace()` (INSERT 1 Space) lẫn `upsertPrivateSpaces()`
+ * (bulk, dùng cho seed/import/legacy-migrate).
+ *
+ * **KHÔNG còn gồm `tasks`/`reminders`/`habits`/`notes`/`logs`** (dọn dẹp 2026-07-11, xem
+ * docs/features/item-level-entity-tables-progress.md, câu hỏi mở #2, "Việc 1") — cả 5 entity đã
+ * cutover đọc/ghi sang bảng item-level riêng (`kn_private_tasks`/`kn_private_notes`/...), 5 cột
+ * jsonb tương ứng trên `kn_private_spaces` không còn được app đọc lại nữa (xem comment ở
+ * `PrivateSpaceRow`/`schema.sql`). Ghi tiếp vào đó chỉ lãng phí network + phình dữ liệu trùng lặp,
+ * không có tác dụng gì lên hiển thị. INSERT mới (`createPrivateSpace`) rỗng vẫn hợp lệ nhờ default
+ * cột DB (`'[]'::jsonb`) — không cần gửi tường minh mảng rỗng.
+ *
+ * Riêng luồng IMPORT_DATA (`AppStateContext.tsx`, `syncImportedSpaceItems()`) và
+ * `runLegacySpacesMigration()` (`migrateLegacySpaces.ts`) là 2 nơi DUY NHẤT còn cần tự bulk-insert
+ * entity data vào bảng item-level SAU KHI gọi `upsertPrivateSpaces()` — hàm này không còn tự làm hộ
+ * việc đó nữa.
+ */
 function toRowPayload(space: Space): Record<string, unknown> {
   return {
     name: space.name,
     space_order: space.order,
     enabled_blocks: space.enabledBlocks,
-    tasks: space.tasks,
-    reminders: space.reminders,
-    habits: space.habits,
-    notes: space.notes,
-    logs: space.logs,
   };
 }
 
@@ -148,7 +160,7 @@ export async function createPrivateSpace(space: Space): Promise<{ ok: boolean; v
 
 /**
  * Upsert HÀNG LOẠT Space cá nhân (INSERT nếu `id` chưa có, UPDATE tại chỗ nếu `id` đã tồn tại) —
- * dùng cho 2 tình huống duy nhất:
+ * dùng cho 3 tình huống:
  *   1. `seedAndPersist()` (user mới) — không có conflict thật (bảng đang rỗng cho user này), upsert
  *      ở đây tương đương insert thuần, chỉ để dùng chung 1 hàm với (2).
  *   2. Import JSON (`IMPORT_DATA`, xem `AppStateContext.tsx`) — file export giữ NGUYÊN id gốc của
@@ -156,10 +168,16 @@ export async function createPrivateSpace(space: Space): Promise<{ ok: boolean; v
  *      thể trùng `id` với hàng đang có sẵn trên `kn_private_spaces` — dùng INSERT thuần ở tình
  *      huống này sẽ vỡ do trùng khoá chính. Upsert xử lý đúng cả 2 nhánh (trùng id -> update tại
  *      chỗ, id mới -> insert) mà không cần biết trước case nào.
+ *   3. `runLegacySpacesMigration()` (`migrateLegacySpaces.ts`) — chỉ gồm Space CHƯA có hàng, tương
+ *      đương insert thuần.
  *
  * Trả về `Space[]` với `_privateVersion` đã điền đúng từ kết quả DB thật (đọc lại qua `.select()`)
  * — version sau UPDATE (do upsert với id trùng) sẽ > 1 (trigger tự tăng), không giả định cứng = 1
- * như `createPrivateSpace()` (case đó CHẮC CHẮN là INSERT thuần, không có nhánh update).
+ * như `createPrivateSpace()` (case đó CHẮC CHẮN là INSERT thuần, không có nhánh update). Field
+ * khác của `Space` (kể cả `tasks`/`notes`/`habits`/`reminders`/`logs`) được TRẢ NGUYÊN từ input
+ * (spread `...s`) — hàm này KHÔNG ghi các field entity đó lên DB (xem `toRowPayload()`), CALLER tự
+ * chịu trách nhiệm bulk-insert entity vào bảng item-level tương ứng SAU KHI upsert thành công (xem
+ * `syncImportedSpaceItems()` ở `AppStateContext.tsx` cho case Import).
  */
 export async function upsertPrivateSpaces(spaces: Space[]): Promise<{ ok: boolean; spaces?: Space[]; error?: string }> {
   if (spaces.length === 0) return { ok: true, spaces: [] };
@@ -193,20 +211,20 @@ export async function upsertPrivateSpaces(spaces: Space[]): Promise<{ ok: boolea
  * Trigger `kn_private_spaces_before_update` vẫn tự tăng `version` + `updated_at` (giữ nguyên, vô
  * hại) nhưng kết quả `newVersion` trả về ở đây chỉ mang tính thông tin, không dùng để chặn ghi lần
  * sau.
+ *
+ * **`patch` KHÔNG còn nhận `tasks`/`reminders`/`habits`/`notes`/`logs`** (dọn dẹp 2026-07-11, xem
+ * docs/features/item-level-entity-tables-progress.md câu hỏi mở #2, "Việc 1") — 5 field này đã
+ * cutover hoàn toàn sang bảng item-level riêng (`itemPersist.ts`), Space-level chỉ còn thật sự sở
+ * hữu `name`/`order`/`enabledBlocks`. Compiler tự chặn mọi nơi còn lỡ gọi với field cũ.
  */
 export async function savePrivateSpace(
   spaceId: string,
-  patch: Partial<Pick<Space, 'name' | 'order' | 'enabledBlocks' | 'tasks' | 'reminders' | 'habits' | 'notes' | 'logs'>>,
+  patch: Partial<Pick<Space, 'name' | 'order' | 'enabledBlocks'>>,
 ): Promise<{ newVersion?: number }> {
   const updatePayload: Record<string, unknown> = {};
   if (patch.name !== undefined) updatePayload.name = patch.name;
   if (patch.order !== undefined) updatePayload.space_order = patch.order;
   if (patch.enabledBlocks !== undefined) updatePayload.enabled_blocks = patch.enabledBlocks;
-  if (patch.tasks !== undefined) updatePayload.tasks = patch.tasks;
-  if (patch.reminders !== undefined) updatePayload.reminders = patch.reminders;
-  if (patch.habits !== undefined) updatePayload.habits = patch.habits;
-  if (patch.notes !== undefined) updatePayload.notes = patch.notes;
-  if (patch.logs !== undefined) updatePayload.logs = patch.logs;
 
   if (Object.keys(updatePayload).length === 0) {
     return {};

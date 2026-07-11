@@ -232,6 +232,19 @@ export async function deleteNote(scope: NoteScope, noteId: string): Promise<void
   }
 }
 
+/**
+ * Xoá TOÀN BỘ Note của 1 Space (theo `space_id`) — dùng cho luồng Import JSON (`IMPORT_DATA`,
+ * `syncImportedSpaceItems()` ở `AppStateContext.tsx`), mirror `deleteAllTasksForSpace()`. KHÔNG
+ * dùng cho CRUD thường (xoá 1 note luôn qua `deleteNote()`).
+ */
+export async function deleteAllNotesForSpace(scope: NoteScope, spaceId: string): Promise<void> {
+  const { error } = await supabase.from(tableFor(scope)).delete().eq('space_id', spaceId);
+  if (error) {
+    console.warn(`[KN-Space] deleteAllNotesForSpace (${scope}) lỗi:`, error.message);
+    throw error;
+  }
+}
+
 /** id của mọi Note hiện có trên bảng mới (theo scope) — dùng để phát hiện Note NÀO trong `notes[]`
  * jsonb cũ CHƯA được migrate (xem `migrateLegacyNotes.ts`). RLS tự giới hạn đúng phạm vi user/space
  * hiện tại, không cần filter thêm (private thêm `.eq('user_id', ...)` để nhất quán với

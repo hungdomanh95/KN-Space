@@ -179,23 +179,25 @@ export async function loadSharedSpaces(): Promise<Space[]> {
  * Save shared space — ghi thẳng (blind write, last-write-wins), KHÔNG version-check (bỏ theo
  * docs/features/conflict-handling-simplification.md mục 2.1 — 2026-07-10).
  *
- * UPDATE kn_shared_spaces SET tasks=..., notes=..., reminders=..., name=... WHERE id = spaceId
+ * UPDATE kn_shared_spaces SET name=..., enabled_blocks=... WHERE id = spaceId
  *
  * Trigger kn_shared_spaces_before_update vẫn tự tăng version + updated_at (giữ nguyên, vô hại)
  * nhưng `newVersion` trả về ở đây chỉ mang tính thông tin, không dùng để chặn ghi lần sau. Lỗi thật
  * (network/server) throw ra ngoài cho caller (`AppStateContext.tsx` — `attemptSaveShared`) tự bật
  * banner lỗi mạng.
+ *
+ * **`patch` KHÔNG còn nhận `tasks`/`notes`/`reminders`/`logs`** (dọn dẹp 2026-07-11, xem
+ * docs/features/item-level-entity-tables-progress.md câu hỏi mở #2, "Việc 1") — cả 4 field này đã
+ * cutover hoàn toàn sang bảng item-level riêng (`kn_shared_tasks`/`kn_shared_notes`/
+ * `kn_shared_reminders`/`kn_shared_logs`, qua `itemPersist.ts`), Space-level chỉ còn thật sự sở hữu
+ * `name`/`enabledBlocks`. Compiler tự chặn mọi nơi còn lỡ gọi với field cũ.
  */
 export async function saveSharedSpace(
   spaceId: string,
-  patch: Partial<Pick<Space, 'tasks' | 'notes' | 'reminders' | 'logs' | 'name' | 'enabledBlocks'>>,
+  patch: Partial<Pick<Space, 'name' | 'enabledBlocks'>>,
 ): Promise<{ newVersion?: number }> {
   // Chỉ gửi các field thực sự có trong patch
   const updatePayload: Record<string, unknown> = {};
-  if (patch.tasks !== undefined) updatePayload.tasks = patch.tasks;
-  if (patch.notes !== undefined) updatePayload.notes = patch.notes;
-  if (patch.reminders !== undefined) updatePayload.reminders = patch.reminders;
-  if (patch.logs !== undefined) updatePayload.logs = patch.logs;
   if (patch.name !== undefined) updatePayload.name = patch.name;
   // Luôn ép `habits: false` trước khi gửi lên DB — phòng trường hợp caller lỡ truyền
   // enabledBlocks có habits:true (không nên xảy ra vì UI đã chặn, nhưng đây là lớp

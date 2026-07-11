@@ -228,6 +228,20 @@ export async function deleteTask(scope: TaskScope, taskId: string): Promise<void
   }
 }
 
+/**
+ * Xoá TOÀN BỘ Task của 1 Space (theo `space_id`) — dùng cho luồng Import JSON (`IMPORT_DATA`,
+ * `syncImportedSpaceItems()` ở `AppStateContext.tsx`), nơi cần "dọn sạch" item-level trước khi
+ * bulk-insert lại từ file import (thay thế hoàn toàn, mirror đúng ngữ nghĩa `IMPORT_DATA` ở
+ * Space-level). KHÔNG dùng cho CRUD thường (xoá 1 task luôn qua `deleteTask()`).
+ */
+export async function deleteAllTasksForSpace(scope: TaskScope, spaceId: string): Promise<void> {
+  const { error } = await supabase.from(tableFor(scope)).delete().eq('space_id', spaceId);
+  if (error) {
+    console.warn(`[KN-Space] deleteAllTasksForSpace (${scope}) lỗi:`, error.message);
+    throw error;
+  }
+}
+
 /** id của mọi Task hiện có trên bảng mới (theo scope) — dùng để phát hiện Task NÀO trong `tasks[]`
  * jsonb cũ CHƯA được migrate (xem `migrateLegacyTasks.ts`). RLS tự giới hạn đúng phạm vi user/space
  * hiện tại, không cần filter thêm (private thêm `.eq('user_id', ...)` để nhất quán với

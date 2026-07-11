@@ -156,6 +156,20 @@ export async function deleteHabit(habitId: string): Promise<void> {
   }
 }
 
+/**
+ * Xoá TOÀN BỘ Habit của 1 Space cá nhân (theo `space_id`) — dùng cho luồng Import JSON
+ * (`IMPORT_DATA`, `syncImportedSpaceItems()` ở `AppStateContext.tsx`), mirror
+ * `deleteAllTasksForSpace()` (không có `scope` — Habit không tồn tại ở Shared Space). KHÔNG dùng
+ * cho CRUD thường (xoá 1 habit luôn qua `deleteHabit()`).
+ */
+export async function deleteAllHabitsForSpace(spaceId: string): Promise<void> {
+  const { error } = await supabase.from('kn_private_habits').delete().eq('space_id', spaceId);
+  if (error) {
+    console.warn('[KN-Space] deleteAllHabitsForSpace lỗi:', error.message);
+    throw error;
+  }
+}
+
 /** id của mọi Habit hiện có trên bảng mới (của user hiện tại) — dùng để phát hiện Habit NÀO trong
  * `habits[]` jsonb cũ CHƯA được migrate (xem `migrateLegacyHabits.ts`). */
 export async function listExistingHabitIds(): Promise<Set<string>> {
