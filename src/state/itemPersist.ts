@@ -9,18 +9,32 @@
 // vẫn có (600ms, gộp nhiều sửa liên tiếp CÙNG 1 item), nhưng đơn vị theo dõi là
 // `itemId` (Map), không phải `spaceId`.
 //
-// File này gộp CẢ 3 entity đã làm tới nay theo đúng kế hoạch cuốn chiếu (mục 7
+// File này gộp CẢ 4 entity đã làm tới nay theo đúng kế hoạch cuốn chiếu (mục 7
 // tài liệu trên, Log → Habit → Reminder → Task → Note):
 //   - Log (Bước 1, xong, Giai đoạn A+B đã bật) — phần đầu file.
 //   - Habit (Bước 2, Giai đoạn A+B đã bật 2026-07-11) — phần giữa file, xem
 //     `HABIT_ITEM_PERSIST_ENABLED` bên dưới. Habit KHÔNG có bản Shared (chỉ có
 //     `kn_private_habits`), khác Log — mọi hàm Habit không có tham số `scope`.
-//   - Reminder (Bước 3, Giai đoạn A+B đã bật 2026-07-11) — phần cuối file. Xem
+//   - Reminder (Bước 3, Giai đoạn A+B đã bật 2026-07-11) — phần giữa file. Xem
 //     `REMINDER_ITEM_PERSIST_ENABLED` bên dưới. Reminder CÓ bản Shared (mirror
 //     Log, không phải Habit) — mọi hàm có tham số `scope`. Khác Log ở chỗ
 //     `REMINDER_UPDATE` luôn thay NGUYÊN item (không phải patch hẹp từng
 //     field) vì `ReminderFormModal.tsx` cho phép đổi cả `type` (once <->
 //     recurring) khi sửa — xem `reminderStore.ts`.
+//   - Task (Bước 4, CHỈ mới chuẩn bị — `TASK_ITEM_PERSIST_ENABLED = false`) —
+//     phần cuối file. Task CÓ bản Shared (mirror Log/Reminder). Khác Reminder:
+//     có 3 action UPDATE tách biệt (`TASK_UPDATE`/`TASK_TOGGLE_DONE`/
+//     `TASK_REORDER`), mỗi action patch 1 nhóm field hẹp — mirror cách Habit
+//     dùng patch hẹp (`HABIT_UPDATE`/`HABIT_TOGGLE_TODAY`), KHÔNG mirror cách
+//     Reminder thay nguyên item. `TASK_REORDER` dùng fractional-index
+//     (`src/state/fractionalOrder.ts`, đã tích hợp vào `state/reducers/tasks.ts`)
+//     — chỉ patch `order` của ĐÚNG 1 task, không đụng task khác. **Điểm khác
+//     biệt quan trọng khi gọi `handleTaskActionForPersist()` từ
+//     `AppStateContext.tsx`:** PHẢI truyền `actionToDispatch` (không phải
+//     `action` gốc) — khối notify Shared Space (assign/hoàn thành task, chạy
+//     TRƯỚC trong `smartDispatch`) có thể đã gắn sẵn `payload.id` cho
+//     `TASK_CREATE` (đảm bảo id gửi trong notify khớp đúng id task thật) —
+//     dùng lại `action` gốc sẽ khiến hàm này tự sinh 1 id THỨ HAI khác hẳn.
 //
 // CỜ BẬT/TẮT — `LOG_ITEM_PERSIST_ENABLED`:
 // Bảng `kn_private_logs`/`kn_shared_logs` (docs/features/item-level-log-schema.sql)
@@ -37,13 +51,15 @@
 // refresh hiện tại (tránh đè mất log vừa tạo/sửa/xoá cục bộ).
 // =============================================================================
 
-import type { Habit, ReminderDefinition, Space } from '../types';
+import type { Habit, ReminderDefinition, Space, Task } from '../types';
 import type { LogAction } from './reducers/logs';
 import { logsReducer } from './reducers/logs';
 import type { HabitAction } from './reducers/habits';
 import { habitsReducer } from './reducers/habits';
 import type { ReminderAction } from './reducers/reminders';
 import { remindersReducer } from './reducers/reminders';
+import type { TaskAction } from './reducers/tasks';
+import { tasksReducer } from './reducers/tasks';
 import type { LogEntry } from '../types';
 import { setPrivateFallbackActive, setSharedFallbackActive } from '../storage/supabaseStore';
 import {
@@ -60,6 +76,12 @@ import {
   updateReminder,
   type ReminderScope,
 } from '../storage/reminderStore';
+import {
+  createTask,
+  deleteTask,
+  updateTask,
+  type TaskScope,
+} from '../storage/taskStore';
 
 export const LOG_ITEM_PERSIST_ENABLED = true;
 
@@ -879,5 +901,313 @@ export function flushAllPendingReminderPersist(): void {
     const entry = reminderPending.get(id);
     if (entry) clearTimeout(entry.timer);
     scheduleReminderFlush(id);
+  });
+}
+
+// =============================================================================
+// Task (Bước 4, docs/features/item-level-entity-tables.md) — mirror CHÍNH XÁC
+// cấu trúc Log/Reminder ở trên (descriptor/merge/debounce theo itemId, CÓ
+// `scope` — Task CÓ bản Shared), chỉ khác:
+//   - 3 action UPDATE TÁCH BIỆT (`TASK_UPDATE`/`TASK_TOGGLE_DONE`/
+//     `TASK_REORDER`), mỗi action patch 1 nhóm field HẸP — mirror cách Habit
+//     dùng patch hẹp (`HABIT_UPDATE`: title, `HABIT_TOGGLE_TODAY`:
+//     completedDates), KHÔNG mirror cách Reminder thay NGUYÊN item (Task
+//     không có action nào đổi "hình dạng" toàn bộ item như đổi type Reminder
+//     once<->recurring).
+//   - `TASK_REORDER` dùng fractional-index (`src/state/fractionalOrder.ts`,
+//     đã tích hợp vào `state/reducers/tasks.ts` — xem `computeOrderForInsertAt`)
+//     — chỉ patch field `order` của ĐÚNG 1 task vừa kéo, task khác giữ nguyên.
+//   - `TASK_ITEM_PERSIST_ENABLED = false` — bảng `kn_private_tasks`/
+//     `kn_shared_tasks` (docs/features/item-level-task-schema.sql) CHỈ MỚI
+//     CHUẨN BỊ SQL trong repo, CHƯA chạy lên Supabase Dashboard thật, CHƯA có
+//     dữ liệu migrate. `handleTaskActionForPersist()` khi cờ tắt CHỈ tự sinh
+//     `id` cho `TASK_CREATE` nếu thiếu (mirror `LOG_CREATE`/`HABIT_CREATE`/
+//     `REMINDER_CREATE`), KHÔNG gọi bất kỳ hàm nào trong `taskStore.ts`.
+//   - Đã viết sẵn `hasPendingTasksForSpace()`/`activeTaskSpaceRefs` NGAY TỪ
+//     ĐẦU dù chưa có Giai đoạn B để dùng tới ở lượt này (mirror bài học đã áp
+//     dụng cho Habit/Reminder — tránh phải quay lại sửa
+//     `scheduleTaskFlush()` sau). Đã áp dụng luôn fix bug `inFlight` phát
+//     hiện ở Giai đoạn B của Log (tự tham chiếu đúng promise `wrapped` khi
+//     dọn map, không so sánh nhầm biến `next`).
+//   - **Lưu ý bắt buộc khi gọi từ `AppStateContext.tsx`:** truyền
+//     `actionToDispatch` (không phải `action` gốc) — xem giải thích đầy đủ ở
+//     đầu file.
+// =============================================================================
+
+export const TASK_ITEM_PERSIST_ENABLED = false;
+
+const TASK_ACTION_TYPES = new Set([
+  'TASK_CREATE',
+  'TASK_UPDATE',
+  'TASK_DELETE',
+  'TASK_TOGGLE_DONE',
+  'TASK_REORDER',
+]);
+
+/** Type guard — action có phải 1 trong 5 action CRUD của Task không (dùng ở `smartDispatch`). */
+export function isTaskAction(action: { type: string }): action is TaskAction {
+  return TASK_ACTION_TYPES.has(action.type);
+}
+
+/** Patch hẹp — mỗi action UPDATE của Task chỉ set 1 nhóm field con (xem giải thích ở đầu block). */
+type TaskPatch = {
+  title?: string;
+  content?: string;
+  date?: string;
+  time?: string;
+  assigneeIds?: string[];
+  done?: boolean;
+  order?: number;
+};
+
+/** 1 thao tác đang chờ ghi cho 1 task — tương đương "descriptor" mục 4.2 tài liệu trên. */
+export type TaskPendingOp =
+  | { kind: 'insert'; task: Task }
+  | { kind: 'update'; patch: TaskPatch }
+  | { kind: 'delete' };
+
+/** Áp patch vào 1 `Task` cục bộ (KHÔNG gọi DB) — dùng khi gộp 1 UPDATE tới trong lúc 1 INSERT của
+ * CÙNG item còn đang chờ (item chưa từng lên server để có gì mà UPDATE). */
+function applyTaskPatch(task: Task, patch: TaskPatch): Task {
+  const next: Task = { ...task };
+  if (patch.title !== undefined) next.title = patch.title;
+  if (patch.content !== undefined) next.content = patch.content;
+  if (patch.date !== undefined) next.date = patch.date;
+  if (patch.time !== undefined) next.time = patch.time;
+  if (patch.assigneeIds !== undefined) next.assigneeIds = patch.assigneeIds;
+  if (patch.done !== undefined) next.done = patch.done;
+  if (patch.order !== undefined) next.order = patch.order;
+  return next;
+}
+
+/**
+ * Gộp 1 thao tác MỚI vào thao tác ĐANG CHỜ (nếu có) của CÙNG 1 item, trong CÙNG cửa sổ debounce —
+ * mirror CHÍNH XÁC `mergeLogPendingOp()`/`mergeHabitPendingOp()` ở trên (cùng bộ quy tắc
+ * insert/update/delete).
+ *
+ * Export để test độc lập (`itemPersist.test.ts`).
+ */
+export function mergeTaskPendingOp(existing: TaskPendingOp | undefined, incoming: TaskPendingOp): TaskPendingOp | null {
+  if (!existing) return incoming;
+
+  if (incoming.kind === 'delete') {
+    // Item CHƯA từng lên server (còn đang chờ insert) rồi bị xoá ngay trong lúc còn chờ -> không
+    // cần làm gì cả (không insert rồi lại delete, tốn 1 lượt network vô ích).
+    if (existing.kind === 'insert') return null;
+    return incoming;
+  }
+
+  if (incoming.kind === 'update') {
+    if (existing.kind === 'insert') {
+      // Item chưa lên server -> merge patch THẲNG vào task đang chờ insert, không tạo 1 UPDATE
+      // riêng (không có gì trên DB để UPDATE).
+      return { kind: 'insert', task: applyTaskPatch(existing.task, incoming.patch) };
+    }
+    if (existing.kind === 'update') {
+      // Gộp nhiều patch liên tiếp — field nào có mặt ở patch SAU thì đè, field vắng giữ patch cũ.
+      return { kind: 'update', patch: { ...existing.patch, ...incoming.patch } };
+    }
+    // existing.kind === 'delete' — đã yêu cầu xoá, 1 update tới sau (race UI hiếm) không hồi sinh
+    // item, giữ nguyên delete.
+    return existing;
+  }
+
+  // incoming.kind === 'insert' — không nên xảy ra thực tế (id là UUID, TASK_CREATE không tái dùng
+  // id đã có) — phòng thủ: ưu tiên bản mới nhất.
+  return incoming;
+}
+
+/**
+ * Tính descriptor (item nào, thao tác gì) từ 1 action Task — LUÔN gọi SAU khi đã chắc chắn
+ * `action.payload.id` (với TASK_CREATE) đã được gắn cố định, và `nextSpace` là kết quả CHẠY THẬT
+ * `tasksReducer(currentSpace, action)` (không phải suy đoán). LUÔN lấy giá trị field từ `nextSpace`
+ * (không phải trực tiếp từ `action.payload`) — vd `TASK_UPDATE` có thể bị `tasksReducer` trim/fallback
+ * `title` rỗng thành 'Việc chưa đặt tên', dùng thẳng payload sẽ lệch với dữ liệu thật trong state.
+ *
+ * Export để test độc lập.
+ */
+export function computeTaskPersistDescriptors(
+  action: TaskAction,
+  nextSpace: Space,
+): { itemId: string; op: TaskPendingOp }[] {
+  switch (action.type) {
+    case 'TASK_CREATE': {
+      const id = action.payload.id;
+      if (!id) return []; // phòng thủ — caller (handleTaskActionForPersist) luôn phải gắn id trước
+      const created = nextSpace.tasks.find((t) => t.id === id);
+      if (!created) return []; // phòng thủ — reducer không có nhánh từ chối tạo hiện tại
+      return [{ itemId: id, op: { kind: 'insert', task: created } }];
+    }
+    case 'TASK_UPDATE': {
+      const updated = nextSpace.tasks.find((t) => t.id === action.payload.id);
+      if (!updated) return []; // task đã bị xoá trước đó (race hiếm) — không còn gì để update
+      const { title, content, date, time, assigneeIds } = updated;
+      return [{ itemId: action.payload.id, op: { kind: 'update', patch: { title, content, date, time, assigneeIds } } }];
+    }
+    case 'TASK_TOGGLE_DONE': {
+      const updated = nextSpace.tasks.find((t) => t.id === action.payload.id);
+      if (!updated) return [];
+      return [{ itemId: action.payload.id, op: { kind: 'update', patch: { done: updated.done } } }];
+    }
+    case 'TASK_DELETE':
+      return [{ itemId: action.payload.id, op: { kind: 'delete' } }];
+    case 'TASK_REORDER': {
+      const updated = nextSpace.tasks.find((t) => t.id === action.payload.draggedId);
+      if (!updated) return []; // draggedId/targetId không hợp lệ -> reducer trả nguyên space, không đổi gì
+      return [{ itemId: action.payload.draggedId, op: { kind: 'update', patch: { order: updated.order } } }];
+    }
+    default:
+      return [];
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Hàng đợi debounce theo itemId + thực thi — mirror CHÍNH XÁC cơ chế Log/Reminder ở trên
+// (`pending`/`inFlight`, CÓ `scope`), đặt tên riêng để không đụng tên module-level của Log/Habit/
+// Reminder.
+// ---------------------------------------------------------------------------
+
+interface TaskPendingEntry {
+  scope: TaskScope;
+  spaceId: string;
+  op: TaskPendingOp;
+  timer: ReturnType<typeof setTimeout>;
+}
+
+const taskPending = new Map<string, TaskPendingEntry>();
+// Promise đang bay của lượt flush GẦN NHẤT cho 1 itemId — mirror `inFlight` ở phần Log (xem giải
+// thích đầy đủ ở đó). Tự tham chiếu đúng promise đã lưu (`wrapped`) khi dọn map — KHÔNG lặp lại bug
+// đã phát hiện + sửa ở `scheduleFlush()` (Log, Giai đoạn B).
+const taskInFlight = new Map<string, Promise<void>>();
+// itemId -> {scope, spaceId} cho MỌI Task hiện "chưa ghi xong" — mirror CHÍNH XÁC `activeSpaceRefs`
+// ở phần Log. Dùng ở `hasPendingTasksForSpace()` (Giai đoạn B, chưa nối ở lượt này, viết sẵn để
+// không phải sửa lại `scheduleTaskFlush()` sau — mirror bài học đã áp dụng cho Habit/Reminder).
+const activeTaskSpaceRefs = new Map<string, { scope: TaskScope; spaceId: string }>();
+
+function setTaskFallback(scope: TaskScope, active: boolean): void {
+  if (scope === 'private') setPrivateFallbackActive(active);
+  else setSharedFallbackActive(active);
+}
+
+async function flushTaskItem(itemId: string): Promise<void> {
+  const entry = taskPending.get(itemId);
+  if (!entry) return; // đã bị mergeTaskPendingOp huỷ (vd insert+delete) hoặc đã flush bởi lượt khác
+  taskPending.delete(itemId);
+  const { scope, spaceId, op } = entry;
+  try {
+    if (op.kind === 'insert') {
+      const result = await createTask({ scope, spaceId }, op.task);
+      if (!result.ok) throw new Error(result.error ?? 'Không rõ lỗi');
+    } else if (op.kind === 'update') {
+      await updateTask(scope, itemId, op.patch);
+    } else {
+      await deleteTask(scope, itemId);
+    }
+    setTaskFallback(scope, false);
+  } catch (err) {
+    console.warn(`[KN-Space] itemPersist: lưu Task ${itemId} thất bại:`, err);
+    setTaskFallback(scope, true);
+  }
+}
+
+/** Xếp lượt flush của `itemId` nối tiếp sau lượt đang bay (nếu có) — mirror CHÍNH XÁC
+ * `scheduleFlush()` ở phần Log (đã áp dụng fix bug `inFlight` ngay từ đầu, không lặp lại lỗi so
+ * sánh nhầm biến `next`). */
+function scheduleTaskFlush(itemId: string): void {
+  const prior = taskInFlight.get(itemId) ?? Promise.resolve();
+  const chained = prior.then(() => flushTaskItem(itemId));
+  const wrapped: Promise<void> = chained.finally(() => {
+    if (taskInFlight.get(itemId) === wrapped) {
+      taskInFlight.delete(itemId);
+      if (!taskPending.has(itemId)) activeTaskSpaceRefs.delete(itemId);
+    }
+  });
+  taskInFlight.set(itemId, wrapped);
+}
+
+/** Đưa 1 thao tác vào hàng đợi debounce (600ms) của `itemId`, gộp với thao tác đang chờ (nếu có). */
+function queueTaskPersist(scope: TaskScope, spaceId: string, itemId: string, op: TaskPendingOp, debounceMs = 600): void {
+  const existing = taskPending.get(itemId);
+  if (existing) clearTimeout(existing.timer);
+
+  const merged = mergeTaskPendingOp(existing?.op, op);
+  if (merged === null) {
+    taskPending.delete(itemId);
+    if (!taskInFlight.has(itemId)) activeTaskSpaceRefs.delete(itemId);
+    return;
+  }
+
+  const timer = setTimeout(() => scheduleTaskFlush(itemId), debounceMs);
+  taskPending.set(itemId, { scope, spaceId, op: merged, timer });
+  activeTaskSpaceRefs.set(itemId, { scope, spaceId });
+}
+
+/**
+ * `true` nếu Space (`scope`+`spaceId`) hiện có ÍT NHẤT 1 Task "chưa ghi xong" (còn chờ debounce
+ * HOẶC network call đang bay) — dùng ở `refreshStaleSpaces()` (Giai đoạn B, chưa nối ở lượt này) để
+ * KHÔNG gán đè `space.tasks` bằng dữ liệu vừa tải lại từ bảng item-level cho Space này trong lượt
+ * refresh hiện tại. Mirror CHÍNH XÁC `hasPendingLogsForSpace()`/`hasPendingRemindersForSpace()`.
+ * Luôn trả `false` khi `TASK_ITEM_PERSIST_ENABLED === false` (không có gì được queue vào
+ * `activeTaskSpaceRefs` khi đó).
+ */
+export function hasPendingTasksForSpace(scope: TaskScope, spaceId: string): boolean {
+  for (const ref of activeTaskSpaceRefs.values()) {
+    if (ref.scope === scope && ref.spaceId === spaceId) return true;
+  }
+  return false;
+}
+
+/**
+ * Điểm gọi DUY NHẤT từ `AppStateContext.tsx` (`smartDispatch`) cho mọi action Task. Làm 3 việc
+ * (mirror CHÍNH XÁC `handleLogActionForPersist()`/`handleReminderActionForPersist()`):
+ *   1. Nếu `TASK_CREATE` chưa có `payload.id` -> tự sinh, trả action đã gắn id để caller dùng làm
+ *      `actionToDispatch` (đảm bảo id dùng để persist == id thật sự được tạo trong state). Ở
+ *      Shared Space, khối notify (chạy TRƯỚC trong `smartDispatch`) có thể ĐÃ gắn sẵn id — nhánh
+ *      này khi đó là no-op (payload.id đã defined).
+ *   2. Chạy `tasksReducer(currentSpace, action)` để biết CHÍNH XÁC kết quả.
+ *   3. Tính descriptor + đẩy vào hàng đợi debounce theo itemId (no-op nếu
+ *      `TASK_ITEM_PERSIST_ENABLED` còn `false`).
+ *
+ * Trả về action ĐÃ gắn id (dùng làm `actionToDispatch`) — KHÔNG dispatch thật ở đây.
+ *
+ * **QUAN TRỌNG:** caller (`AppStateContext.tsx`) PHẢI truyền `actionToDispatch` (state hiện tại của
+ * biến đó tại điểm gọi, có thể đã được khối notify Shared Space gắn id) làm tham số `action`, KHÔNG
+ * phải `action` gốc nhận từ `dispatch()` — xem giải thích đầy đủ ở đầu block Task trong file này.
+ */
+export function handleTaskActionForPersist(currentSpace: Space, action: TaskAction): TaskAction {
+  let resolvedAction = action;
+  if (resolvedAction.type === 'TASK_CREATE' && resolvedAction.payload.id === undefined) {
+    resolvedAction = { ...resolvedAction, payload: { ...resolvedAction.payload, id: crypto.randomUUID() } };
+  }
+
+  if (!TASK_ITEM_PERSIST_ENABLED) return resolvedAction;
+
+  const scope: TaskScope = currentSpace.isShared && currentSpace.sharedSpaceId ? 'shared' : 'private';
+  const spaceId = scope === 'shared' ? currentSpace.sharedSpaceId! : currentSpace.id;
+
+  // Space cá nhân CHƯA từng lưu lên `kn_private_spaces` (vừa tạo cục bộ, `_privateVersion`
+  // undefined) -> KHÔNG persist item-level ngay (FK `kn_private_tasks.space_id` sẽ vi phạm vì hàng
+  // cha chưa tồn tại trên DB). Bỏ qua an toàn — cột `tasks` jsonb (đường cũ) vẫn lưu bình thường,
+  // không mất dữ liệu; item-level sẽ persist đúng ở lần sửa KẾ TIẾP.
+  if (scope === 'private' && currentSpace._privateVersion === undefined) return resolvedAction;
+
+  const nextSpace = tasksReducer(currentSpace, resolvedAction);
+  const descriptors = computeTaskPersistDescriptors(resolvedAction, nextSpace);
+  descriptors.forEach(({ itemId, op }) => queueTaskPersist(scope, spaceId, itemId, op));
+
+  return resolvedAction;
+}
+
+/**
+ * Flush ngay mọi thao tác Task đang chờ debounce (mirror `flushAllPendingLogPersist()` ở trên) —
+ * gọi khi tab chuyển `hidden`. No-op nếu không có gì đang chờ (luôn đúng khi
+ * `TASK_ITEM_PERSIST_ENABLED === false`).
+ */
+export function flushAllPendingTaskPersist(): void {
+  const ids = Array.from(taskPending.keys());
+  ids.forEach((id) => {
+    const entry = taskPending.get(id);
+    if (entry) clearTimeout(entry.timer);
+    scheduleTaskFlush(id);
   });
 }

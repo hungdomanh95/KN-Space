@@ -19,6 +19,8 @@
 
 **Bước 3 (entity Reminder) — sub-bước 1-5 xong, Giai đoạn A ĐÃ BẬT + Giai đoạn B ĐÃ CODE XONG (2026-07-11, gộp chung 1 lượt theo yêu cầu chủ dự án).** Chủ dự án đã tự chạy `item-level-reminder-schema.sql` + migrate dữ liệu thật (2/2 khớp, idempotent — đã sửa xong bug `insertRemindersBulk` trộn khoá once/recurring trước đó). `REMINDER_ITEM_PERSIST_ENABLED = true` — mọi action `REMINDER_*` dual-write thật vào `kn_private_reminders`/`kn_shared_reminders`. Giai đoạn B (nối phần đọc `loadPrivateReminders`/`loadSharedReminders` vào bootstrap/`refreshStaleSpaces`, thêm `hasPendingRemindersForSpace()`) **✅ đã code, mirror CHÍNH XÁC Log (CÓ Shared, khác Habit), CHƯA test tay UI thật** — chờ chủ dự án tự test qua OAuth thật, 1 lượt duy nhất (Giai đoạn A+B gộp, không tách 2 lượt như Log/Habit). Xem chi tiết ở mục "Bước 3 — entity Reminder" bên dưới.
 
+**Bước 4 (entity Task, `kn_private_tasks`/`kn_shared_tasks`) — 4a (fractional-index thuần logic) VÀ 4b (bảng/RLS/storage layer/dispatch/migration script) đều ĐÃ CODE XONG (2026-07-11).** `TASK_REORDER` (`state/reducers/tasks.ts`) đã tích hợp `computeOrderForInsertAt()` thật — không còn reindex toàn mảng. 132/132 test pass, `npx tsc --noEmit`/`npm run build` pass. Cờ `TASK_ITEM_PERSIST_ENABLED` vẫn `false` — CHƯA chạy SQL lên Supabase Dashboard, CHƯA migrate dữ liệu thật, CHƯA bật dual-write. Xem chi tiết ở mục "Bước 4 — entity Task" bên dưới.
+
 ---
 
 ## Quyết định đã chốt (2026-07-10)
@@ -28,7 +30,7 @@
 3. **`order` (Task/Note): fractional-index** — số thực, chỉ 1 dòng đổi khi kéo-thả, thay vì reindex toàn mảng. `dev` xác nhận không có chỗ nào khác trong code giả định `order` là số nguyên liên tục.
 4. **`assignee_ids`: giữ `jsonb`** (không đổi sang `uuid[]`).
 5. **`createdAt` (Reminder/Log): bỏ field riêng, dùng thẳng cột DB `created_at`** — nhưng migration/import PHẢI set tường minh giá trị cũ, không để DB tự `now()`.
-6. **Thứ tự migrate 5 entity: độ đơn giản tăng dần — Log → Habit → Reminder → Task → Note**, có thêm 1 bước con "viết + unit-test fractional-index độc lập" trước khi đụng Task (theo tinh chỉnh của `dev`).
+6. **Thứ tự migrate 5 entity: độ đơn giản tăng dần — Log → Habit → Reminder → Task → Note**, có thêm 1 bước con "viết + unit-test fractional-index độc lập" trước khi đụng Task (theo tinh chỉnh của `dev`). **✅ Bước con này đã xong (2026-07-11)** — xem mục "Bước 4a — fractional-index (thuần logic)" bên dưới.
 7. ~~A1 (banner cảnh báo hết-retry, `storage-architecture-fix.md` mục 6): làm ngay, độc lập, không chờ việc lớn này~~ — **đã bị thay thế, không còn làm theo mô tả gốc.** Khái niệm "hết lượt retry" không còn tồn tại sau khi bỏ version-check (Hướng 1, `conflict-handling-simplification.md` mục 2.1/3). Đã code xong và push: banner lỗi mạng chung, nối vào nhánh `catch` (lỗi network/server thật) của `attemptSavePrivate`/`attemptSaveShared` — bảo vệ đúng giá trị cốt lõi A1 muốn (không để user tưởng đã lưu trong khi chưa), phạm vi rộng hơn A1 gốc (bắt cả lỗi network vốn đang bị bỏ sót). Xem `conflict-handling-simplification.md` mục 3.
 
 ## Phát hiện mới cần xử lý trước (không thuộc entity nào)
@@ -319,6 +321,124 @@ Reminder" và "Cách test Giai đoạn A+B" phía trên. Còn lại: chủ dự 
 (mirror câu hỏi mở #2 chưa quyết định chính thức cho cả Log/Habit) — chưa làm ở lượt này. Bước tiếp
 theo trong kế hoạch tổng (Log → Habit → Reminder → Task → Note): entity Task, chờ chủ dự án xác nhận
 resume.
+
+---
+
+## Bước 4 — entity Task (kn_private_tasks/kn_shared_tasks, CÓ bản shared)
+
+### Bước 4a — fractional-index (thuần logic) — ✅ ĐÃ XONG
+
+Đúng bước con đã chốt ở quyết định #6 (`item-level-entity-tables.md` mục 5): trước khi đụng entity
+Task (entity đầu tiên trong 5 loại có `order`/kéo-thả thủ công), viết + unit-test riêng cơ chế
+fractional-index trước, độc lập, chưa đụng gì tới reducer/DB.
+
+**File mới:**
+- `src/state/fractionalOrder.ts` — 2 hàm thuần logic, không side-effect, không import gì từ
+  reducer/storage/DB:
+  - `computeOrderBetween(before, after)`: công thức chính. 2 láng giềng đều có → trung bình cộng
+    `(before + after) / 2`. Chỉ có `after` (đầu danh sách) → `after - 1`. Chỉ có `before` (cuối danh
+    sách) → `before + 1`. Cả 2 đều không có (danh sách rỗng) → `DEFAULT_ORDER` (hằng số, = `0`).
+  - `computeOrderForInsertAt(existingOrders, insertIndex)` — helper tiện dụng ở mức "vị trí chèn":
+    nhận mảng `order` đã sort tăng dần (KHÔNG gồm item đang kéo — mirror bước `splice` hiện có trong
+    `TASK_REORDER`/`NOTE_REORDER`) + vị trí muốn chèn, tự tìm 2 láng giềng kề rồi gọi
+    `computeOrderBetween`. Chuẩn bị sẵn để lượt sau cắm thẳng vào reducer mà không cần viết lại phần
+    tìm láng giềng.
+- `src/state/fractionalOrder.test.ts` — 12 test: chèn giữa 2 láng giềng, chèn đầu/cuối danh sách,
+  danh sách rỗng (cả 2 hàm), `insertIndex` vượt biên tự clamp, kéo lặp lại 20 lần liên tiếp vào cùng
+  1 khoảng (giá trị vẫn hợp lệ, nằm chặt giữa 2 biên, không NaN/Infinity), kéo xen kẽ đầu/cuối 10 lần
+  liên tiếp, và 1 test ghi nhận rõ giới hạn double-precision đã biết (200 lần chia đôi liên tiếp vào
+  đúng 1 khoảng → giá trị suy biến trùng biên dưới, nhưng KHÔNG crash/NaN — đúng tinh thần đã chốt
+  "chấp nhận rủi ro thấp, không renumber tự động đợt này").
+
+**CHƯA đụng:** `state/reducers/notes.ts` (`NOTE_REORDER`) — vẫn y nguyên hành vi cũ (`sort → splice →
+map((x, idx) => ({...x, order: idx}))` cho toàn mảng). Việc tích hợp `computeOrderForInsertAt` vào
+`NOTE_REORDER` để dịp code Note (Bước 5) — **TASK_REORDER đã tích hợp ở phần 4b** ngay dưới đây.
+
+**Cách test:**
+- `npx tsc --noEmit`, `npm run build` — cả 2 PASS.
+- `npm test` — **108/108 test pass** (từ 96, +12 test mới trong `fractionalOrder.test.ts`, không đổi
+  test nào khác vì không đụng reducer/code thật nào đang chạy).
+- Đọc code review: `src/state/fractionalOrder.ts`, `src/state/fractionalOrder.test.ts`.
+
+### Bước 4b — bảng/storage/dispatch/migration — ✅ ĐÃ CODE XONG, CHƯA chạy SQL thật
+
+Theo đúng 5 bước con đã mô tả ở `item-level-entity-tables.md` mục 7, mirror CHÍNH XÁC cách làm Log/
+Reminder (CÓ bản shared) ở giai đoạn TRƯỚC KHI bật Giai đoạn A/B (chỉ chuẩn bị, chưa đụng dữ liệu
+thật):
+
+1. ✅ **Bảng mới** — `docs/features/item-level-task-schema.sql` (file mới, CHƯA chạy lên Supabase
+   Dashboard thật). `kn_private_tasks`/`kn_shared_tasks`, mirror đúng `kn_private_reminders`/
+   `kn_shared_reminders`: `id` uuid client-sinh (giữ nguyên định danh Task qua migration — quan
+   trọng vì Task còn dùng làm deep-link trong notify Shared Space, xem
+   `docs/features/shared-space-task-assign-notify.md`), `item_order` double precision NOT NULL
+   (fractional-index), `created_by` uuid null (chỉ ý nghĩa hiển thị avatar Shared Space, không dùng
+   cho RLS), `assignee_ids` giữ jsonb (quyết định #4), `created_at` timestamptz NULL ĐƯỢC — khác hẳn
+   Log/Reminder (NOT NULL DEFAULT now()) vì `Task.createdAt` là field thật sự optional ở tầng app
+   (task cũ có thể thiếu hẳn field này, có ý nghĩa khác với "vừa tạo bây giờ" — dùng để sort trong
+   `MobileChatScreen.tsx`), `version`/trigger giữ nguyên nhưng không dùng version-check.
+2. ✅ **RLS 2 nhánh tách biệt** — gộp trong cùng file SQL trên. Private: `auth.uid() = user_id`
+   (mirror `kn_private_reminders`). Shared: `is_space_member(space_id)` (mirror
+   `kn_shared_reminders`, mọi member được sửa/xoá task của người khác trong cùng Space — đúng hành
+   vi cũ, không giới hạn theo người tạo).
+3. ✅ **Storage layer** — `src/storage/taskStore.ts` (CRUD: `loadPrivateTasks`/`loadSharedTasks`
+   (sort theo `item_order`)/`createTask`/`insertTasksBulk`/`updateTask` (patch hẹp theo từng nhóm
+   field)/`deleteTask`/`listExistingTaskIds`, ghi thẳng blind write; `toInsertRow()` chỉ set
+   `created_at` khi `Task.createdAt` có giá trị thật — không set `NULL`/`now()` khi thiếu). `src/
+   state/itemPersist.ts` mở rộng thêm nhánh Task (giữ NGUYÊN 3 nhánh Log/Habit/Reminder có sẵn, chỉ
+   nối thêm phía dưới) — debounce theo `itemId` 600ms, `mergeTaskPendingOp()`, hàng đợi
+   `taskPending`/`taskInFlight` riêng. 3 action UPDATE tách biệt (`TASK_UPDATE`/`TASK_TOGGLE_DONE`/
+   `TASK_REORDER`), mỗi action patch 1 nhóm field hẹp — mirror cách Habit dùng patch hẹp, KHÔNG
+   mirror cách Reminder thay nguyên item. Đã áp dụng luôn fix bug `inFlight` (tự tham chiếu đúng
+   promise `wrapped` khi dọn map) và viết sẵn `hasPendingTasksForSpace()`/`activeTaskSpaceRefs`
+   NGAY TỪ ĐẦU dù chưa có Giai đoạn B để dùng tới ở lượt này (mirror bài học đã áp dụng cho
+   Habit/Reminder). **Lưu ý đặc thù riêng của Task (khác Log/Habit/Reminder):** trong
+   `AppStateContext.tsx` (`smartDispatch`), `handleTaskActionForPersist()` PHẢI được gọi bằng
+   `actionToDispatch` (không phải `action` gốc) — khối notify Shared Space (assign/hoàn thành task)
+   chạy TRƯỚC trong `smartDispatch` có thể ĐÃ gắn sẵn `payload.id` cho `TASK_CREATE` vào
+   `actionToDispatch` (đảm bảo id gửi trong notify khớp đúng id task thật); nếu dùng lại `action`
+   gốc, `handleTaskActionForPersist()` sẽ tự sinh 1 id THỨ HAI khác hẳn, tạo ra 2 UUID khác nhau cho
+   cùng 1 lượt tạo. 3 nhánh Log/Habit/Reminder ở trên KHÔNG có rủi ro này (không có notify nào chạy
+   trước gắn sẵn id) nên vẫn dùng `action` gốc như cũ.
+4. ✅ **Tích hợp dispatch** — `AppStateContext.tsx` (`smartDispatch`) gọi
+   `handleTaskActionForPersist()` cho mọi action `TASK_*`, thêm NGAY SAU nhánh Reminder, độc lập với
+   luồng save Space-level (`kn_private_spaces.tasks`/`kn_shared_spaces.tasks` jsonb — VẪN LÀ NGUỒN
+   THẬT, không đổi gì). Cờ `TASK_ITEM_PERSIST_ENABLED = false` (đầu phần Task trong `itemPersist.ts`)
+   — khi `false`, `handleTaskActionForPersist()` chỉ tự sinh `id` cho `TASK_CREATE` nếu thiếu
+   (mirror Log/Habit/Reminder), KHÔNG gọi bất kỳ hàm nào trong `taskStore.ts` (bảng
+   `kn_private_tasks`/`kn_shared_tasks` CHƯA tồn tại thật). `flushAllPendingTaskPersist()` cũng đã
+   nối vào nhánh `hidden` của `visibilitychange` (cùng chỗ Log/Habit/Reminder).
+5. ✅ **Migration** — `src/storage/migrateLegacyTasks.ts` (mirror `migrateLegacyReminders.ts`, CÓ
+   nhánh shared), giữ nguyên `order`/`createdAt` cũ (`created_at` chỉ set khi có giá trị thật),
+   expose qua `window.knMigrateTasks.preview()/.run()` (`main.tsx`). **CHƯA chạy** — chờ chủ dự án tự
+   chạy `item-level-task-schema.sql` trên Supabase Dashboard trước.
+
+**Test mới:**
+- `src/state/reducers/tasks.test.ts` — bộ test `TASK_REORDER (fractional-index)` (kéo giữa/đầu/cuối
+  danh sách, no-op khi `draggedId`/`targetId` không hợp lệ, kéo lặp lại nhiều lần liên tiếp không
+  NaN/crash, và edge-case kéo đi rồi kéo NGAY VỀ đúng vị trí cũ — xác nhận `order` khôi phục đúng
+  giá trị số học ban đầu, verify tính idempotent của công thức khi thao tác qua lại).
+- `src/state/itemPersist.test.ts` — `computeTaskPersistDescriptors`/`mergeTaskPendingOp` (thuần
+  logic, mirror Log/Habit/Reminder lúc mới viết, KHÔNG gọi Supabase thật).
+- Tổng **132/132 test pass** (từ 108 sau Bước 4a, +24 test: reducer Task + itemPersist Task).
+
+**Cách test (cờ còn tắt, `npm run dev` với OAuth thật):**
+- `npx tsc --noEmit`, `npm run build`, `npm test` (132/132) — cả 3 PASS.
+- Tạo/sửa/tick/kéo-thả/xoá 1 Task ở Space cá nhân bất kỳ — UI phải hoạt động **giống hệt trước** (cờ
+  `TASK_ITEM_PERSIST_ENABLED` còn `false`, mọi thứ vẫn đọc/ghi qua cột `tasks` jsonb như cũ). Mở
+  DevTools > Network trong lúc thao tác, xác nhận **KHÔNG** có request nào tới `kn_private_tasks`/
+  `kn_shared_tasks` (2 bảng chưa tồn tại thật — nếu thấy request lỗi "relation does not exist" là
+  dấu hiệu cờ bị bật nhầm, cần báo ngay).
+- Đọc code review: `src/storage/taskStore.ts`, `src/state/itemPersist.ts` (phần Task ở cuối file),
+  đoạn tích hợp trong `src/state/AppStateContext.tsx` (`smartDispatch`, tìm
+  `isTaskAction`/`handleTaskActionForPersist`), `docs/features/item-level-task-schema.sql`,
+  `src/storage/migrateLegacyTasks.ts`.
+
+**Bước kế tiếp (chờ chủ dự án tự tay làm, đúng quy trình đã áp dụng cho Log/Habit/Reminder):** chạy
+`item-level-task-schema.sql` trên Supabase Dashboard → test `window.knMigrateTasks.preview()/.run()`
+bằng tài khoản Google phụ (User B) trước → migrate tài khoản chính (User A) → xác nhận để bật
+`TASK_ITEM_PERSIST_ENABLED = true` → chủ dự án tự verify tay qua UI thật (OAuth) → cân nhắc code Giai
+đoạn B (cutover phần đọc, mirror Log/Habit/Reminder) → sau khi Task ổn định, chuyển sang entity Note
+(Bước 5, kế hoạch tổng Log → Habit → Reminder → Task → **Note**).
 
 ---
 

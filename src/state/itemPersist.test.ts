@@ -3,6 +3,7 @@ import {
   computeHabitPersistDescriptors,
   computeLogPersistDescriptors,
   computeReminderPersistDescriptors,
+  computeTaskPersistDescriptors,
   handleHabitActionForPersist,
   handleLogActionForPersist,
   handleReminderActionForPersist,
@@ -12,11 +13,13 @@ import {
   mergeHabitPendingOp,
   mergeLogPendingOp,
   mergeReminderPendingOp,
+  mergeTaskPendingOp,
   type HabitPendingOp,
   type LogPendingOp,
   type ReminderPendingOp,
+  type TaskPendingOp,
 } from './itemPersist';
-import type { Habit, LogEntry, ReminderDefinition, Space } from '../types';
+import type { Habit, LogEntry, ReminderDefinition, Space, Task } from '../types';
 
 // Mock logStore.ts (thay vì để `hasPendingLogsForSpace` test dưới đây gọi network Supabase THẬT) —
 // chỉ cần biết CÓ gọi hàm ghi nào không và điều khiển được thời điểm resolve, không cần hành vi
@@ -46,6 +49,15 @@ vi.mock('../storage/reminderStore', () => ({
   deleteReminder: vi.fn(),
 }));
 import { createReminder, deleteReminder } from '../storage/reminderStore';
+
+// Mock taskStore.ts — mirror logStore.ts ở trên. `TASK_ITEM_PERSIST_ENABLED` đang `false` ở lượt
+// này (chỉ mới chuẩn bị) nên các hàm này chưa thực sự được `handleTaskActionForPersist()` gọi, mock
+// chỉ để tránh phụ thuộc `createClient()` thật khi import module (mirror các entity khác).
+vi.mock('../storage/taskStore', () => ({
+  createTask: vi.fn(),
+  updateTask: vi.fn(),
+  deleteTask: vi.fn(),
+}));
 
 function emptySpace(logs: LogEntry[] = []): Space {
   return {
@@ -602,4 +614,148 @@ describe('hasPendingRemindersForSpace', () => {
     await wait(0);
     expect(hasPendingRemindersForSpace('shared', 'space-reminder-delete')).toBe(false);
   }, 2000);
+});
+
+// =============================================================================
+// Task (Bước 4, docs/features/item-level-entity-tables.md) — CHỈ MỚI CHUẨN BỊ
+// (`TASK_ITEM_PERSIST_ENABLED = false`, xem itemPersist.ts). Gồm phần thuần logic (descriptor +
+// merge, không gọi Supabase thật) — mirror đúng mức độ test đã làm cho Reminder/Habit ở giai đoạn
+// TRƯỚC Giai đoạn B (chưa viết test `hasPendingTasksForSpace` ở lượt này, dù hàm/hàng đợi
+// `activeTaskSpaceRefs` đã viết sẵn trong itemPersist.ts — mirror bài học áp dụng cho Habit/Reminder,
+// Giai đoạn B sẽ thêm test riêng khi tới lượt, như đã làm với Log/Habit/Reminder).
+// =============================================================================
+
+function makeTask(overrides: Partial<Task> = {}): Task {
+  return { id: 'task-1', title: 'Việc A', content: '', date: '', time: '', done: false, order: 0, assigneeIds: [], ...overrides };
+}
+
+function taskSpace(tasks: Task[] = []): Space {
+  return { ...emptySpace(), tasks };
+}
+
+describe('computeTaskPersistDescriptors', () => {
+  it('TASK_CREATE — trả đúng 1 descriptor insert khi id đã gắn và task xuất hiện trong nextSpace', () => {
+    const task = makeTask();
+    const nextSpace = taskSpace([task]);
+    const result = computeTaskPersistDescriptors(
+      { type: 'TASK_CREATE', payload: { title: 'Việc A', content: '', date: '', time: '', id: 'task-1' } },
+      nextSpace,
+    );
+    expect(result).toEqual([{ itemId: 'task-1', op: { kind: 'insert', task } }]);
+  });
+
+  it('TASK_CREATE — trả mảng rỗng nếu thiếu id (phòng thủ, không nên xảy ra thực tế)', () => {
+    const result = computeTaskPersistDescriptors(
+      { type: 'TASK_CREATE', payload: { title: 'X', content: '', date: '', time: '' } },
+      taskSpace(),
+    );
+    expect(result).toEqual([]);
+  });
+
+  it('TASK_CREATE — trả mảng rỗng nếu reducer từ chối tạo (task không có trong nextSpace)', () => {
+    const result = computeTaskPersistDescriptors(
+      { type: 'TASK_CREATE', payload: { title: 'X', content: '', date: '', time: '', id: 'task-ghost' } },
+      taskSpace([]),
+    );
+    expect(result).toEqual([]);
+  });
+
+  it('TASK_UPDATE — trả đúng 1 descriptor update với 5 field (title/content/date/time/assigneeIds), lấy từ nextSpace (đã qua trim/fallback của reducer)', () => {
+    const updated = makeTask({ title: 'Việc A sửa', content: 'chi tiết', date: '2026-07-11', time: '09:00', assigneeIds: ['u1'] });
+    const nextSpace = taskSpace([updated]);
+    const result = computeTaskPersistDescriptors(
+      {
+        type: 'TASK_UPDATE',
+        payload: { id: 'task-1', title: 'Việc A sửa', content: 'chi tiết', date: '2026-07-11', time: '09:00', assigneeIds: ['u1'] },
+      },
+      nextSpace,
+    );
+    expect(result).toEqual([
+      {
+        itemId: 'task-1',
+        op: { kind: 'update', patch: { title: 'Việc A sửa', content: 'chi tiết', date: '2026-07-11', time: '09:00', assigneeIds: ['u1'] } },
+      },
+    ]);
+  });
+
+  it('TASK_UPDATE — trả mảng rỗng nếu task không còn trong nextSpace (đã bị xoá, race hiếm)', () => {
+    const result = computeTaskPersistDescriptors(
+      { type: 'TASK_UPDATE', payload: { id: 'task-1', title: 'X', content: '', date: '', time: '', assigneeIds: [] } },
+      taskSpace([]),
+    );
+    expect(result).toEqual([]);
+  });
+
+  it('TASK_TOGGLE_DONE — trả đúng 1 descriptor update CHỈ patch field done (không kèm field khác)', () => {
+    const nextSpace = taskSpace([makeTask({ done: true })]);
+    const result = computeTaskPersistDescriptors({ type: 'TASK_TOGGLE_DONE', payload: { id: 'task-1' } }, nextSpace);
+    expect(result).toEqual([{ itemId: 'task-1', op: { kind: 'update', patch: { done: true } } }]);
+  });
+
+  it('TASK_TOGGLE_DONE — trả mảng rỗng nếu task không còn trong nextSpace (race hiếm)', () => {
+    const result = computeTaskPersistDescriptors({ type: 'TASK_TOGGLE_DONE', payload: { id: 'task-1' } }, taskSpace([]));
+    expect(result).toEqual([]);
+  });
+
+  it('TASK_DELETE — trả đúng 1 descriptor delete', () => {
+    const result = computeTaskPersistDescriptors({ type: 'TASK_DELETE', payload: { id: 'task-1' } }, taskSpace());
+    expect(result).toEqual([{ itemId: 'task-1', op: { kind: 'delete' } }]);
+  });
+
+  it('TASK_REORDER — trả đúng 1 descriptor update CHỈ patch field order, itemId = draggedId (không phải targetId)', () => {
+    const nextSpace = taskSpace([makeTask({ id: 'task-1', order: 1.5 }), makeTask({ id: 'task-2', order: 2 })]);
+    const result = computeTaskPersistDescriptors(
+      { type: 'TASK_REORDER', payload: { draggedId: 'task-1', targetId: 'task-2' } },
+      nextSpace,
+    );
+    expect(result).toEqual([{ itemId: 'task-1', op: { kind: 'update', patch: { order: 1.5 } } }]);
+  });
+
+  it('TASK_REORDER — trả mảng rỗng nếu draggedId không còn trong nextSpace (race hiếm)', () => {
+    const result = computeTaskPersistDescriptors(
+      { type: 'TASK_REORDER', payload: { draggedId: 'ghost', targetId: 'task-2' } },
+      taskSpace([makeTask({ id: 'task-2' })]),
+    );
+    expect(result).toEqual([]);
+  });
+});
+
+describe('mergeTaskPendingOp', () => {
+  it('không có pending trước -> trả thẳng op mới', () => {
+    const incoming: TaskPendingOp = { kind: 'delete' };
+    expect(mergeTaskPendingOp(undefined, incoming)).toBe(incoming);
+  });
+
+  it('insert + update (cùng cửa sổ debounce) -> merge patch THẲNG vào task đang chờ insert, vẫn là insert', () => {
+    const task = makeTask();
+    const existing: TaskPendingOp = { kind: 'insert', task };
+    const incoming: TaskPendingOp = { kind: 'update', patch: { done: true } };
+    const merged = mergeTaskPendingOp(existing, incoming);
+    expect(merged).toEqual({ kind: 'insert', task: { ...task, done: true } });
+  });
+
+  it('insert + delete (cùng cửa sổ debounce) -> huỷ hẳn, trả null (không gửi gì lên server)', () => {
+    const existing: TaskPendingOp = { kind: 'insert', task: makeTask() };
+    const merged = mergeTaskPendingOp(existing, { kind: 'delete' });
+    expect(merged).toBeNull();
+  });
+
+  it('update + update -> gộp patch, field patch SAU đè field patch TRƯỚC (vd TOGGLE_DONE rồi REORDER liên tiếp)', () => {
+    const existing: TaskPendingOp = { kind: 'update', patch: { done: true } };
+    const incoming: TaskPendingOp = { kind: 'update', patch: { order: 3.5 } };
+    const merged = mergeTaskPendingOp(existing, incoming);
+    expect(merged).toEqual({ kind: 'update', patch: { done: true, order: 3.5 } });
+  });
+
+  it('update + delete -> đè thành delete (bỏ patch đang chờ)', () => {
+    const existing: TaskPendingOp = { kind: 'update', patch: { done: true } };
+    const merged = mergeTaskPendingOp(existing, { kind: 'delete' });
+    expect(merged).toEqual({ kind: 'delete' });
+  });
+
+  it('delete + bất kỳ -> giữ nguyên delete (không hồi sinh item đã yêu cầu xoá)', () => {
+    const existing: TaskPendingOp = { kind: 'delete' };
+    const merged = mergeTaskPendingOp(existing, { kind: 'update', patch: { done: true } });
+    expect(merged).toEqual({ kind: 'delete' });
+  });
 });

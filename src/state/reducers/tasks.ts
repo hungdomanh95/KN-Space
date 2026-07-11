@@ -1,4 +1,5 @@
 import type { Space, Task } from '../../types';
+import { computeOrderForInsertAt } from '../fractionalOrder';
 
 /** Actions tác động lên dữ liệu Task trong 1 Space. TASK_SET_FILTER là UI-only, xử lý ở appReducer. */
 export type TaskAction =
@@ -56,18 +57,25 @@ export function tasksReducer(space: Space, action: TaskAction): Space {
     case 'TASK_REORDER': {
       const { draggedId, targetId } = action.payload;
       if (draggedId === targetId) return space;
-      // Cùng pattern NOTE_REORDER: sort theo order hiện tại -> mảng tuyến tính -> re-assign 0..n-1.
-      // Luôn chèn TRƯỚC targetId (đơn giản hơn bản note có insertAfter — danh sách task chỉ 1 cột,
-      // không cần phân biệt nửa trên/nửa dưới của row).
+      // Fractional-index (docs/features/item-level-entity-tables.md mục 5): CHỈ tính lại `order`
+      // của ĐÚNG task vừa kéo (draggedId) — KHÔNG reindex toàn mảng `0..n-1` như trước. Mọi task
+      // khác giữ nguyên `order` -> khi tách bảng item-level (kn_private_tasks/kn_shared_tasks), 1
+      // lần kéo-thả chỉ cần UPDATE đúng 1 dòng thay vì N dòng.
       const ordered = [...space.tasks].sort((a, b) => a.order - b.order);
       const fromIdx = ordered.findIndex((t) => t.id === draggedId);
       if (fromIdx === -1) return space;
-      const [moved] = ordered.splice(fromIdx, 1);
+      ordered.splice(fromIdx, 1); // loại task đang kéo khỏi mảng tham chiếu láng giềng
       const toIdx = ordered.findIndex((t) => t.id === targetId);
       if (toIdx === -1) return space;
-      ordered.splice(toIdx, 0, moved);
-      const reindexed = ordered.map((t, idx) => ({ ...t, order: idx }));
-      return { ...space, tasks: reindexed };
+      // Vị trí chèn giữ NGUYÊN Ý NGHĨA thuật toán cũ (chèn TRƯỚC targetId, `ordered` đã loại task
+      // đang kéo nhưng vẫn còn sort tăng dần) — chỉ khác cách tính: lấy 2 láng giềng kề tại đúng vị
+      // trí chèn thay vì gán lại toàn bộ chỉ số mảng.
+      const existingOrders = ordered.map((t) => t.order);
+      const newOrder = computeOrderForInsertAt(existingOrders, toIdx);
+      return {
+        ...space,
+        tasks: space.tasks.map((t) => (t.id === draggedId ? { ...t, order: newOrder } : t)),
+      };
     }
     default:
       return space;
