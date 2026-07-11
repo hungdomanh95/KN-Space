@@ -21,9 +21,10 @@
 //     `REMINDER_UPDATE` luôn thay NGUYÊN item (không phải patch hẹp từng
 //     field) vì `ReminderFormModal.tsx` cho phép đổi cả `type` (once <->
 //     recurring) khi sửa — xem `reminderStore.ts`.
-//   - Task (Bước 4, CHỈ mới chuẩn bị — `TASK_ITEM_PERSIST_ENABLED = false`) —
-//     phần giữa file (sau Reminder). Task CÓ bản Shared (mirror Log/Reminder).
-//     Khác Reminder: có 3 action UPDATE tách biệt (`TASK_UPDATE`/
+//   - Task (Bước 4, Giai đoạn A+B đã bật 2026-07-11) — phần giữa file (sau
+//     Reminder). Xem `TASK_ITEM_PERSIST_ENABLED` bên dưới. Task CÓ bản Shared
+//     (mirror Log/Reminder). Khác Reminder: có 3 action UPDATE tách biệt
+//     (`TASK_UPDATE`/
 //     `TASK_TOGGLE_DONE`/`TASK_REORDER`), mỗi action patch 1 nhóm field hẹp —
 //     mirror cách Habit dùng patch hẹp (`HABIT_UPDATE`/`HABIT_TOGGLE_TODAY`),
 //     KHÔNG mirror cách Reminder thay nguyên item. `TASK_REORDER` dùng
@@ -36,9 +37,9 @@
 //     gắn sẵn `payload.id` cho `TASK_CREATE` (đảm bảo id gửi trong notify
 //     khớp đúng id task thật) — dùng lại `action` gốc sẽ khiến hàm này tự
 //     sinh 1 id THỨ HAI khác hẳn.
-//   - Note (Bước 5, entity CUỐI CÙNG, CHỈ mới chuẩn bị —
-//     `NOTE_ITEM_PERSIST_ENABLED = false`) — phần cuối file. Note CÓ bản
-//     Shared (mirror Task/Log/Reminder). Giống Task ở chỗ có nhiều action
+//   - Note (Bước 5, entity CUỐI CÙNG, Giai đoạn A+B đã bật 2026-07-11) — phần
+//     cuối file. Xem `NOTE_ITEM_PERSIST_ENABLED` bên dưới. Note CÓ bản Shared
+//     (mirror Task/Log/Reminder). Giống Task ở chỗ có nhiều action
 //     UPDATE tách biệt patch field hẹp (`NOTE_UPDATE`/`NOTE_REORDER`/
 //     `NOTE_TOGGLE_CONTENT_HIDDEN`), dùng fractional-index cho `NOTE_REORDER`
 //     (mirror `TASK_REORDER`, có thêm `insertAfter` — xem
@@ -943,24 +944,29 @@ export function flushAllPendingReminderPersist(): void {
 //   - `TASK_REORDER` dùng fractional-index (`src/state/fractionalOrder.ts`,
 //     đã tích hợp vào `state/reducers/tasks.ts` — xem `computeOrderForInsertAt`)
 //     — chỉ patch field `order` của ĐÚNG 1 task vừa kéo, task khác giữ nguyên.
-//   - `TASK_ITEM_PERSIST_ENABLED = false` — bảng `kn_private_tasks`/
-//     `kn_shared_tasks` (docs/features/item-level-task-schema.sql) CHỈ MỚI
-//     CHUẨN BỊ SQL trong repo, CHƯA chạy lên Supabase Dashboard thật, CHƯA có
-//     dữ liệu migrate. `handleTaskActionForPersist()` khi cờ tắt CHỈ tự sinh
-//     `id` cho `TASK_CREATE` nếu thiếu (mirror `LOG_CREATE`/`HABIT_CREATE`/
-//     `REMINDER_CREATE`), KHÔNG gọi bất kỳ hàm nào trong `taskStore.ts`.
-//   - Đã viết sẵn `hasPendingTasksForSpace()`/`activeTaskSpaceRefs` NGAY TỪ
-//     ĐẦU dù chưa có Giai đoạn B để dùng tới ở lượt này (mirror bài học đã áp
-//     dụng cho Habit/Reminder — tránh phải quay lại sửa
-//     `scheduleTaskFlush()` sau). Đã áp dụng luôn fix bug `inFlight` phát
-//     hiện ở Giai đoạn B của Log (tự tham chiếu đúng promise `wrapped` khi
-//     dọn map, không so sánh nhầm biến `next`).
+//   - Bảng `kn_private_tasks`/`kn_shared_tasks` (docs/features/
+//     item-level-task-schema.sql) đã tạo thật trên Supabase, dữ liệu cũ đã
+//     migrate xong (30/30 khớp, idempotent — `window.knMigrateTasks.run()`).
+//     Cờ đang BẬT (`true`, 2026-07-11) — mọi action `TASK_*` GHI SONG SONG
+//     (dual-write) vào bảng mới. "Giai đoạn B" (cùng ngày) đã nối phần ĐỌC:
+//     `AppStateContext.tsx` (bootstrap + `refreshStaleSpaces()`) gọi
+//     `loadPrivateTasks`/`loadSharedTasks` (`taskStore.ts`) cho từng Space rồi
+//     GÁN ĐÈ `space.tasks` — nguồn đọc THẬT của Việc cần làm giờ là bảng
+//     item-level, KHÔNG còn là cột `tasks` jsonb nữa (dù nhánh ghi jsonb VẪN
+//     CHẠY SONG SONG làm lưới an toàn, chưa tắt).
+//   - `hasPendingTasksForSpace()`/`activeTaskSpaceRefs` (viết sẵn từ lúc chuẩn
+//     bị, mirror bài học đã áp dụng cho Habit/Reminder) giờ là điểm nối quan
+//     trọng nhất: cho `refreshStaleSpaces()` biết Space nào đang có Task "chưa
+//     ghi xong" để KHÔNG gán đè `space.tasks` cho Space đó trong lượt refresh
+//     hiện tại. Đã áp dụng luôn fix bug `inFlight` phát hiện ở Giai đoạn B của
+//     Log (tự tham chiếu đúng promise `wrapped` khi dọn map, không so sánh
+//     nhầm biến `next`).
 //   - **Lưu ý bắt buộc khi gọi từ `AppStateContext.tsx`:** truyền
 //     `actionToDispatch` (không phải `action` gốc) — xem giải thích đầy đủ ở
 //     đầu file.
 // =============================================================================
 
-export const TASK_ITEM_PERSIST_ENABLED = false;
+export const TASK_ITEM_PERSIST_ENABLED = true;
 
 const TASK_ACTION_TYPES = new Set([
   'TASK_CREATE',
@@ -1258,19 +1264,24 @@ export function flushAllPendingTaskPersist(): void {
 //     thiết kế đã xác định trước khi code: kéo-thả/ẩn-hiện không được vô
 //     tình đổi "đã sửa lúc..." hiển thị cho user hay làm sai thứ tự sort
 //     "Mới sửa gần nhất").
-//   - `NOTE_ITEM_PERSIST_ENABLED = false` — bảng `kn_private_notes`/
-//     `kn_shared_notes` (docs/features/item-level-note-schema.sql) CHỈ MỚI
-//     CHUẨN BỊ SQL trong repo, CHƯA chạy lên Supabase Dashboard thật, CHƯA có
-//     dữ liệu migrate. `handleNoteActionForPersist()` khi cờ tắt CHỈ tự sinh
-//     `id` cho `NOTE_CREATE` nếu thiếu (mirror `LOG_CREATE`/`HABIT_CREATE`/
-//     `REMINDER_CREATE`/`TASK_CREATE`), KHÔNG gọi bất kỳ hàm nào trong
-//     `noteStore.ts`.
-//   - Đã viết sẵn `hasPendingNotesForSpace()`/`activeNoteSpaceRefs` NGAY TỪ
-//     ĐẦU dù chưa có Giai đoạn B để dùng tới ở lượt này (mirror bài học đã áp
-//     dụng cho Habit/Reminder/Task — tránh phải quay lại sửa
-//     `scheduleNoteFlush()` sau). Đã áp dụng luôn fix bug `inFlight` phát
-//     hiện ở Giai đoạn B của Log (tự tham chiếu đúng promise `wrapped` khi
-//     dọn map, không so sánh nhầm biến `next`).
+//   - Bảng `kn_private_notes`/`kn_shared_notes` (docs/features/
+//     item-level-note-schema.sql) đã tạo thật trên Supabase, dữ liệu cũ đã
+//     migrate xong (7/7 khớp, idempotent — `window.knMigrateNotes.run()`). Cờ
+//     đang BẬT (`true`, 2026-07-11) — mọi action `NOTE_*` GHI SONG SONG
+//     (dual-write) vào bảng mới. "Giai đoạn B" (cùng ngày) đã nối phần ĐỌC:
+//     `AppStateContext.tsx` (bootstrap + `refreshStaleSpaces()`) gọi
+//     `loadPrivateNotes`/`loadSharedNotes` (`noteStore.ts`) cho từng Space rồi
+//     GÁN ĐÈ `space.notes` — nguồn đọc THẬT của Ghi chú giờ là bảng item-level,
+//     KHÔNG còn là cột `notes` jsonb nữa (dù nhánh ghi jsonb VẪN CHẠY SONG
+//     SONG làm lưới an toàn, chưa tắt). ĐÂY LÀ ENTITY CUỐI CÙNG — cả 5 entity
+//     (Log/Habit/Reminder/Task/Note) đều đã hoàn tất Giai đoạn A+B.
+//   - `hasPendingNotesForSpace()`/`activeNoteSpaceRefs` (viết sẵn từ lúc chuẩn
+//     bị, mirror bài học đã áp dụng cho Habit/Reminder/Task) giờ là điểm nối
+//     quan trọng nhất: cho `refreshStaleSpaces()` biết Space nào đang có Note
+//     "chưa ghi xong" để KHÔNG gán đè `space.notes` cho Space đó trong lượt
+//     refresh hiện tại. Đã áp dụng luôn fix bug `inFlight` phát hiện ở Giai
+//     đoạn B của Log (tự tham chiếu đúng promise `wrapped` khi dọn map, không
+//     so sánh nhầm biến `next`).
 //   - **KHÁC Task:** Note KHÔNG có notify Shared Space nào chạy trước gắn sẵn
 //     `payload.id` (không có Edge Function/notify nào cho Note, xác nhận qua
 //     grep toàn repo trước khi viết block này) — `handleNoteActionForPersist()`
@@ -1281,7 +1292,7 @@ export function flushAllPendingTaskPersist(): void {
 //     biến đổi action có type `TASK_*`).
 // =============================================================================
 
-export const NOTE_ITEM_PERSIST_ENABLED = false;
+export const NOTE_ITEM_PERSIST_ENABLED = true;
 
 const NOTE_ACTION_TYPES = new Set([
   'NOTE_CREATE',

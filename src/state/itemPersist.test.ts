@@ -7,10 +7,14 @@ import {
   computeTaskPersistDescriptors,
   handleHabitActionForPersist,
   handleLogActionForPersist,
+  handleNoteActionForPersist,
   handleReminderActionForPersist,
+  handleTaskActionForPersist,
   hasPendingHabitsForSpace,
   hasPendingLogsForSpace,
+  hasPendingNotesForSpace,
   hasPendingRemindersForSpace,
+  hasPendingTasksForSpace,
   mergeHabitPendingOp,
   mergeLogPendingOp,
   mergeNotePendingOp,
@@ -53,23 +57,23 @@ vi.mock('../storage/reminderStore', () => ({
 }));
 import { createReminder, deleteReminder } from '../storage/reminderStore';
 
-// Mock taskStore.ts — mirror logStore.ts ở trên. `TASK_ITEM_PERSIST_ENABLED` đang `false` ở lượt
-// này (chỉ mới chuẩn bị) nên các hàm này chưa thực sự được `handleTaskActionForPersist()` gọi, mock
-// chỉ để tránh phụ thuộc `createClient()` thật khi import module (mirror các entity khác).
+// Mock taskStore.ts — mirror reminderStore.ts ở trên, dùng cho `hasPendingTasksForSpace` (Giai
+// đoạn B, `TASK_ITEM_PERSIST_ENABLED` đang BẬT).
 vi.mock('../storage/taskStore', () => ({
   createTask: vi.fn(),
   updateTask: vi.fn(),
   deleteTask: vi.fn(),
 }));
+import { createTask, deleteTask } from '../storage/taskStore';
 
-// Mock noteStore.ts — mirror taskStore.ts ở trên. `NOTE_ITEM_PERSIST_ENABLED` đang `false` ở lượt
-// này (chỉ mới chuẩn bị) nên các hàm này chưa thực sự được `handleNoteActionForPersist()` gọi, mock
-// chỉ để tránh phụ thuộc `createClient()` thật khi import module (mirror các entity khác).
+// Mock noteStore.ts — mirror taskStore.ts ở trên, dùng cho `hasPendingNotesForSpace` (Giai đoạn B,
+// `NOTE_ITEM_PERSIST_ENABLED` đang BẬT).
 vi.mock('../storage/noteStore', () => ({
   createNote: vi.fn(),
   updateNote: vi.fn(),
   deleteNote: vi.fn(),
 }));
+import { createNote, deleteNote } from '../storage/noteStore';
 
 function emptySpace(logs: LogEntry[] = []): Space {
   return {
@@ -629,12 +633,10 @@ describe('hasPendingRemindersForSpace', () => {
 });
 
 // =============================================================================
-// Task (Bước 4, docs/features/item-level-entity-tables.md) — CHỈ MỚI CHUẨN BỊ
-// (`TASK_ITEM_PERSIST_ENABLED = false`, xem itemPersist.ts). Gồm phần thuần logic (descriptor +
-// merge, không gọi Supabase thật) — mirror đúng mức độ test đã làm cho Reminder/Habit ở giai đoạn
-// TRƯỚC Giai đoạn B (chưa viết test `hasPendingTasksForSpace` ở lượt này, dù hàm/hàng đợi
-// `activeTaskSpaceRefs` đã viết sẵn trong itemPersist.ts — mirror bài học áp dụng cho Habit/Reminder,
-// Giai đoạn B sẽ thêm test riêng khi tới lượt, như đã làm với Log/Habit/Reminder).
+// Task (Bước 4, docs/features/item-level-entity-tables.md) — Giai đoạn A+B đã BẬT
+// (`TASK_ITEM_PERSIST_ENABLED = true`, xem itemPersist.ts). Gồm phần thuần logic (descriptor +
+// merge, không gọi Supabase thật) MIRROR CHÍNH XÁC mức độ test đã làm cho Reminder/Log, cộng thêm
+// `hasPendingTasksForSpace` ở cuối file (network-mock qua `taskStore.ts`).
 // =============================================================================
 
 function makeTask(overrides: Partial<Task> = {}): Task {
@@ -772,13 +774,80 @@ describe('mergeTaskPendingOp', () => {
   });
 });
 
+// Giai đoạn B (item-level-entity-tables-progress.md, Bước 4) — `hasPendingTasksForSpace()` mirror
+// CHÍNH XÁC `hasPendingRemindersForSpace()` (Task CÓ `scope`, giống Log/Reminder — khác Habit).
+// Không có test tương đương LOG_DELETE_MANY vì Task không có action "xoá hàng loạt". Tái dùng
+// `sharedSpace()`/`wait()` đã định nghĩa ở phần Log phía trên (helper chung, không riêng entity nào).
+describe('hasPendingTasksForSpace', () => {
+  beforeEach(() => {
+    vi.mocked(createTask).mockReset();
+    vi.mocked(deleteTask).mockReset();
+  });
+
+  it('Space chưa từng có action Task nào -> luôn false', () => {
+    expect(hasPendingTasksForSpace('shared', 'space-never-touched-task')).toBe(false);
+  });
+
+  it('TASK_CREATE: true ngay khi queue (đang debounce), true suốt lúc network đang bay, false khi resolve xong', async () => {
+    let resolveCreate!: (v: { ok: boolean }) => void;
+    vi.mocked(createTask).mockImplementation(
+      () => new Promise((resolve) => { resolveCreate = resolve; }),
+    );
+
+    const space = sharedSpace({ sharedSpaceId: 'space-task-create' });
+    handleTaskActionForPersist(space, {
+      type: 'TASK_CREATE',
+      payload: { title: 'Test', content: '', date: '2026-07-11', time: '', id: 'task-create-1' },
+    });
+
+    expect(hasPendingTasksForSpace('shared', 'space-task-create')).toBe(true); // còn trong 600ms debounce
+
+    await wait(650); // hết debounce -> flushTaskItem() gọi createTask() (đang treo, chưa resolve)
+    expect(hasPendingTasksForSpace('shared', 'space-task-create')).toBe(true); // network chưa resolve
+
+    resolveCreate({ ok: true });
+    await wait(0); // setTimeout(0) chạy SAU khi mọi microtask (.then/.finally) đã xử lý xong
+    expect(hasPendingTasksForSpace('shared', 'space-task-create')).toBe(false);
+  }, 2000);
+
+  it('TASK_CREATE rồi TASK_DELETE cùng id TRONG cửa sổ debounce -> huỷ hẳn, không còn pending, KHÔNG gọi network', async () => {
+    const space = sharedSpace({ sharedSpaceId: 'space-task-create-delete' });
+    handleTaskActionForPersist(space, {
+      type: 'TASK_CREATE',
+      payload: { title: 'Test', content: '', date: '2026-07-11', time: '', id: 'task-create-2' },
+    });
+    expect(hasPendingTasksForSpace('shared', 'space-task-create-delete')).toBe(true);
+
+    handleTaskActionForPersist(space, { type: 'TASK_DELETE', payload: { id: 'task-create-2' } });
+    expect(hasPendingTasksForSpace('shared', 'space-task-create-delete')).toBe(false); // insert+delete = huỷ
+
+    await wait(650);
+    expect(createTask).not.toHaveBeenCalled();
+  }, 2000);
+
+  it('TASK_DELETE (task đã tồn tại từ trước): true lúc debounce, true lúc network đang bay, false sau khi resolve', async () => {
+    let resolveDelete!: () => void;
+    vi.mocked(deleteTask).mockImplementation(() => new Promise((resolve) => { resolveDelete = resolve; }));
+
+    const space = sharedSpace({ sharedSpaceId: 'space-task-delete' });
+    handleTaskActionForPersist(space, { type: 'TASK_DELETE', payload: { id: 'task-existing-1' } });
+
+    expect(hasPendingTasksForSpace('shared', 'space-task-delete')).toBe(true);
+
+    await wait(650);
+    expect(hasPendingTasksForSpace('shared', 'space-task-delete')).toBe(true); // network chưa resolve
+
+    resolveDelete();
+    await wait(0);
+    expect(hasPendingTasksForSpace('shared', 'space-task-delete')).toBe(false);
+  }, 2000);
+});
+
 // =============================================================================
-// Note (Bước 5, entity CUỐI CÙNG, docs/features/item-level-entity-tables.md) — CHỈ MỚI CHUẨN BỊ
-// (`NOTE_ITEM_PERSIST_ENABLED = false`, xem itemPersist.ts). Gồm phần thuần logic (descriptor +
-// merge, không gọi Supabase thật) — mirror đúng mức độ test đã làm cho Task ở giai đoạn TRƯỚC Giai
-// đoạn B (chưa viết test `hasPendingNotesForSpace` ở lượt này, dù hàm/hàng đợi `activeNoteSpaceRefs`
-// đã viết sẵn trong itemPersist.ts — mirror bài học áp dụng cho Habit/Reminder/Task, Giai đoạn B sẽ
-// thêm test riêng khi tới lượt).
+// Note (Bước 5, entity CUỐI CÙNG, docs/features/item-level-entity-tables.md) — Giai đoạn A+B đã BẬT
+// (`NOTE_ITEM_PERSIST_ENABLED = true`, xem itemPersist.ts). Gồm phần thuần logic (descriptor +
+// merge, không gọi Supabase thật) MIRROR CHÍNH XÁC mức độ test đã làm cho Task, cộng thêm
+// `hasPendingNotesForSpace` ở cuối file (network-mock qua `noteStore.ts`).
 // =============================================================================
 
 function makeNote(overrides: Partial<Note> = {}): Note {
@@ -911,4 +980,73 @@ describe('mergeNotePendingOp', () => {
     const merged = mergeNotePendingOp(existing, { kind: 'update', patch: { hidden: true } });
     expect(merged).toEqual({ kind: 'delete' });
   });
+});
+
+// Giai đoạn B (item-level-entity-tables-progress.md, Bước 5, entity CUỐI CÙNG) —
+// `hasPendingNotesForSpace()` mirror CHÍNH XÁC `hasPendingTasksForSpace()` (Note CÓ `scope`, giống
+// Task/Log/Reminder — khác Habit). Không có test tương đương LOG_DELETE_MANY vì Note không có
+// action "xoá hàng loạt". Tái dùng `sharedSpace()`/`wait()` đã định nghĩa ở phần Log phía trên.
+describe('hasPendingNotesForSpace', () => {
+  beforeEach(() => {
+    vi.mocked(createNote).mockReset();
+    vi.mocked(deleteNote).mockReset();
+  });
+
+  it('Space chưa từng có action Note nào -> luôn false', () => {
+    expect(hasPendingNotesForSpace('shared', 'space-never-touched-note')).toBe(false);
+  });
+
+  it('NOTE_CREATE: true ngay khi queue (đang debounce), true suốt lúc network đang bay, false khi resolve xong', async () => {
+    let resolveCreate!: (v: { ok: boolean }) => void;
+    vi.mocked(createNote).mockImplementation(
+      () => new Promise((resolve) => { resolveCreate = resolve; }),
+    );
+
+    const space = sharedSpace({ sharedSpaceId: 'space-note-create' });
+    handleNoteActionForPersist(space, {
+      type: 'NOTE_CREATE',
+      payload: { title: 'Test', content: '', color: '#8b5cf6', id: 'note-create-1' },
+    });
+
+    expect(hasPendingNotesForSpace('shared', 'space-note-create')).toBe(true); // còn trong 600ms debounce
+
+    await wait(650); // hết debounce -> flushNoteItem() gọi createNote() (đang treo, chưa resolve)
+    expect(hasPendingNotesForSpace('shared', 'space-note-create')).toBe(true); // network chưa resolve
+
+    resolveCreate({ ok: true });
+    await wait(0); // setTimeout(0) chạy SAU khi mọi microtask (.then/.finally) đã xử lý xong
+    expect(hasPendingNotesForSpace('shared', 'space-note-create')).toBe(false);
+  }, 2000);
+
+  it('NOTE_CREATE rồi NOTE_DELETE cùng id TRONG cửa sổ debounce -> huỷ hẳn, không còn pending, KHÔNG gọi network', async () => {
+    const space = sharedSpace({ sharedSpaceId: 'space-note-create-delete' });
+    handleNoteActionForPersist(space, {
+      type: 'NOTE_CREATE',
+      payload: { title: 'Test', content: '', color: '#8b5cf6', id: 'note-create-2' },
+    });
+    expect(hasPendingNotesForSpace('shared', 'space-note-create-delete')).toBe(true);
+
+    handleNoteActionForPersist(space, { type: 'NOTE_DELETE', payload: { id: 'note-create-2' } });
+    expect(hasPendingNotesForSpace('shared', 'space-note-create-delete')).toBe(false); // insert+delete = huỷ
+
+    await wait(650);
+    expect(createNote).not.toHaveBeenCalled();
+  }, 2000);
+
+  it('NOTE_DELETE (note đã tồn tại từ trước): true lúc debounce, true lúc network đang bay, false sau khi resolve', async () => {
+    let resolveDelete!: () => void;
+    vi.mocked(deleteNote).mockImplementation(() => new Promise((resolve) => { resolveDelete = resolve; }));
+
+    const space = sharedSpace({ sharedSpaceId: 'space-note-delete' });
+    handleNoteActionForPersist(space, { type: 'NOTE_DELETE', payload: { id: 'note-existing-1' } });
+
+    expect(hasPendingNotesForSpace('shared', 'space-note-delete')).toBe(true);
+
+    await wait(650);
+    expect(hasPendingNotesForSpace('shared', 'space-note-delete')).toBe(true); // network chưa resolve
+
+    resolveDelete();
+    await wait(0);
+    expect(hasPendingNotesForSpace('shared', 'space-note-delete')).toBe(false);
+  }, 2000);
 });

@@ -46,18 +46,24 @@ import {
   handleTaskActionForPersist,
   hasPendingHabitsForSpace,
   hasPendingLogsForSpace,
+  hasPendingNotesForSpace,
   hasPendingRemindersForSpace,
+  hasPendingTasksForSpace,
   isHabitAction,
   isLogAction,
   isNoteAction,
   isReminderAction,
   isTaskAction,
   LOG_ITEM_PERSIST_ENABLED,
+  NOTE_ITEM_PERSIST_ENABLED,
   REMINDER_ITEM_PERSIST_ENABLED,
+  TASK_ITEM_PERSIST_ENABLED,
 } from './itemPersist';
 import { loadPrivateLogs, loadSharedLogs } from '../storage/logStore';
 import { loadPrivateHabits } from '../storage/habitStore';
 import { loadPrivateReminders, loadSharedReminders } from '../storage/reminderStore';
+import { loadPrivateTasks, loadSharedTasks } from '../storage/taskStore';
+import { loadPrivateNotes, loadSharedNotes } from '../storage/noteStore';
 
 interface AppStateContextValue {
   state: AppState;
@@ -222,6 +228,84 @@ async function hydrateItemLevelReminders(
   );
 }
 
+/**
+ * Giai đoạn B (Task, item-level-entity-tables-progress.md, Bước 4) — mirror CHÍNH XÁC
+ * `hydrateItemLevelReminders()` ở trên (Task CÓ bản Shared, giống Log/Reminder — khác Habit): tải
+ * Task của TỪNG Space (private + shared) từ bảng item-level mới (`kn_private_tasks`/
+ * `kn_shared_tasks`, qua `taskStore.ts`), gán đè `space.tasks` (thay cho mảng jsonb cũ) làm nguồn
+ * ĐỌC thật. Chạy song song cho mọi Space qua `Promise.all` — lỗi tải riêng 1 Space KHÔNG throw/chặn
+ * Space khác, fallback dùng đúng `space.tasks` jsonb đã có sẵn cho Space đó.
+ *
+ * `shouldSkip(space)` — mirror Log/Habit/Reminder — dùng ở `refreshStaleSpaces()` để bỏ qua Space
+ * đang có Task "chưa ghi xong" (xem `hasPendingTasksForSpace()`).
+ *
+ * No-op hoàn toàn (trả về nguyên mảng đầu vào, không gọi network) khi `TASK_ITEM_PERSIST_ENABLED
+ * === false`.
+ */
+async function hydrateItemLevelTasks(
+  spaces: Space[],
+  shouldSkip: (space: Space) => boolean = () => false,
+): Promise<Space[]> {
+  if (!TASK_ITEM_PERSIST_ENABLED) return spaces;
+  return Promise.all(
+    spaces.map(async (space) => {
+      if (shouldSkip(space)) return space;
+      try {
+        const tasks =
+          space.isShared && space.sharedSpaceId
+            ? await loadSharedTasks(space.sharedSpaceId)
+            : await loadPrivateTasks(space.id);
+        return { ...space, tasks };
+      } catch (err) {
+        console.warn(
+          `[KN-Space] Không tải được Task item-level cho Space "${space.name}" (${space.id}) — dùng tạm tasks jsonb cũ:`,
+          err,
+        );
+        return space;
+      }
+    }),
+  );
+}
+
+/**
+ * Giai đoạn B (Note, item-level-entity-tables-progress.md, Bước 5, entity CUỐI CÙNG) — mirror
+ * CHÍNH XÁC `hydrateItemLevelTasks()` ở trên (Note CÓ bản Shared, giống Task/Log/Reminder — khác
+ * Habit): tải Note của TỪNG Space (private + shared) từ bảng item-level mới (`kn_private_notes`/
+ * `kn_shared_notes`, qua `noteStore.ts`), gán đè `space.notes` (thay cho mảng jsonb cũ) làm nguồn
+ * ĐỌC thật. Chạy song song cho mọi Space qua `Promise.all` — lỗi tải riêng 1 Space KHÔNG throw/chặn
+ * Space khác, fallback dùng đúng `space.notes` jsonb đã có sẵn cho Space đó.
+ *
+ * `shouldSkip(space)` — mirror Log/Habit/Reminder/Task — dùng ở `refreshStaleSpaces()` để bỏ qua
+ * Space đang có Note "chưa ghi xong" (xem `hasPendingNotesForSpace()`).
+ *
+ * No-op hoàn toàn (trả về nguyên mảng đầu vào, không gọi network) khi `NOTE_ITEM_PERSIST_ENABLED
+ * === false`.
+ */
+async function hydrateItemLevelNotes(
+  spaces: Space[],
+  shouldSkip: (space: Space) => boolean = () => false,
+): Promise<Space[]> {
+  if (!NOTE_ITEM_PERSIST_ENABLED) return spaces;
+  return Promise.all(
+    spaces.map(async (space) => {
+      if (shouldSkip(space)) return space;
+      try {
+        const notes =
+          space.isShared && space.sharedSpaceId
+            ? await loadSharedNotes(space.sharedSpaceId)
+            : await loadPrivateNotes(space.id);
+        return { ...space, notes };
+      } catch (err) {
+        console.warn(
+          `[KN-Space] Không tải được Note item-level cho Space "${space.name}" (${space.id}) — dùng tạm notes jsonb cũ:`,
+          err,
+        );
+        return space;
+      }
+    }),
+  );
+}
+
 export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, emptyState());
   const [isLoading, setIsLoading] = React.useState(true);
@@ -273,17 +357,20 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Giai đoạn B (item-level-entity-tables-progress.md, câu hỏi mở #2) — gán đè `space.logs`
-        // của MỌI Space (private + shared), `space.habits` của Space cá nhân, VÀ `space.reminders`
-        // của MỌI Space (private + shared) bằng dữ liệu tải từ bảng item-level mới, TRƯỚC khi
-        // dispatch HYDRATE. Không cần cập nhật `prevPrivateRef`/`prevSharedRef` thủ công ở đây — 2
-        // baseline này bắt đầu rỗng, effect debounce Space-level tự nhận ra "lần đầu thấy Space này"
-        // (sau khi `state.spaces` đổi do HYDRATE) và chỉ ghi nhận baseline từ
-        // `space.logs`/`space.habits`/`space.reminders` ĐÃ được gán đè ở bước này, không tự bắn save
-        // thừa.
+        // của MỌI Space (private + shared), `space.habits` của Space cá nhân, VÀ
+        // `space.reminders`/`space.tasks`/`space.notes` của MỌI Space (private + shared) bằng dữ
+        // liệu tải từ bảng item-level mới, TRƯỚC khi dispatch HYDRATE. Không cần cập nhật
+        // `prevPrivateRef`/`prevSharedRef` thủ công ở đây — 2 baseline này bắt đầu rỗng, effect
+        // debounce Space-level tự nhận ra "lần đầu thấy Space này" (sau khi `state.spaces` đổi do
+        // HYDRATE) và chỉ ghi nhận baseline từ
+        // `space.logs`/`space.habits`/`space.reminders`/`space.tasks`/`space.notes` ĐÃ được gán đè
+        // ở bước này, không tự bắn save thừa.
         const rawSpaces = [...privateSpaces, ...sharedSpaces];
         const logsHydrated = await hydrateItemLevelLogs(rawSpaces);
         const habitsHydrated = await hydrateItemLevelHabits(logsHydrated);
-        const allSpaces = await hydrateItemLevelReminders(habitsHydrated);
+        const remindersHydrated = await hydrateItemLevelReminders(habitsHydrated);
+        const tasksHydrated = await hydrateItemLevelTasks(remindersHydrated);
+        const allSpaces = await hydrateItemLevelNotes(tasksHydrated);
         // Validate sau khi có đủ cả private + shared — localId có thể là shared space
         const validCurrentSpaceId = allSpaces.some((s) => s.id === currentSpaceId)
           ? currentSpaceId
@@ -527,6 +614,14 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
    * `refreshedPrivateHabits` (private, đã gán đè `.habits`) và `refreshedSharedLogs` (shared, đã gán
    * đè `.logs`), chạy tiếp `hydrateItemLevelReminders` cho CẢ 2 nhánh để gán đè `.reminders`, bỏ qua
    * Space đang có Reminder "chưa ghi xong" theo `hasPendingRemindersForSpace()`.
+   *
+   * Mirror y hệt cho Task (Bước 4, CÓ bản Shared — mirror Reminder) — chạy tiếp
+   * `hydrateItemLevelTasks` cho CẢ 2 nhánh (sau khi đã gán đè `.reminders`) để gán đè `.tasks`, bỏ
+   * qua Space đang có Task "chưa ghi xong" theo `hasPendingTasksForSpace()`.
+   *
+   * Mirror y hệt cho Note (Bước 5, entity CUỐI CÙNG, CÓ bản Shared — mirror Task) — chạy tiếp
+   * `hydrateItemLevelNotes` cho CẢ 2 nhánh (sau khi đã gán đè `.tasks`) để gán đè `.notes`, bỏ qua
+   * Space đang có Note "chưa ghi xong" theo `hasPendingNotesForSpace()`.
    */
   async function refreshStaleSpaces(): Promise<void> {
     if (!hydratedRef.current) return; // bootstrap chưa xong — để bootstrap tự lo, tránh gọi trùng
@@ -567,12 +662,30 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       hasPendingHabitsForSpace(space.id),
     );
 
-    const [refreshedPrivate, refreshedShared] = await Promise.all([
+    const [refreshedPrivateReminders, refreshedSharedReminders] = await Promise.all([
       hydrateItemLevelReminders(refreshedPrivateHabits, (space) =>
         hasPendingRemindersForSpace('private', space.id),
       ),
       hydrateItemLevelReminders(refreshedSharedLogs, (space) =>
         hasPendingRemindersForSpace('shared', space.sharedSpaceId ?? space.id),
+      ),
+    ]);
+
+    const [refreshedPrivateTasks, refreshedSharedTasks] = await Promise.all([
+      hydrateItemLevelTasks(refreshedPrivateReminders, (space) =>
+        hasPendingTasksForSpace('private', space.id),
+      ),
+      hydrateItemLevelTasks(refreshedSharedReminders, (space) =>
+        hasPendingTasksForSpace('shared', space.sharedSpaceId ?? space.id),
+      ),
+    ]);
+
+    const [refreshedPrivate, refreshedShared] = await Promise.all([
+      hydrateItemLevelNotes(refreshedPrivateTasks, (space) =>
+        hasPendingNotesForSpace('private', space.id),
+      ),
+      hydrateItemLevelNotes(refreshedSharedTasks, (space) =>
+        hasPendingNotesForSpace('shared', space.sharedSpaceId ?? space.id),
       ),
     ]);
 
@@ -624,9 +737,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           sharedSaveTimersRef.current.clear();
         }
         // Flush Log/Habit/Reminder/Task/Note item-level còn pending (mirror các nhánh trên, xem
-        // itemPersist.ts) — no-op khi LOG_ITEM_PERSIST_ENABLED/HABIT_ITEM_PERSIST_ENABLED/
-        // REMINDER_ITEM_PERSIST_ENABLED/TASK_ITEM_PERSIST_ENABLED/NOTE_ITEM_PERSIST_ENABLED === false
-        // (hàng đợi luôn rỗng trong trường hợp đó — Task/Note hiện đang `false`, chỉ mới chuẩn bị).
+        // itemPersist.ts) — cả 5 cờ (LOG/HABIT/REMINDER/TASK/NOTE_ITEM_PERSIST_ENABLED) đều đang
+        // BẬT (`true`), hàng đợi các nhánh này có thể có dữ liệu thật đang chờ flush.
         flushAllPendingLogPersist();
         flushAllPendingHabitPersist();
         flushAllPendingReminderPersist();
@@ -799,18 +911,17 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
     // Persist item-level cho Reminder (Bước 3, docs/features/item-level-entity-tables.md) — mirror
     // CHÍNH XÁC nhánh Log ở trên (bảng riêng `kn_private_reminders`/`kn_shared_reminders`, debounce
-    // theo itemId, CÓ scope — khác Habit). No-op hoàn toàn khi `REMINDER_ITEM_PERSIST_ENABLED ===
-    // false` (hiện đang `false` — chỉ mới chuẩn bị, chưa chạy SQL/migrate) — Nhắc việc tiếp tục lưu
-    // qua cột `reminders` jsonb như cũ, không đổi hành vi hiện tại.
+    // theo itemId, CÓ scope — khác Habit). `REMINDER_ITEM_PERSIST_ENABLED` đang BẬT (`true`) — mọi
+    // action `REMINDER_*` giờ dual-write thật vào bảng item-level song song với cột `reminders`
+    // jsonb cũ.
     if (currentSpace && isReminderAction(action)) {
       actionToDispatch = handleReminderActionForPersist(currentSpace, action);
     }
 
     // Persist item-level cho Task (Bước 4, docs/features/item-level-entity-tables.md) — mirror
     // CHÍNH XÁC nhánh Log/Reminder ở trên (bảng riêng `kn_private_tasks`/`kn_shared_tasks`, debounce
-    // theo itemId, CÓ scope). No-op hoàn toàn khi `TASK_ITEM_PERSIST_ENABLED === false` (hiện đang
-    // `false` — chỉ mới chuẩn bị, chưa chạy SQL/migrate) — Task tiếp tục lưu qua cột `tasks` jsonb
-    // như cũ, không đổi hành vi hiện tại.
+    // theo itemId, CÓ scope). `TASK_ITEM_PERSIST_ENABLED` đang BẬT (`true`) — mọi action `TASK_*`
+    // giờ dual-write thật vào bảng item-level song song với cột `tasks` jsonb cũ.
     //
     // KHÁC nhánh Log/Habit/Reminder ở trên: truyền `actionToDispatch` (không phải `action` gốc) —
     // khối notify Shared Space phía trên (assign/hoàn thành task) có thể ĐÃ gắn sẵn `payload.id` cho
@@ -823,9 +934,9 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
     // Persist item-level cho Note (Bước 5, entity CUỐI CÙNG, docs/features/item-level-entity-tables.md)
     // — mirror CHÍNH XÁC nhánh Task ở trên (bảng riêng `kn_private_notes`/`kn_shared_notes`, debounce
-    // theo itemId, CÓ scope). No-op hoàn toàn khi `NOTE_ITEM_PERSIST_ENABLED === false` (hiện đang
-    // `false` — chỉ mới chuẩn bị, chưa chạy SQL/migrate) — Note tiếp tục lưu qua cột `notes` jsonb
-    // như cũ, không đổi hành vi hiện tại.
+    // theo itemId, CÓ scope). `NOTE_ITEM_PERSIST_ENABLED` đang BẬT (`true`) — mọi action `NOTE_*`
+    // giờ dual-write thật vào bảng item-level song song với cột `notes` jsonb cũ. Đây là entity CUỐI
+    // CÙNG trong kế hoạch tách bảng item-level (Log/Habit/Reminder/Task/Note đều đã Giai đoạn A+B).
     //
     // Dùng `actionToDispatch` (không phải `action` gốc) để nhất quán với nhánh Task ngay phía trên —
     // Note KHÔNG có notify Shared Space nào chạy trước gắn sẵn id (khác Task), nên tại điểm gọi này
