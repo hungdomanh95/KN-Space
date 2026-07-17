@@ -11,8 +11,8 @@
  *   - input/button dạng field:                 ~9-10px (vd .btn-ghost/.btn-primary/.field 9px,
  *                                                        DatePicker/TimePicker trigger 9px,
  *                                                        AssigneePicker trigger/HomeBackgroundSettings 10px)
- *   - card/khối nội dung:                       ~10-14px (vd .nr-kind 8px, .space-menu-surface
- *                                                          12px, .main-block/.sub-block 14px)
+ *   - card/khối nội dung:                       ~10-14px (vd .space-menu-surface 12px,
+ *                                                          .main-block/.sub-block 14px)
  *   - modal:                                    16px (Modal.tsx rounded-2xl)
  */
 @layer components {
@@ -187,7 +187,7 @@
     @apply flex flex-col;
   }
   .note-row {
-    @apply flex cursor-pointer items-center gap-2.5 border-b border-[color:var(--border-hairline)] px-1.5 py-2
+    @apply flex cursor-pointer items-center gap-2.5 border-b border-[color:var(--border-hairline)] px-2 py-4
       transition-[background-color] duration-150 last:border-b-0;
   }
   .note-row:hover {
@@ -208,32 +208,29 @@
   .nr-grip:active {
     @apply cursor-grabbing;
   }
+  /* Chấm màu (do user chọn khi tạo note) — từ 2026-07-17 là tín hiệu trực quan phân biệt DUY
+     NHẤT bên trái dòng, sau khi bỏ icon-chip loại (redundant với preview: URL/dấu chấm ẩn/text
+     tự phân biệt được loại note) — xem docs/features/... nếu có ghi lại quyết định này. */
   .nr-dot {
-    @apply h-2 w-2 flex-none rounded-full;
-  }
-  .nr-kind {
-    @apply flex h-[26px] w-[26px] flex-none items-center justify-center rounded-lg bg-[var(--bg)] text-[var(--text-dim)];
-  }
-  .nr-kind .icon {
-    @apply h-3.5 w-3.5;
+    @apply h-2.5 w-2.5 flex-none rounded-full;
   }
   .nr-main {
-    @apply flex min-w-0 flex-1 flex-col gap-px;
-  }
-  .nr-title-line {
-    @apply flex items-baseline gap-1.5;
+    @apply flex min-w-0 flex-1 flex-col gap-2;
   }
   .nr-title {
-    @apply overflow-hidden text-ellipsis whitespace-nowrap text-[0.875rem] font-semibold text-[var(--text)];
-  }
-  .nr-badge {
-    @apply flex-none rounded-full bg-[var(--bg)] px-1.5 py-px text-[0.625rem] font-bold uppercase tracking-wide text-[var(--text-dim)];
+    @apply overflow-hidden text-ellipsis whitespace-nowrap text-[0.9rem] font-semibold text-[var(--text)];
   }
   .nr-preview {
-    @apply overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[0.8125rem] text-[var(--text-dim)];
+    @apply overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[0.825rem] text-[var(--text-dim)];
+  }
+  /* Bọc ngày + cụm action thành 1 cột bên phải (thay vì 2 sibling ngang có khoảng trống ẩn khi
+     action đang opacity-0) — self-stretch để cao bằng .nr-main, ngày luôn sát mép phải thật kể
+     cả khi không hover, action hiện đè xuống dưới ngày lúc hover, không che. */
+  .nr-trailing {
+    @apply flex flex-none flex-col items-end justify-center gap-[3px] self-stretch;
   }
   .nr-date {
-    @apply w-12 flex-none text-right text-[0.75rem] text-[var(--text-dim)] opacity-70;
+    @apply flex-none whitespace-nowrap text-right text-[0.75rem] text-[var(--text-dim)];
   }
   .nr-actions {
     @apply flex flex-none items-center gap-[3px] opacity-0 transition-opacity duration-150;

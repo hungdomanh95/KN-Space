@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Check, Copy, Eye, EyeOff, FileText, GripVertical, Link2, Lock, Pencil, Trash2 } from 'lucide-react';
+import { Check, Copy, Eye, EyeOff, GripVertical, Pencil, Trash2 } from 'lucide-react';
 import { useAppState } from '../../state/AppStateContext';
 import { useMobileLayout } from '../../layout/useMobileLayout';
 import { MemberAvatar } from '../../components/MemberAvatar';
-import { detectNoteKind, formatNoteDate, notePreviewText } from './noteUtils';
+import { formatNoteDate, notePreviewText } from './noteUtils';
 import type { Note, NoteSortBy } from '../../types';
 
 interface NoteRowProps {
@@ -18,9 +18,6 @@ interface NoteRowProps {
   /** Chỉ truyền khi shared space + note của người khác */
   creatorInfo?: { name: string; color: string };
 }
-
-const KIND_ICON = { hidden: Lock, link: Link2, text: FileText } as const;
-const KIND_LABEL = { hidden: 'Ẩn', link: 'Link', text: 'Ghi chú' } as const;
 
 const COPIED_FEEDBACK_MS = 1200;
 
@@ -57,8 +54,6 @@ export function NoteRow({
   const isHidden = note.hidden;
   const isDragging = draggedId === note.id;
   const isDragSource = draggedId !== null && draggedId !== note.id;
-  const kind = detectNoteKind(isHidden, note.content);
-  const KindIcon = KIND_ICON[kind];
 
   function armDraggable() {
     if (rowRef.current) rowRef.current.draggable = true;
@@ -131,14 +126,8 @@ export function NoteRow({
         </span>
       )}
       <span className="nr-dot" style={{ background: note.color }} />
-      <span className="nr-kind">
-        <KindIcon className="icon" size={14} />
-      </span>
       <div className="nr-main">
-        <div className="nr-title-line">
-          <span className="nr-title" title={note.title}>{note.title}</span>
-          <span className="nr-badge">{KIND_LABEL[kind]}</span>
-        </div>
+        <span className="nr-title" title={note.title}>{note.title}</span>
         <div className="nr-preview" title={isHidden ? undefined : notePreviewText(isHidden, note.content)}>
           {notePreviewText(isHidden, note.content)}
         </div>
@@ -148,25 +137,27 @@ export function NoteRow({
           <MemberAvatar name={creatorInfo.name} color={creatorInfo.color} size={18} />
         </span>
       )}
-      {note.updatedAt > 0 && <span className="nr-date">{formatNoteDate(note.updatedAt)}</span>}
-      <div className="nr-actions" onClick={(e) => e.stopPropagation()}>
-        <button className="icon-btn" title="Copy nội dung" aria-label="Copy nội dung" onClick={handleCopyWhole}>
-          {copied ? <Check className="icon" size={13} /> : <Copy className="icon" size={13} />}
-        </button>
-        <button
-          className="icon-btn"
-          title={isHidden ? 'Hiện nội dung' : 'Ẩn nội dung'}
-          aria-label={isHidden ? 'Hiện nội dung' : 'Ẩn nội dung'}
-          onClick={() => dispatch({ type: 'NOTE_TOGGLE_CONTENT_HIDDEN', payload: { id: note.id } })}
-        >
-          {isHidden ? <Eye className="icon" size={13} /> : <EyeOff className="icon" size={13} />}
-        </button>
-        <button className="icon-btn" title="Sửa note" aria-label="Sửa note" onClick={() => onEdit(note)}>
-          <Pencil className="icon" size={13} />
-        </button>
-        <button className="icon-btn" title="Xoá note" aria-label="Xoá note" onClick={() => onDelete(note)}>
-          <Trash2 className="icon" size={13} />
-        </button>
+      <div className="nr-trailing">
+        {note.updatedAt > 0 && <span className="nr-date">{formatNoteDate(note.updatedAt)}</span>}
+        <div className="nr-actions" onClick={(e) => e.stopPropagation()}>
+          <button className="icon-btn" title="Copy nội dung" aria-label="Copy nội dung" onClick={handleCopyWhole}>
+            {copied ? <Check className="icon" size={13} /> : <Copy className="icon" size={13} />}
+          </button>
+          <button
+            className="icon-btn"
+            title={isHidden ? 'Hiện nội dung' : 'Ẩn nội dung'}
+            aria-label={isHidden ? 'Hiện nội dung' : 'Ẩn nội dung'}
+            onClick={() => dispatch({ type: 'NOTE_TOGGLE_CONTENT_HIDDEN', payload: { id: note.id } })}
+          >
+            {isHidden ? <Eye className="icon" size={13} /> : <EyeOff className="icon" size={13} />}
+          </button>
+          <button className="icon-btn" title="Sửa note" aria-label="Sửa note" onClick={() => onEdit(note)}>
+            <Pencil className="icon" size={13} />
+          </button>
+          <button className="icon-btn" title="Xoá note" aria-label="Xoá note" onClick={() => onDelete(note)}>
+            <Trash2 className="icon" size={13} />
+          </button>
+        </div>
       </div>
     </div>
   );
